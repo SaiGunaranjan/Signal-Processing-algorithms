@@ -443,6 +443,7 @@ if 1:
     magnitude_spectrum = np.abs(spectrum)
     phase_spectrum = np.unwrap(np.angle(spectrum))
     
+    
     spectrum_iaa_nr = iaa_approx_nonrecursive(received_signal, digital_freq_grid) # non-recursive IAA
 #    spectrum_iaa_nr = np.flipud(spectrum_iaa_nr)
     magnitude_spectrum_iaa_nr = np.abs(spectrum_iaa_nr)
@@ -477,7 +478,7 @@ if 1:
     
     
     plt.figure(3)
-    plt.title('Magnitude Spectrum from APES')
+    plt.title('Magnitude Spectrum')
     plt.plot(digital_freq_grid, 20*np.log10(magnitude_spectrum),alpha=0.7, label = 'APES')
     plt.plot(digital_freq_grid, 20*np.log10(magnitude_spectrum_iaa_nr),alpha=0.7, label = 'approx non-recursive IAA')
     plt.plot(digital_freq_grid, 20*np.log10(magnitude_spectrum_iaa),alpha=0.7, label = 'Recursive IAA')

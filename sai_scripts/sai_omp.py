@@ -66,6 +66,7 @@ def OMP(dictionary_matrix, y_vec, threshold):
     x_vec_est = np.zeros(dictionary.shape[1]).astype('complex64')[:,None]
     error_iter = []
     res_err_cond = True
+    count = 1
     while res_err_cond:
         ind = np.argmax(np.abs(np.matmul(np.conj(dictionary.T), residue))) # Look for the column with maximum projection on the y/residue vector
         col_index.append(ind) # Store the column index
@@ -76,6 +77,8 @@ def OMP(dictionary_matrix, y_vec, threshold):
         err = np.linalg.norm(residue_mat[:,-1] - residue_mat[:,-2]) # check the error in the residue across iterations to check if the residue is changing 
         res_err_cond =  err > threshold # check if the change in residue/error is below a particular threshold. Then stop
         error_iter.append(err)
+        print(count)
+        count+=1
 #    valid_col_ind = np.sort(np.array(col_index))
 #    z_est_sorted = z_est[np.argsort(np.array(col_index))]
 #    x_vec_est[valid_col_ind] = z_est_sorted
@@ -136,21 +139,21 @@ def mutual_coherence(dictionary):
 
 if 1:
     plt.close('all')
-    num_rows = 30 # 16
-    num_cols = 500 # 356
+    num_rows = 208 # 16
+    num_cols = 4241 # 356
     dictionary = np.random.randn(num_rows, num_cols)
     dictionary = dictionary/np.linalg.norm(dictionary,axis=0)
-    sparsity = 3
+    sparsity = 5
     non_zero_ind = np.random.randint(num_cols, size = sparsity)
     x_vec = np.zeros((num_cols,1))
     x_vec[non_zero_ind,:] = 1
     y_vec = np.matmul(dictionary, x_vec)
-#    threshold = 1e-3
-#    x_vec_est, error_iter = OMP(dictionary, y_vec, threshold)
-    #x_vec_est, error_iter = MP(dictionary, y_vec, threshold)
-    threshold = 1e1
-    y_vec = y_vec/np.linalg.norm(y_vec,axis=0)
-    x_vec_est, error_iter = MP_covariance(dictionary, y_vec, threshold)
+    threshold = 1e-3
+    x_vec_est, error_iter = OMP(dictionary, y_vec, threshold)
+#    x_vec_est, error_iter = MP(dictionary, y_vec, threshold)
+#    threshold = 1e1
+#    y_vec = y_vec/np.linalg.norm(y_vec,axis=0)
+#    x_vec_est, error_iter = MP_covariance(dictionary, y_vec, threshold)
     
     print('True Col Ind: ', non_zero_ind,  'Estimated Col Ind: ', np.nonzero(x_vec_est)[0])
     
