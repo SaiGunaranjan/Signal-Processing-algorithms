@@ -6,8 +6,9 @@ Created on Tue Mar 26 23:34:33 2019
 """
 import numpy as np
 import matplotlib.pyplot as plt
-from sai_omp import OMP as omp
+from compressive_sensing_lib import OMP as omp
 
+""" This scheme has some logical bugs and results are not satisfactory. Need to debug this"""
 
 plt.close('all')
 num_sources = 3

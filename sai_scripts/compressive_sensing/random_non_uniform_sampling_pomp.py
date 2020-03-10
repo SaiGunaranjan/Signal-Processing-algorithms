@@ -5,9 +5,12 @@ Created on Wed Mar 27 23:29:48 2019
 @author: Sai Gunaranjan Pelluri
 """
 import numpy as np
-from sai_omp import OMP as omp
+from compressive_sensing_lib import OMP as omp
+import sachin_pomp
 import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
+
+plt.close('all')
 
 num_sources = 2
 object_snr = np.array([40,40])#np.random.randint(low=20,high=80,size=num_sources)
@@ -17,14 +20,14 @@ noise_sigma = np.sqrt(noise_variance)
 weights = noise_variance*10**(object_snr/10)
 num_signal_samples = 128
 num_cols_signal_dict = 1500#num_signal_samples
-num_subsampled_measurements = 32#num_signal_samples//4
+num_subsampled_measurements = 128#32#num_signal_samples//4
 num_rows_random_sampl_mat = num_subsampled_measurements
 num_cols_random_sampl_mat = num_signal_samples
 omp_threshold = 2e-1
 eps = 2e-3
 dig_freq_resol = 2*np.pi/num_cols_signal_dict 
 freq_grid = np.linspace(-np.pi,np.pi,num_cols_signal_dict) #np.arange(-np.pi,np.pi,dig_freq_resol)#create a uniform grid of digital frequencies spaced 'dig_freq_resol' apart
-sig_freq_ind = np.random.randint(num_cols_signal_dict, size=num_sources)#np.array([393,398])#np.random.randint(num_cols_signal_dict, size=num_sources) # select randomly from these discrete digital frequencies based on the number of sources given
+sig_freq_ind = np.array([400,420])#np.random.randint(num_cols_signal_dict, size=num_sources) # select randomly from these discrete digital frequencies based on the number of sources given
 sig_freq = freq_grid[sig_freq_ind] # select randomly from these discrete digital frequencies based on the number of sources given
 signal_gen_matrix = np.exp(1j*np.matmul(np.arange(num_signal_samples)[:,None], freq_grid[None,:])) # Fat vandermode matrix from whose column space the signal is generated
 
@@ -60,8 +63,17 @@ mod_sparse_coeff_vec_ls = np.zeros((num_cols_signal_dict)).astype('complex64')
 mod_sparse_coeff_vec_ls[cols_est_ls] = sparse_coeff_vec_ls[cols_est_ls]
 est_dopp_signal_ls = np.matmul(signal_gen_matrix,mod_sparse_coeff_vec_ls)
 
+
+overall_mat_normalized=overall_mat/np.linalg.norm(overall_mat,axis=0)[None,:]
+mu, G = sachin_pomp.mutual_coherence(overall_mat)
+phi_max = 1/2*np.arccos(mu)*np.ones(overall_mat.shape[1])
+pomp_num_iters = 40
+pomp_tol = 1e-60
+residual_threshold = 1e-4
+xhat, xhat_all, x_nonzInd = sachin_pomp.POMP_sai(overall_mat_normalized, sub_sampl_signal, pomp_num_iters, phi_max, pomp_tol, residual_threshold)
+
 fft_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/num_signal_samples)
-plt.figure(10)
+plt.figure(1)
 plt.plot(fft_freq_grid,20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(dopp_signal_with_noise)))),label='True Dopp Signal Spectrum')
 plt.plot(fft_freq_grid,10+20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(est_dopp_signal)))),label='Est Dopp Signal Spectrum using OMP method')
 plt.plot(fft_freq_grid,40+20*np.log10(eps+np.abs(np.fft.fftshift(np.fft.fft(est_dopp_signal_ls)))),label='Est Dopp Signal Spectrum using Least squares')

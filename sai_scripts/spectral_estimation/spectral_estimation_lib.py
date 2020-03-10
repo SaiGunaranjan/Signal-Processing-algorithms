@@ -5,11 +5,8 @@ Created on Tue Mar 19 21:06:12 2019
 @author: Sai Gunaranjan Pelluri
 """
 import numpy as np
-#import sai_spectral_estimation as spec_est
-import matplotlib.pyplot as plt
-import time
 
-### Predefined functions
+
 
 def sts_correlate(x):
     N= x.shape[1]
@@ -31,6 +28,75 @@ def vtoeplitz(toprow):
         ACM[:,i:,i]= toprow[:,0:Npts-i]
     
     return ACM
+
+
+def solve_levinson_durbin(toeplitz_matrix, y_vec):
+    '''
+    Solves for Tx = y
+     inputs:
+         toeplitz matrix (T): NxN
+         y_vec : numpy array of length N
+     outputs:
+         solution vector x: numpy array of length N
+     
+        Refer wiki page: https://en.wikipedia.org/wiki/Levinson_recursion # for a simple and elegant understanding and implemenation of the algo
+        Refer https://github.com/topisani/OTTO/pull/104/files/c5985545bb39de2a27689066150a5caac0c1fdf9 for the cpp implemenation of the algo
+    
+    '''
+    corr_mat = toeplitz_matrix.copy()
+    num_iter = corr_mat.shape[0] # N
+    inv_fact = 1/corr_mat[0,0] # 1/t0
+    backward_vec = inv_fact
+    forward_vec = inv_fact
+    x_vec = y_vec[0]*inv_fact # x_vec = y[0]/t0
+    for iter_count in np.arange(2,num_iter+1):
+        forward_error = np.dot(corr_mat[iter_count-1:0:-1,0],forward_vec) # inner product between the forward vector from previous iteration and a flipped version of the 0th column of the corr_mat 
+        backward_error = np.dot(corr_mat[0,1:iter_count],backward_vec) # inner product between the backward vector from previous iteration and the 0th row of the corr_mat 
+        error_fact = 1/(1-(backward_error*forward_error))
+        prev_iter_forward_vec = forward_vec.copy()
+        forward_vec = error_fact*np.append(forward_vec,0) - forward_error*error_fact*np.append(0,backward_vec) # forward vector update
+        backward_vec = error_fact*np.append(0,backward_vec) - backward_error*error_fact*np.append(prev_iter_forward_vec,0) # backward vector update
+        error_x_vec = np.dot(x_vec,corr_mat[iter_count-1,0:iter_count-1]) # error in the xvector
+        x_vec = np.append(x_vec,0) + (y_vec[iter_count-1]-error_x_vec)*backward_vec # x_vec update
+        
+    return x_vec
+
+def solve_levinson_durbin_ymatrix(toeplitz_matrix, y_vector):
+    '''
+    Solves for Tx = y
+     inputs:
+         toeplitz matrix (T): NxN
+         y_vec : numpy array of shape N x M : M is the number of different y's
+     outputs:
+         solution vector x: numpy array of length N
+     
+        Refer wiki page: https://en.wikipedia.org/wiki/Levinson_recursion # for a simple and elegant understanding and implemenation of the algo
+        Refer https://github.com/topisani/OTTO/pull/104/files/c5985545bb39de2a27689066150a5caac0c1fdf9 for the cpp implemenation of the algo
+    
+    '''
+    corr_mat = toeplitz_matrix.copy()
+    y_vec = y_vector.copy()
+    num_iter = corr_mat.shape[0] # N
+    inv_fact = 1/corr_mat[0,0] # 1/t0
+    num_sols = y_vec.shape[1]
+    x_mat = np.zeros((0,num_iter)).astype('complex64')
+    for ele in np.arange(num_sols):
+        backward_vec = inv_fact
+        forward_vec = inv_fact
+        x_vec = y_vec[0,ele]*inv_fact # x_vec = y[0]/t0
+        for iter_count in np.arange(2,num_iter+1):
+            forward_error = np.dot(corr_mat[iter_count-1:0:-1,0],forward_vec) # inner product between the forward vector from previous iteration and a flipped version of the 0th column of the corr_mat 
+            backward_error = np.dot(corr_mat[0,1:iter_count],backward_vec) # inner product between the backward vector from previous iteration and the 0th row of the corr_mat 
+            error_fact = 1/(1-(backward_error*forward_error))
+            prev_iter_forward_vec = forward_vec.copy()
+            forward_vec = error_fact*np.append(forward_vec,0) - forward_error*error_fact*np.append(0,backward_vec) # forward vector update
+            backward_vec = error_fact*np.append(0,backward_vec) - backward_error*error_fact*np.append(prev_iter_forward_vec,0) # backward vector update
+            error_x_vec = np.dot(x_vec,corr_mat[iter_count-1,0:iter_count-1]) # error in the xvector
+            x_vec = np.append(x_vec,0) + (y_vec[iter_count-1,ele]-error_x_vec)*backward_vec # x_vec update
+        x_mat = np.vstack((x_mat,x_vec))
+    final_x_mat = x_mat.T
+    
+    return final_x_mat
 
 
 def music_toeplitz(received_signal, num_sources, digital_freq_grid):
@@ -214,177 +280,89 @@ def apes(received_signal, corr_mat_model_order, digital_freq_grid):
     return spectrum
 
 
-
-
-
-
-
-
-
-
-#######
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-plt.close('all')
-
-SNR = np.arange(25,26)#np.arange(-5,25,2)
-num_samples = 256#1024
-signal_power = 1
-num_montecarlo = 3#100
-num_sources = 2
-corr_mat_model_order = 100 # corr_mat_model_order : must be strictly less than half the signal length
-fft_freq_resol = 2*np.pi/num_samples
-min_dig_freq_step_size = fft_freq_resol/10
-digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(100*num_samples))
-dig_freq_steps = np.arange(min_dig_freq_step_size,fft_freq_resol,min_dig_freq_step_size)
-
-rmse_fft_snr = np.zeros((0,len(dig_freq_steps)))
-rmse_music_snr = np.zeros((0,len(dig_freq_steps)))
-rmse_esprit_snr = np.zeros((0,len(dig_freq_steps)))
-rmse_capon_snr = np.zeros((0,len(dig_freq_steps)))
-rmse_apes_snr = np.zeros((0,len(dig_freq_steps)))
-
-rmse_fft_snr_sec_source = np.zeros((0,len(dig_freq_steps)))
-rmse_music_snr_sec_source = np.zeros((0,len(dig_freq_steps)))
-rmse_esprit_snr_sec_source = np.zeros((0,len(dig_freq_steps)))
-rmse_capon_snr_sec_source = np.zeros((0,len(dig_freq_steps)))
-rmse_apes_snr_sec_source = np.zeros((0,len(dig_freq_steps)))
-tstart = time.time()
-for snr in SNR:
-    noise_power = 10**(-snr/10)
-    noise_sigma = np.sqrt(noise_power)
-    error_fft = []
-    error_music = []
-    error_esprit = []
-    error_capon = []
-    error_apes = []
-    error_fft_sec_source = []
-    error_music_sec_source = []
-    error_esprit_sec_source = []
-    error_capon_sec_source = []
-    error_apes_sec_source = []
+def iaa_approx_nonrecursive(received_signal, digital_freq_grid):
+    '''corr_mat_model_order : must be strictly less than half then signal length'''
+    signal_length = len(received_signal)
+    auto_corr_vec = sts_correlate(received_signal.T) # Generate the auto-correlation vector of the same length as the signal
+    auto_corr_matrix = vtoeplitz(auto_corr_vec) # Create a toeplitz matrix which is variant of the Auto-correlation matrix
+    auto_corr_matrix = auto_corr_matrix[0,:,:]    
+    auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
+    vandermonde_matrix = np.exp(1j*np.outer(np.arange(signal_length),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies. Notice the posititve sign inside the exponential
+    Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv, received_signal),axis=0)
+    Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv,vandermonde_matrix),axis=0)
+#    spectrum = Ah_Rinv_G/((1-Gh_Rinv_G)*Ah_Rinv_A + np.abs(Ah_Rinv_G)**2) # Actual APES based spectrum
+    spectrum = Ah_Rinv_y/Ah_Rinv_A 
     
-    rmse_fft_res = []
-    rmse_music_res = []
-    rmse_esprit_res = []
-    rmse_capon_res = []
-    rmse_apes_res = []
-    rmse_fft_res_sec_source = []
-    rmse_music_res_sec_source = []
-    rmse_esprit_res_sec_source = []
-    rmse_capon_res_sec_source = []
-    rmse_apes_res_sec_source = []
-    
-    for dig_freq_delta in dig_freq_steps:
-        dig_freq = np.random.uniform(-np.pi, np.pi)
-        second_source_dig_freq = dig_freq + dig_freq_delta
-        signal1 = np.exp(1j*dig_freq*np.arange(num_samples))
-        signal2 = np.exp(1j*second_source_dig_freq*np.arange(num_samples))
-        signal = (signal1 + signal2)/np.sqrt(num_samples)
-        for iteration in np.arange(num_montecarlo):
-            noise = np.random.normal(0,noise_sigma/np.sqrt(2),num_samples) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),num_samples)
-            noisy_signal = (signal + noise)[:,None]
-            fft_indices = np.argsort(np.abs(np.fft.fft(noisy_signal,axis=0)),axis=0)[-num_sources::]
-            est_dig_freq_fft = (2*np.pi/num_samples)*np.array([fft_index if fft_index <= num_samples//2 else fft_index-num_samples for fft_index in fft_indices])
-            pseudo_spectrum = music_backward(noisy_signal, num_sources, corr_mat_model_order, digital_freq_grid)
-            est_dig_freq_music = digital_freq_grid[np.argsort(pseudo_spectrum)[-num_sources::]]
-            est_dig_freq_esprit = -1*esprit_backward(noisy_signal, num_sources, corr_mat_model_order)
-            psd_b = capon_backward(noisy_signal, corr_mat_model_order, digital_freq_grid)
-            est_dig_freq_capon = digital_freq_grid[np.argsort(psd_b)[-num_sources::]]
-            spectrum = apes(noisy_signal, corr_mat_model_order, digital_freq_grid)
-            magnitude_spectrum = np.abs(spectrum)
-            est_dig_freq_apes = digital_freq_grid[np.argsort(magnitude_spectrum)[-num_sources::]]
-            
-            error_fft.append(dig_freq-np.amin(est_dig_freq_fft))
-            error_music.append(dig_freq-np.amin(est_dig_freq_music))
-            error_esprit.append(dig_freq-np.amin(est_dig_freq_esprit))
-            error_capon.append(dig_freq-np.amin(est_dig_freq_capon))
-            error_apes.append(dig_freq-np.amin(est_dig_freq_apes))
-    
-            error_fft_sec_source.append(second_source_dig_freq-np.amax(est_dig_freq_fft))
-            error_music_sec_source.append(second_source_dig_freq-np.amax(est_dig_freq_music))
-            error_esprit_sec_source.append(second_source_dig_freq-np.amax(est_dig_freq_esprit))
-            error_capon_sec_source.append(second_source_dig_freq-np.amax(est_dig_freq_capon))
-            error_apes_sec_source.append(second_source_dig_freq-np.amax(est_dig_freq_apes))
-        
-        rmse_fft =  np.sqrt(np.sum(np.array(error_fft)**2)/num_montecarlo)
-        rmse_music =  np.sqrt(np.sum(np.array(error_music)**2)/num_montecarlo)
-        rmse_esprit =  np.sqrt(np.sum(np.array(error_esprit)**2)/num_montecarlo)
-        rmse_capon =  np.sqrt(np.sum(np.array(error_capon)**2)/num_montecarlo)
-        rmse_apes =  np.sqrt(np.sum(np.array(error_apes)**2)/num_montecarlo)
-    
-        rmse_fft_sec_source =  np.sqrt(np.sum(np.array(error_fft_sec_source)**2)/num_montecarlo)
-        rmse_music_sec_source =  np.sqrt(np.sum(np.array(error_music_sec_source)**2)/num_montecarlo)
-        rmse_esprit_sec_source =  np.sqrt(np.sum(np.array(error_esprit_sec_source)**2)/num_montecarlo)
-        rmse_capon_sec_source =  np.sqrt(np.sum(np.array(error_capon_sec_source)**2)/num_montecarlo)
-        rmse_apes_sec_source =  np.sqrt(np.sum(np.array(error_apes_sec_source)**2)/num_montecarlo)
-        
-        rmse_fft_res.append(rmse_fft)
-        rmse_music_res.append(rmse_music)
-        rmse_esprit_res.append(rmse_esprit)
-        rmse_capon_res.append(rmse_capon)
-        rmse_apes_res.append(rmse_apes)
-    
-    
-        rmse_fft_res_sec_source.append(rmse_fft_sec_source)
-        rmse_music_res_sec_source.append(rmse_music_sec_source)
-        rmse_esprit_res_sec_source.append(rmse_esprit_sec_source)
-        rmse_capon_res_sec_source.append(rmse_capon_sec_source)
-        rmse_apes_res_sec_source.append(rmse_apes_sec_source)
-        
-        
-    
-    rmse_fft_snr = np.vstack((rmse_fft_snr,rmse_fft_res))
-    rmse_music_snr = np.vstack((rmse_music_snr,rmse_music_res))
-    rmse_esprit_snr = np.vstack((rmse_esprit_snr,rmse_esprit_res))
-    rmse_capon_snr = np.vstack((rmse_capon_snr,rmse_capon_res))
-    rmse_apes_snr = np.vstack((rmse_apes_snr,rmse_apes_res))
+    return spectrum
 
 
-    rmse_fft_snr_sec_source = np.vstack((rmse_fft_snr_sec_source,rmse_fft_res_sec_source))
-    rmse_music_snr_sec_source = np.vstack((rmse_music_snr_sec_source,rmse_music_res_sec_source))
-    rmse_esprit_snr_sec_source = np.vstack((rmse_esprit_snr_sec_source,rmse_esprit_res_sec_source))
-    rmse_capon_snr_sec_source = np.vstack((rmse_capon_snr_sec_source,rmse_capon_res_sec_source))
-    rmse_apes_snr_sec_source = np.vstack((rmse_apes_snr_sec_source,rmse_apes_res_sec_source))
+def iaa_approx_recursive_computeheavy(received_signal, digital_freq_grid, iterations):
+    '''corr_mat_model_order : must be strictly less than half the signal length'''
+    signal_length = len(received_signal)
+    num_freq_grid_points = len(digital_freq_grid)
+    spectrum = np.fft.fftshift(np.fft.fft(received_signal.squeeze(),num_freq_grid_points)/(signal_length),axes=(0,))
+    vandermonde_matrix = np.exp(1j*np.outer(np.arange(signal_length),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies. Notice the posititve sign inside the exponential
+    for iter_num in np.arange(iterations):
+        power_vals = np.abs(spectrum)**2
+        diagonal_mat_power_vals = np.diag(power_vals)
+        A_P_Ah = np.matmul(vandermonde_matrix,np.matmul(diagonal_mat_power_vals,vandermonde_matrix.T.conj()))
+        auto_corr_matrix = A_P_Ah.copy()
+        auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
+        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv, received_signal),axis=0)
+        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv,vandermonde_matrix),axis=0)
+        spectrum = Ah_Rinv_y/Ah_Rinv_A 
     
-tend = time.time()
-print("Time elapsed = {} secs".format(np.round((tend-tstart)*10)/10))
+    return spectrum
 
 
-      
-plt.figure(1)
-plt.subplot(121)
-plt.title('First source')
-#plt.plot(dig_freq_steps, rmse_fft_snr.squeeze(),'o-',label='FFT')
-#plt.plot(dig_freq_steps, rmse_music_snr.squeeze(),'o-',label='MUSIC')
-#plt.plot(dig_freq_steps, rmse_esprit_snr.squeeze(),'o-',label='ESPRIT')
-plt.plot(dig_freq_steps, rmse_capon_snr.squeeze(),'o-',label='CAPON')
-plt.plot(dig_freq_steps, rmse_apes_snr.squeeze(),'o-',label='APES')
-plt.xlabel('Digital Freq Resol (rad/samp)')
-plt.ylabel('RMSE')
-plt.legend()
-plt.grid(True)
+def iaa_recursive(received_signal, digital_freq_grid, iterations):
+    '''corr_mat_model_order : must be strictly less than half the signal length'''
+    signal_length = len(received_signal)
+    num_freq_grid_points = len(digital_freq_grid)    
+    spectrum = np.fft.fftshift(np.fft.fft(received_signal.squeeze(),num_freq_grid_points)/(signal_length),axes=(0,))
+#    spectrum = np.ones(num_freq_grid_points)
+    vandermonde_matrix = np.exp(1j*np.outer(np.arange(signal_length),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies. Notice the posititve sign inside the exponential
+    for iter_num in np.arange(iterations):
+        spectrum_without_fftshift = np.fft.fftshift(spectrum,axes=(0,))
+        power_vals = np.abs(spectrum_without_fftshift)**2
+        double_sided_corr_vect = np.fft.fft(power_vals,num_freq_grid_points)/(num_freq_grid_points)
+        single_sided_corr_vec = double_sided_corr_vect[0:signal_length] # r0,r1,..rM-1
+        auto_corr_matrix = vtoeplitz(single_sided_corr_vec[None,:])[0,:,:].T
+        auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
+        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv, received_signal),axis=0)
+        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv,vandermonde_matrix),axis=0)
+        spectrum = Ah_Rinv_y/Ah_Rinv_A
+        print(iter_num)
+    return spectrum
 
-plt.subplot(122)
-plt.title('Second source')
-#plt.plot(dig_freq_steps, rmse_fft_snr_sec_source.squeeze(),'o-',label='FFT')
-#plt.plot(dig_freq_steps, rmse_music_snr_sec_source.squeeze(),'o-',label='MUSIC')
-#plt.plot(dig_freq_steps, rmse_esprit_snr_sec_source.squeeze(),'o-',label='ESPRIT')
-plt.plot(dig_freq_steps, rmse_capon_snr_sec_source.squeeze(),'o-',label='CAPON')
-plt.plot(dig_freq_steps, rmse_apes_snr_sec_source.squeeze(),'o-',label='APES')
-plt.xlabel('Digital Freq Resol (rad/samp)')
-plt.ylabel('RMSE')
-plt.legend()
-plt.grid(True)
+
+def iaa_recursive_levinson_temp(received_signal, digital_freq_grid, iterations):
+    '''corr_mat_model_order : must be strictly less than half then signal length'''
+    signal_length = len(received_signal)
+    num_freq_grid_points = len(digital_freq_grid)    
+    spectrum = np.fft.fftshift(np.fft.fft(received_signal.squeeze(),num_freq_grid_points)/(signal_length),axes=(0,))
+#    spectrum = np.ones(num_freq_grid_points)
+    vandermonde_matrix = np.exp(1j*np.outer(np.arange(signal_length),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies. Notice the posititve sign inside the exponential
+    for iter_num in np.arange(iterations):
+        spectrum_without_fftshift = np.fft.fftshift(spectrum,axes=(0,))
+        power_vals = np.abs(spectrum_without_fftshift)**2
+        double_sided_corr_vect = np.fft.fft(power_vals,num_freq_grid_points)/(num_freq_grid_points)
+        single_sided_corr_vec = double_sided_corr_vect[0:signal_length] # r0,r1,..rM-1
+        auto_corr_matrix = vtoeplitz(single_sided_corr_vec[None,:])[0,:,:].T
+#        auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
+        Rinv_y = solve_levinson_durbin(auto_corr_matrix, received_signal.squeeze())
+        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*Rinv_y[:,None],axis=0)
+        Rinv_A = solve_levinson_durbin_ymatrix(auto_corr_matrix, vandermonde_matrix)
+        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*Rinv_A,axis=0)
+        spectrum = Ah_Rinv_y/Ah_Rinv_A
+        print(iter_num)
+    return spectrum
+
+
+
+
+
+
+
+
+
