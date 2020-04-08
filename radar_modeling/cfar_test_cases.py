@@ -53,7 +53,8 @@ if 0:
     plt.figure(1)
     plt.title('CFAR OS')
     plt.plot(freq_grid,20*np.log10(np.abs(FFT_SignalVector)))
-    plt.plot(det_freq,20*np.log10(np.abs(FFT_SignalVector[det_indices[0]])),'rD')
+    plt.plot(det_freq,20*np.log10(np.abs(FFT_SignalVector[det_indices[0]])),'rD', label='CFAR detected peaks');
+    plt.legend()
     plt.xlabel('Frequency in Hz')
     plt.ylabel('Power (dB)')
     plt.grid(True)
@@ -63,9 +64,10 @@ if 0:
     det_freq = det_indices[0]*fs/(2*num_fft)
     print('True frequencies: ', freq_vec, 'Estimated frequencies: ', det_freq)
     plt.figure(2)
-    plt.title('CFAR CA sai')
+    plt.title('CFAR CA')
     plt.plot(freq_grid,20*np.log10(np.abs(FFT_SignalVector)))
-    plt.plot(det_freq,20*np.log10(np.abs(FFT_SignalVector[det_indices[0]])),'rD')
+    plt.plot(det_freq,20*np.log10(np.abs(FFT_SignalVector[det_indices[0]])),'rD',label='CFAR detected peaks')
+    plt.legend()
     plt.xlabel('Frequency in Hz')
     plt.ylabel('Power (dB)')
     plt.grid(True)
@@ -104,8 +106,8 @@ if 0:
     wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),num_fft*num_ramps) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),num_fft*num_ramps)
     noise_signal = wgn_noise.reshape(num_fft,num_ramps)
     radar_signal = radar_signal + noise_signal
-    radar_signal_range_fft = np.fft.fft(radar_signal,axis=0)
-    radar_signal_range_fft_dopp_fft = np.fft.fft(radar_signal_range_fft,axis=1)
+    radar_signal_range_fft = np.fft.fft(radar_signal,axis=0)/num_fft
+    radar_signal_range_fft_dopp_fft = np.fft.fft(radar_signal_range_fft,axis=1)/num_ramps
     range_freq_vec[range_freq_vec<0] = range_freq_vec[range_freq_vec<0] + fs_range
     range_bins_ind = (range_freq_vec/(fs_range/num_fft)).astype(int)
     doppler_freq_vec[doppler_freq_vec<0] = doppler_freq_vec[doppler_freq_vec<0] + fs_dopp
@@ -124,8 +126,8 @@ if 0:
     plt.title('CFAR OS 2D')
     plt.imshow(10*np.log10(signal_mag),aspect='auto')
     plt.scatter(det_indices[1],det_indices[0],c='r',marker='*',s=20)
-    print('True range bins:',range_bins_ind, ', CFAR det range bins:', det_indices[0])
-    print('True doppler bins:',doppler_bins_ind, ', CFAR det doppler bins:', det_indices[1])
+    print('True range bins:',range_bins_ind, ', CFAR OS det range bins:', det_indices[0])
+    print('True doppler bins:',doppler_bins_ind, ', CFAR OS det doppler bins:', det_indices[1])
     
     bool_array = cfar_lib.CFAR_CA_2D(signal_mag, guardband_len_x, guardband_len_y, valid_samp_len_x, valid_samp_len_y, false_alarm_rate)
     det_indices = np.where(bool_array>0)
@@ -133,17 +135,17 @@ if 0:
     plt.title('CFAR CA 2D')
     plt.imshow(10*np.log10(signal_mag),aspect='auto')
     plt.scatter(det_indices[1],det_indices[0],c='r',marker='*',s=20)
-    print('True range bins:',range_bins_ind, ', CFAR det range bins:', det_indices[0])
-    print('True doppler bins:',doppler_bins_ind, ', CFAR det doppler bins:', det_indices[1])
+    print('True range bins:',range_bins_ind, ', CFAR CA det range bins:', det_indices[0])
+    print('True doppler bins:',doppler_bins_ind, ', CFAR CA det doppler bins:', det_indices[1])
     
     bool_array = cfar_lib.CFAR_CA_2D_cross(signal_mag, guardband_len_x, guardband_len_y, valid_samp_len_x, valid_samp_len_y, false_alarm_rate)
     det_indices = np.where(bool_array>0)
     plt.figure(3)
     plt.title('CFAR CA 2D cross')
-    plt.imshow(10*np.log10(signal_mag),aspect='auto')
+    plt.imshow(10*np.log10(signal_mag),aspect='auto');
     plt.scatter(det_indices[1],det_indices[0],c='r',marker='*',s=20)
-    print('True range bins:',range_bins_ind, ', CFAR det range bins:', det_indices[0])
-    print('True doppler bins:',doppler_bins_ind, ', CFAR det doppler bins:', det_indices[1])
+    print('True range bins:',range_bins_ind, ', CFAR CA cross det range bins:', det_indices[0])
+    print('True doppler bins:',doppler_bins_ind, ', CFAR CA cross det doppler bins:', det_indices[1])
 
     
 if 0:
