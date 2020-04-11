@@ -119,15 +119,15 @@ def CFAR_OS_2D(signal, guardband_len_x, guardband_len_y, valid_samp_len_x, valid
     count_x = 0
     for signal_index_x in np.arange(signal_shape_cols-1,2*signal_shape_cols-1):
       cut = extend_signal[signal_index_y,signal_index_x]
-      if 1:
-#      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x],   \
-#                                  extend_signal[signal_index_y-1,signal_index_x],   \
-#                                  extend_signal[signal_index_y,signal_index_x+1],   \
-#                                  extend_signal[signal_index_y,signal_index_x-1],   \
-#                                  extend_signal[signal_index_y+1,signal_index_x+1], \
-#                                  extend_signal[signal_index_y+1,signal_index_x-1], \
-#                                  extend_signal[signal_index_y-1,signal_index_x+1], \
-#                                  extend_signal[signal_index_y-1,signal_index_x-1]])):
+      # if 1:
+      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x],   \
+                                  extend_signal[signal_index_y-1,signal_index_x],   \
+                                  extend_signal[signal_index_y,signal_index_x+1],   \
+                                  extend_signal[signal_index_y,signal_index_x-1],   \
+                                  extend_signal[signal_index_y+1,signal_index_x+1], \
+                                  extend_signal[signal_index_y+1,signal_index_x-1], \
+                                  extend_signal[signal_index_y-1,signal_index_x+1], \
+                                  extend_signal[signal_index_y-1,signal_index_x-1]])):
           temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1, \
                                                signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
           sorted_Temp = -1*np.sort(-1*temp.flatten())
@@ -159,7 +159,6 @@ def CFAR_OS_2D_cross(signal, guardband_len_x, guardband_len_y, valid_samp_len_x,
   cfar_window_2_D[valid_samp_len_y+guardband_len_y,:] = CFAR_Window_x
   cfar_window_2_D[:,valid_samp_len_x+guardband_len_x] = CFAR_Window_y
   
-  
   cfar_half_window_len_x =  valid_samp_len_x + guardband_len_x
   cfar_half_window_len_y = valid_samp_len_y + guardband_len_y
   
@@ -172,15 +171,15 @@ def CFAR_OS_2D_cross(signal, guardband_len_x, guardband_len_y, valid_samp_len_x,
     count_x = 0
     for signal_index_x in np.arange(signal_shape_cols-1,2*signal_shape_cols-1):
       cut = extend_signal[signal_index_y,signal_index_x]
-      if 1:
-#      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x],   \
-#                                  extend_signal[signal_index_y-1,signal_index_x],   \
-#                                  extend_signal[signal_index_y,signal_index_x+1],   \
-#                                  extend_signal[signal_index_y,signal_index_x-1],   \
-#                                  extend_signal[signal_index_y+1,signal_index_x+1], \
-#                                  extend_signal[signal_index_y+1,signal_index_x-1], \
-#                                  extend_signal[signal_index_y-1,signal_index_x+1], \
-#                                  extend_signal[signal_index_y-1,signal_index_x-1]])):
+      # if 1:
+      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x],   \
+                                  extend_signal[signal_index_y-1,signal_index_x],   \
+                                  extend_signal[signal_index_y,signal_index_x+1],   \
+                                  extend_signal[signal_index_y,signal_index_x-1],   \
+                                  extend_signal[signal_index_y+1,signal_index_x+1], \
+                                  extend_signal[signal_index_y+1,signal_index_x-1], \
+                                  extend_signal[signal_index_y-1,signal_index_x+1], \
+                                  extend_signal[signal_index_y-1,signal_index_x-1]])):
           temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1, \
                                                signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
           sorted_Temp = -1*np.sort(-1*temp.flatten())
@@ -188,6 +187,9 @@ def CFAR_OS_2D_cross(signal, guardband_len_x, guardband_len_y, valid_samp_len_x,
             Target_BoolVector[count_y,count_x] = 1
       count_x = count_x + 1
     count_y = count_y + 1
+
+  
+  return Target_BoolVector
 
   
   return Target_BoolVector
@@ -208,7 +210,6 @@ def CFAR_CA_2D(signal, guardband_len_x, guardband_len_y, valid_samp_len_x, valid
   window_patch_zeros[guardband_len_y-1,guardband_len_x-1] = 1
   cfar_window_2_D[valid_samp_len_y-1:valid_samp_len_y+2*guardband_len_y,valid_samp_len_x-1:valid_samp_len_x+2*guardband_len_x] = window_patch_zeros
   
-  
   cfar_half_window_len_x =  valid_samp_len_x + guardband_len_x
   cfar_half_window_len_y = valid_samp_len_y + guardband_len_y
   
@@ -221,9 +222,17 @@ def CFAR_CA_2D(signal, guardband_len_x, guardband_len_y, valid_samp_len_x, valid
     count_x = 0
     for signal_index_x in np.arange(signal_shape_cols-1,2*signal_shape_cols-1):
       cut = extend_signal[signal_index_y,signal_index_x]
-      if 1:
-#      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x], extend_signal[signal_index_y-1,signal_index_x], extend_signal[signal_index_y,signal_index_x+1], extend_signal[signal_index_y,signal_index_x-1], extend_signal[signal_index_y+1,signal_index_x+1], extend_signal[signal_index_y+1,signal_index_x-1], extend_signal[signal_index_y-1,signal_index_x+1], extend_signal[signal_index_y-1,signal_index_x-1]])):
-          temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1,signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
+      # if 1:
+      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x], \
+                                  extend_signal[signal_index_y-1,signal_index_x], \
+                                      extend_signal[signal_index_y,signal_index_x+1], \
+                                          extend_signal[signal_index_y,signal_index_x-1], \
+                                              extend_signal[signal_index_y+1,signal_index_x+1], \
+                                                  extend_signal[signal_index_y+1,signal_index_x-1], \
+                                                      extend_signal[signal_index_y-1,signal_index_x+1], \
+                                                          extend_signal[signal_index_y-1,signal_index_x-1]])):
+          temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1, \
+                                               signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
           noise_power = np.sum(temp)/(valid_samp_len_x+valid_samp_len_y)
           if (cut > threshold_alpha*noise_power):
             Target_BoolVector[count_y,count_x] = 1
@@ -253,9 +262,6 @@ def CFAR_CA_2D_cross(signal, guardband_len_x, guardband_len_y, valid_samp_len_x,
   cfar_window_2_D[valid_samp_len_y+guardband_len_y,:] = CFAR_Window_x
   cfar_window_2_D[:,valid_samp_len_x+guardband_len_x] = CFAR_Window_y
   
-
-  
-  
   cfar_half_window_len_x =  valid_samp_len_x + guardband_len_x
   cfar_half_window_len_y = valid_samp_len_y + guardband_len_y
   
@@ -268,14 +274,25 @@ def CFAR_CA_2D_cross(signal, guardband_len_x, guardband_len_y, valid_samp_len_x,
     count_x = 0
     for signal_index_x in np.arange(signal_shape_cols-1,2*signal_shape_cols-1):
       cut = extend_signal[signal_index_y,signal_index_x]
-      if 1:
-#      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x], extend_signal[signal_index_y-1,signal_index_x], extend_signal[signal_index_y,signal_index_x+1], extend_signal[signal_index_y,signal_index_x-1], extend_signal[signal_index_y+1,signal_index_x+1], extend_signal[signal_index_y+1,signal_index_x-1], extend_signal[signal_index_y-1,signal_index_x+1], extend_signal[signal_index_y-1,signal_index_x-1]])):
-          temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1,signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
+      # if 1:
+      if cut >= np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x], \
+                                  extend_signal[signal_index_y-1,signal_index_x], \
+                                      extend_signal[signal_index_y,signal_index_x+1], \
+                                          extend_signal[signal_index_y,signal_index_x-1], \
+                                              extend_signal[signal_index_y+1,signal_index_x+1], \
+                                                  extend_signal[signal_index_y+1,signal_index_x-1], \
+                                                      extend_signal[signal_index_y-1,signal_index_x+1], \
+                                                          extend_signal[signal_index_y-1,signal_index_x-1]])):
+          temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1, \
+                                               signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
           noise_power = np.sum(temp)/(2*(valid_samp_len_x+valid_samp_len_y))
           if (cut > threshold_alpha*noise_power):
             Target_BoolVector[count_y,count_x] = 1
       count_x = count_x + 1
     count_y = count_y + 1
+
+  
+  return Target_BoolVector
 
   
   return Target_BoolVector
@@ -316,7 +333,14 @@ def CFAR_CA_2D_cross_algo_stack(signal, guardband_len_x, guardband_len_y, valid_
     for signal_index_x in np.arange(signal_shape_cols-1,2*signal_shape_cols-1):
       cut = extend_signal[signal_index_y,signal_index_x]
       if local_max_along_x == True and local_max_along_y == True:
-          max_val =  np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x], extend_signal[signal_index_y-1,signal_index_x], extend_signal[signal_index_y,signal_index_x+1], extend_signal[signal_index_y,signal_index_x-1], extend_signal[signal_index_y+1,signal_index_x+1], extend_signal[signal_index_y+1,signal_index_x-1], extend_signal[signal_index_y-1,signal_index_x+1], extend_signal[signal_index_y-1,signal_index_x-1]]))
+          max_val =  np.amax(np.array([extend_signal[signal_index_y+1,signal_index_x], \
+          extend_signal[signal_index_y-1,signal_index_x], \
+          extend_signal[signal_index_y,signal_index_x+1], \
+          extend_signal[signal_index_y,signal_index_x-1], \
+          extend_signal[signal_index_y+1,signal_index_x+1], \
+          extend_signal[signal_index_y+1,signal_index_x-1], \
+          extend_signal[signal_index_y-1,signal_index_x+1], \
+          extend_signal[signal_index_y-1,signal_index_x-1]]))
           if cut >= max_val:
               temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1,signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
               noise_power = np.sum(temp)/(2*(valid_samp_len_x+valid_samp_len_y))
@@ -378,7 +402,8 @@ def CFAR_CA_2D_cross_map(signal, guardband_len_x, guardband_len_y, valid_samp_le
   for signal_index_y in np.arange(signal_shape_rows-1,2*signal_shape_rows-1):
     count_x = 0
     for signal_index_x in np.arange(signal_shape_cols-1,2*signal_shape_cols-1):
-      temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1,signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
+      temp = cfar_window_2_D*extend_signal[signal_index_y-cfar_half_window_len_y:signal_index_y+cfar_half_window_len_y+1, \
+                                           signal_index_x-cfar_half_window_len_x:signal_index_x+cfar_half_window_len_x+1]
       avg_noise_power = np.sum(temp)/(2*(valid_samp_len_x+valid_samp_len_y))
       threshold_map[count_y,count_x] = avg_noise_power
       count_x = count_x + 1
