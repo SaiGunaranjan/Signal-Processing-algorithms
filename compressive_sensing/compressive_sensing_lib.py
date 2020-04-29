@@ -74,10 +74,11 @@ def OMP(dictionary_matrix, y_vec, threshold):
         z_est = np.matmul(np.linalg.pinv(basis), y_vec) # compute the z_est such that z_est = pinv(basis)*y
         residue = y_vec - np.matmul(basis, z_est) # compute the residue/error as y-y^ where y is our measurement vector and y^ = basis*z_est(from previous step)
         residue_mat = np.hstack((residue_mat, residue)) # store the residue vector for each iteration(just to check how the error/residue is changing across ietrations)
-        err = np.linalg.norm(residue_mat[:,-1] - residue_mat[:,-2]) # check the error in the residue across iterations to check if the residue is changing 
+        # err = np.linalg.norm(residue_mat[:,-1] - residue_mat[:,-2]) # check the error in the residue across iterations to check if the residue is changing
+        err = np.linalg.norm(residue)**2
         res_err_cond =  err > threshold # check if the change in residue/error is below a particular threshold. Then stop
         error_iter.append(err)
-        print(count)
+        print('OMP iteration: ',count)
         count+=1
 #    valid_col_ind = np.sort(np.array(col_index))
 #    z_est_sorted = z_est[np.argsort(np.array(col_index))]
