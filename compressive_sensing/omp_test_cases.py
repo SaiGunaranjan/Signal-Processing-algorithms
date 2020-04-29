@@ -34,7 +34,7 @@ if 1:
     
     print('True Col Ind: ', non_zero_ind,  'Estimated Col Ind: ', np.nonzero(x_vec_est)[0])
     
-    plt.figure(1)
+    plt.figure(1,figsize=(20,10))
     plt.plot(x_vec, 'o-')
     plt.plot(np.abs(x_vec_est), '*-')
     plt.grid(True)

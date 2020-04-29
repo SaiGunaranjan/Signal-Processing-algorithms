@@ -12,18 +12,22 @@ from scipy.signal import argrelextrema
 
 plt.close('all')
 
+num_signal_samples = 128
 num_sources = 2
 object_snr = np.array([40,40])#np.random.randint(low=20,high=80,size=num_sources)
 noise_power_db = -40 # Noise Power in dB
+noiseFloorPerBin_dB = noise_power_db - 10*np.log10(num_signal_samples)
 noise_variance = 10**(noise_power_db/10)
 noise_sigma = np.sqrt(noise_variance)
-weights = noise_variance*10**(object_snr/10)
-num_signal_samples = 128
+# weights = noise_variance*10**(object_snr/10)
+weights = np.sqrt(10**((noiseFloorPerBin_dB + object_snr)/10))
+
 num_cols_signal_dict = 1500#num_signal_samples
-num_subsampled_measurements = 128#32#num_signal_samples//4
+num_subsampled_measurements = num_signal_samples//4 #128#32#num_signal_samples//4
 num_rows_random_sampl_mat = num_subsampled_measurements
 num_cols_random_sampl_mat = num_signal_samples
-omp_threshold = 2e-1
+# omp_threshold = 2e-1
+omp_threshold = 10**((noiseFloorPerBin_dB+50)/10);
 eps = 2e-3
 dig_freq_resol = 2*np.pi/num_cols_signal_dict 
 freq_grid = np.linspace(-np.pi,np.pi,num_cols_signal_dict) #np.arange(-np.pi,np.pi,dig_freq_resol)#create a uniform grid of digital frequencies spaced 'dig_freq_resol' apart
@@ -73,11 +77,12 @@ residual_threshold = 1e-4
 xhat, xhat_all, x_nonzInd = sachin_pomp.POMP_sai(overall_mat_normalized, sub_sampl_signal, pomp_num_iters, phi_max, pomp_tol, residual_threshold)
 
 fft_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/num_signal_samples)
-plt.figure(1)
-plt.plot(fft_freq_grid,20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(dopp_signal_with_noise)))),label='True Dopp Signal Spectrum')
-plt.plot(fft_freq_grid,10+20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(est_dopp_signal)))),label='Est Dopp Signal Spectrum using OMP method')
-plt.plot(fft_freq_grid,40+20*np.log10(eps+np.abs(np.fft.fftshift(np.fft.fft(est_dopp_signal_ls)))),label='Est Dopp Signal Spectrum using Least squares')
-plt.vlines(sig_freq,-40,40, label = 'Ground truth')
+plt.figure(1,figsize=(20,10))
+plt.plot(fft_freq_grid,20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(dopp_signal_with_noise)/num_signal_samples))),'-o',label='True Dopp Signal Spectrum')
+plt.plot(fft_freq_grid,20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(est_dopp_signal)/num_signal_samples))),label='Est Dopp Signal Spectrum using OMP method')
+plt.plot(fft_freq_grid,20*np.log10(eps+np.abs(np.fft.fftshift(np.fft.fft(est_dopp_signal_ls)/num_signal_samples))),label='Est Dopp Signal Spectrum using Least squares')
+plt.vlines(sig_freq,-80,20, label = 'Ground truth');
+plt.xlabel('Digital frequency (rad/samp)')
 plt.grid(True)
 plt.legend()
 #plt.figure(3)
