@@ -22,9 +22,11 @@ num_samples = 1024
 num_sources = 3
 object_snr = np.array([20,20,20])
 noise_power_db = -40 # Noise Power in dB
+noiseFloorPerBin_dB = noise_power_db - 10*np.log10(num_samples)
 noise_variance = 10**(noise_power_db/10)
 noise_sigma = np.sqrt(noise_variance)
-weights = noise_sigma*10**(object_snr/10)
+# weights = noise_sigma*10**(object_snr/10)
+weights = np.sqrt(10**((noiseFloorPerBin_dB + object_snr)/10))
 source_freq = np.random.uniform(low=-np.pi, high=np.pi, size = num_sources)
 source_signals = np.matmul(np.exp(-1j*np.outer(np.arange(num_samples),source_freq)),weights[:,None])
 wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape)
@@ -50,7 +52,7 @@ if 0:
     #est_freq = spec_est.esprit_toeplitz(received_signal, num_sources)
 #    est_freq = spec_est.esprit_forward(received_signal, num_sources, corr_mat_model_order)
     est_freq = spec_est.esprit_backward(received_signal, num_sources, corr_mat_model_order)
-    print('True Frequencies:', source_freq, 'Estimated Frequncies:', -est_freq)
+    print('True Frequencies:', source_freq, 'Estimated Frequncies:', est_freq)
 if 0:
 #    psd_f = spec_est.capon_forward(received_signal, corr_mat_model_order, digital_freq_grid)
     psd_b = spec_est.capon_backward(received_signal, corr_mat_model_order, digital_freq_grid)
@@ -72,11 +74,13 @@ if 1:
     plt.close('all')
     num_samples = 32
     num_sources = 2
-    object_snr = np.array([40,40])
+    object_snr = np.array([60,60])
     noise_power_db = -40 # Noise Power in dB
+    noiseFloorPerBin_dB = noise_power_db - 10*np.log10(num_samples)
     noise_variance = 10**(noise_power_db/10)
     noise_sigma = np.sqrt(noise_variance)
-    weights = noise_variance*(10**(object_snr/10))
+    # weights = noise_variance*(10**(object_snr/10))
+    weights = np.sqrt(10**((noiseFloorPerBin_dB + object_snr)/10))
     signal_phases = np.exp(1j*np.random.uniform(low=-np.pi, high = np.pi, size = num_sources))
     complex_signal_amplitudes = weights*signal_phases
     random_freq = np.random.uniform(low=-np.pi, high=np.pi, size = 1)

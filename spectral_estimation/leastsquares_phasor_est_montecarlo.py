@@ -37,11 +37,12 @@ freq_ind_1 = 10#np.random.randint(0,num_chirps_tx1-1);
 num_objects = 2;
 
 noise_power_db = -40; # Noise Power in dB
+noiseFloorPerBin_dB = noise_power_db - 10*np.log10(num_chirps_tx1)
 noise_variance = 10**(noise_power_db/10);
 noise_sigma = np.sqrt(noise_variance);
 
 bin_sep = np.arange(2,14,3);
-SNR = np.arange(-20,30,2);
+SNR = np.arange(15,30,1);
 num_montecarlo = 100;
 
 rmse_amp_tx1_snr_binspace = np.zeros((SNR.shape[0],num_objects,0)).astype('float32');
@@ -66,7 +67,8 @@ for freq_ind_sep in bin_sep:
     
     for snr in SNR:
         object_snr = np.array([snr,snr]);
-        signal_power = noise_variance*10**(object_snr/10);
+        # signal_power = noise_variance*10**(object_snr/10);
+        signal_power = 10**((noiseFloorPerBin_dB + object_snr)/10)
         signal_amp_real = np.sqrt(signal_power);
         random_phase = 2*np.pi*np.random.uniform(-0.5,0.5,num_objects)
         random_phasor = np.exp(1j*random_phase);
@@ -173,7 +175,7 @@ bin_sep_legend = ['bin_sep = ' + str(ele) for ele in bin_sep];
 #plt.legend(bin_sep_legend);
 #plt.grid(True);
 
-plt.figure(2,figsize=(16,9));
+plt.figure(2,figsize=(20,10));
 plt.subplot(1,2,1);
 plt.title('Angle RMSE of 1st object from 128 chirps');
 plt.plot(SNR,rmse_ang_tx1_snr_binspace[:,0,:],'-o');
@@ -210,7 +212,7 @@ plt.legend(bin_sep_legend);
 #plt.legend(bin_sep_legend);
 #plt.grid(True);
 
-plt.figure(4,figsize=(16,9));
+plt.figure(4,figsize=(20,10));
 plt.subplot(1,2,1);
 plt.title('Angle RMSE of 2nd object from 128 chirps');
 plt.plot(SNR,rmse_ang_tx1_snr_binspace[:,1,:],'-o');

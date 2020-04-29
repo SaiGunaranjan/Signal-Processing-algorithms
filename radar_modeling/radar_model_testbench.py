@@ -32,12 +32,12 @@ import matplotlib.pyplot as plt
 plt.close('all')
 
 ## System Parameters
-num_fft = 1024
+num_fft = 512
 num_ramps = 128
 num_rx = 4
 num_tx= 2
-adc_sampling_rate = 12e6 # 
-inter_chirp_time = 62.5e-6 # micro seconds
+adc_sampling_rate = 40e6 # 
+inter_chirp_time = 36.1e-6 # micro seconds
 doppler_fs = 1/inter_chirp_time
 carrier_freq = 76.2e9 # GHz
 speed_light = 3e8 #m/s
@@ -47,6 +47,13 @@ tx_spacing_along_x = num_rx*rx_spacing
 tx_spacing_along_y = 0 #4*rx_spacing#0 #rx_spacing
 az_fs = lamda/rx_spacing
 chirp_sweep_bw = 2e9
+
+vmax = 1 # Signal swing from +1 V to -1 V
+vrms = vmax/(np.sqrt(2))
+terminationImpedence = 50 # in Ohms
+powerWatt = vrms**2/(terminationImpedence) # power in watts
+powermilliWatt = powerWatt/(1e-3)
+dbFstodBm = 10*np.log10(powermilliWatt)
 
 # Derived system specs
 range_resolution = speed_light/(2*chirp_sweep_bw)
@@ -58,16 +65,21 @@ az_ang_resolution = np.arcsin(lamda/(num_rx*rx_spacing))*180/np.pi
 max_az_angle = np.arcsin(lamda/(2*rx_spacing))*180/np.pi
 #max_el_angle = np.arcsin(lamda/(2*tx_spacing_along_y))*180/np.pi
 
-
 num_rx_extend = 128
 
 # user defined parameters
 num_objects = 2
 object_snr = np.array([20,10])
-noise_power_db = -40 # Noise Power in dB
-noise_variance = 10**(noise_power_db/10)
+thermalNoise = -174 # dBm/Hz
+rxGain = 44 # dB
+noiseFigure = 10 # dB
+noise_power_dbm = thermalNoise + rxGain + noiseFigure + 10*np.log10(adc_sampling_rate) # Noise Power in dBm
+noise_power_dbFs = noise_power_dbm - dbFstodBm # Noise power in dbFs
+noiseFloorPerBin_dBm = noise_power_dbm - 10*np.log10(2*num_fft)
+noiseFloorPerBin_dBFs = noiseFloorPerBin_dBm - dbFstodBm
+noise_variance = 10**(noise_power_dbFs/10)
 noise_sigma = np.sqrt(noise_variance)
-weights = np.sqrt(noise_variance*10**(object_snr/10))
+weights = np.sqrt(10**((object_snr + noiseFloorPerBin_dBFs)/10))# np.sqrt(noise_variance*10**(object_snr/10))
 object_range = np.array([12,33]) # range in m # np.array([9.975,19.95]) # range in m
 object_velocity = np.array([11,-6]) # velocity in m/s
 object_theta = np.array([-35,50]) # Theta
@@ -96,14 +108,15 @@ for ele in np.arange(num_objects):
     tx_phase_signal = np.exp(1j*2*np.pi*tx_phase[ele,:]/lamda)
     radar_signal += range_signal[:,None,None,None]*doppler_signal[None,:,None,None]*az_signal[None,None,:,None]*tx_phase_signal[None,None,None,:] # [range, chirps, sensor, tx_phase]
 
-wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),2*num_fft*num_ramps*num_rx*num_tx) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),2*num_fft*num_ramps*num_rx*num_tx)
+# wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),2*num_fft*num_ramps*num_rx*num_tx) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),2*num_fft*num_ramps*num_rx*num_tx)
+wgn_noise = (noise_sigma/np.sqrt(2))*np.random.randn(2*num_fft*num_ramps*num_rx*num_tx) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(2*num_fft*num_ramps*num_rx*num_tx)
 noise_signal = wgn_noise.reshape(2*num_fft,num_ramps,num_rx,num_tx)
 radar_signal = radar_signal + noise_signal
 
 radar_signal_pad = np.pad(radar_signal,((0,0),(0,0),(0,num_rx_extend-num_rx),(0,0)),'constant')
-radar_signal_range_fft = np.fft.fft(radar_signal_pad,axis=0)[0:num_fft,:,:,:]
-radar_signal_range_dopp_fft = np.fft.fft(radar_signal_range_fft,axis=1)
-radar_signal_range_dopp_angle_fft = np.fft.fft(radar_signal_range_dopp_fft,axis=2)
+radar_signal_range_fft = np.fft.fft(radar_signal_pad,axis=0)[0:num_fft,:,:,:]/(2*num_fft)
+radar_signal_range_dopp_fft = np.fft.fft(radar_signal_range_fft,axis=1)/(num_ramps)
+radar_signal_range_dopp_angle_fft = np.fft.fft(radar_signal_range_dopp_fft,axis=2)/(num_rx)
 
 actual_range_bins = (object_range/range_resolution).astype(int)
 object_velocity_0_Fs = object_velocity.copy()
@@ -112,7 +125,15 @@ actual_velocity_bins = (object_velocity_0_Fs/velocity_resolution).astype(int)
 
 
 ext_virt_array = np.hstack((radar_signal_range_dopp_fft[actual_range_bins,actual_velocity_bins,0:num_rx,0],radar_signal_range_dopp_fft[actual_range_bins,actual_velocity_bins,0:num_rx,1]))
-ext_virt_array_pad = np.pad(ext_virt_array,((0,0),(0,num_rx_extend-2*num_rx)),'constant') 
+ext_virt_array_pad = np.pad(ext_virt_array,((0,0),(0,num_rx_extend-2*num_rx)),'constant')
+
+rangeFFT_rmse = 10*np.log10(np.sum(np.abs(radar_signal_range_fft)**2,axis=(1,2,3))/(num_ramps*num_tx*num_rx))
+
+estimated_noiseFloorPerBin_dBFs = np.median(rangeFFT_rmse);
+estimated_noise_power_dbFs = estimated_noiseFloorPerBin_dBFs + 10*np.log10(2*num_fft)
+
+print('True Noise Floor = {0:.2f} dBFs, Estimated Noise Floor = {1:.2f} dBFs'.format(noiseFloorPerBin_dBFs,estimated_noiseFloorPerBin_dBFs))
+print('True Noise Power = {0:.2f} dBFs, Estimated Noise Power = {1:.2f} dBFs'.format(noise_power_dbFs,estimated_noise_power_dbFs))
 
 ##object_num = 0
 ##plt.plot(range_grid,20*np.log10(np.abs(radar_signal_range_fft[:,:,0,0])))
@@ -122,17 +143,32 @@ ext_virt_array_pad = np.pad(ext_virt_array,((0,0),(0,num_rx_extend-2*num_rx)),'c
 ##plt.plot(angle_grid,20*np.log10(np.abs(np.fft.fftshift(radar_signal_range_dopp_angle_fft[actual_range_bins[1],actual_velocity_bins[1],:,:],axes=0))))
 #
 #
-plt.figure(1)
+plt.figure(1,figsize=(20,10))
+plt.subplot(1,3,1)
 plt.title('Range FFT')
 plt.plot(range_grid,20*np.log10(np.abs(radar_signal_range_fft[:,:,0,0])))
+plt.xlabel('Range (m)')
+plt.ylabel('dBFs')
 plt.grid(True)
-plt.figure(2)
+plt.subplot(1,3,2)
 plt.title('Doppler FFT')
 plt.plot(doppler_grid,20*np.log10(np.abs(np.fft.fftshift(radar_signal_range_dopp_fft[actual_range_bins[0],:,:,0],axes=0))))
 plt.plot(doppler_grid,20*np.log10(np.abs(np.fft.fftshift(radar_signal_range_dopp_fft[actual_range_bins[1],:,:,0],axes=0))))
+plt.xlabel('Velocity (m/s)')
 plt.grid(True)
-plt.figure(3)
+plt.subplot(1,3,3)
 plt.title('Extended Sensor FFT')
 plt.plot(angle_grid,20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(ext_virt_array_pad,axis=1),axes=1))).T)
+plt.xlabel('Azimuth Angle (deg)')
 plt.grid(True)
 
+
+
+plt.figure(2,figsize=(20,10))
+plt.title('Range FFT rmse across all transmitted chirps')
+plt.plot(range_grid,rangeFFT_rmse);
+plt.axhline(noiseFloorPerBin_dBFs,color='k',lw=2,label='True Noise Floor')
+plt.xlabel('Range (m)')
+plt.ylabel('dBFs')
+plt.legend()
+plt.grid(True)
