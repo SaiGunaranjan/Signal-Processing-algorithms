@@ -72,7 +72,7 @@ num_rx_extend = 128
 
 # user defined parameters
 num_objects = 2
-object_snr = np.array([10,20])
+object_snr = np.array([20,20])
 thermalNoise = -174 # dBm/Hz
 rxGain = 44 # dB
 noiseFigure = 10 # dB
@@ -118,8 +118,15 @@ noise_signal = wgn_noise.reshape(2*num_fft,num_ramps,num_rx,num_tx)
 radar_signal = radar_signal + noise_signal
 
 radar_signal_pad = np.pad(radar_signal,((0,0),(0,0),(0,num_rx_extend-num_rx),(0,0)),'constant')
+
+""" With windowing along both time and Doppler dimension before performing Range/Doppler FFT """
+# radar_signal_range_fft = np.fft.fft(radar_signal_pad*np.hanning(2*num_fft)[:,None,None,None],axis=0)[0:num_fft,:,:,:]/(2*num_fft)
+# radar_signal_range_dopp_fft = np.fft.fft(radar_signal_range_fft*np.hanning(num_ramps)[None,:,None,None],axis=1)/(num_ramps)
+
+""" Without Range/Doppler windowing before performing FFT """
 radar_signal_range_fft = np.fft.fft(radar_signal_pad,axis=0)[0:num_fft,:,:,:]/(2*num_fft)
 radar_signal_range_dopp_fft = np.fft.fft(radar_signal_range_fft,axis=1)/(num_ramps)
+
 radar_signal_range_dopp_angle_fft = np.fft.fft(radar_signal_range_dopp_fft,axis=2)/(num_rx)
 
 actual_range_bins = (object_range/range_resolution).astype(int)
