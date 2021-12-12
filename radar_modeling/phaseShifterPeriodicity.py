@@ -34,7 +34,11 @@ plt.close('all')
 numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
-phaseStepPerRamp_deg = 30 # With 30 deg we see periodicity since 30 divides 360 but with say 29 deg, it doesnt divide 360 and hence periodicity is significantly reduced
+numTx_simult = 4
+""" With 30 deg we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
+phaseStepPerTx_deg = 30
+phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
+# phaseStepPerRamp_deg = 30
 numRamps = 280
 phaseShifterCodes = DNL*np.arange(numPhaseCodes)
 phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
@@ -53,28 +57,39 @@ I have observed that for phaseStepPerRamp_deg=30 deg, alpha = 1e-4 is best. We w
 to scale the alpha for other step sizes"""
 
 
-alpha = 1e-4
-rampPhaseIdeal_deg = phaseStepPerRamp_deg*np.arange(numRamps) + (alpha/2)*phaseStepPerRamp_deg*(np.arange(numRamps))**2
+alpha = 1e-4 # 1e-3
+rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
+
+# alphaPerTx = (phaseStepPerRamp_deg/30) * 1e-4
+# rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alphaPerTx[:,None]/2)*(np.arange(numRamps)[None,:])**2)
+
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
 
-phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,None] - phaseShifterCodes_withNoise[None,:]),axis=1)
+phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
 
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 
 
-signal = np.exp(1j*phaseCodesToBeApplied_rad)
+signal = np.sum(np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
+
 
 signalWindowed = signal*np.hanning(numRamps)
 signalFFT = np.fft.fft(signalWindowed)/numRamps
 signalFFTShift = np.fft.fftshift(signalFFT)
-signalMagSpectrum = 20*np.log10(np.abs(signalFFTShift))
-signalMagSpectrum -= np.amax(signalMagSpectrum)
+signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
+signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum)
+signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
+
 noiseFloorSetByDNL = 10*np.log10((DNL/180 *np.pi)**2/12) - 10*np.log10(numRamps)
+noiseFloorEstFromSignal = 10*np.log10(np.mean(np.sort(signalFFTShiftSpectrum)[0:numRamps-10*numTx_simult]))
+
+print('Noise Floor Estimated from signal: ', np.round(noiseFloorEstFromSignal))
+print('Noise Floor set by DNL: ', np.round(noiseFloorSetByDNL))
 
 plt.figure(1, figsize=(20,10))
-plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin, ' + 'alpha = ' + str(alpha))
-plt.plot(signalMagSpectrum)
+plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
+plt.plot(signalMagSpectrum, lw=2)
 plt.xlabel('Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
