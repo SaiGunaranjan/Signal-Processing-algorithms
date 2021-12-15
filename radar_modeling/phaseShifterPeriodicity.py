@@ -24,7 +24,10 @@ is not the same as the phase shifter for the 1st ramp. Similarly, the second ram
 has a phase of 29 degress while the 14th ramp has a phase of 29*14= 406 = 46 degress which
 is not the same as 29 degress. Hence the phase shifter for the 14th ramp
 is not the same as the phase shifter for the 2nd ramp. Hence just by making
-the phase change per ramp not a divisor of 360 degress, we remove the periodicity. """
+the phase change per ramp not a divisor of 360 degress, we remove the periodicity.
+We also observe that the noise floor increases by 3 dB for each Tx that is added
+to the simultaneous transmission i.e., when we move from 3 Tx to 4 Tx, the noise floor raises by another 3 dB.
+This is not very clear to me and I need to understand this better!!"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -84,13 +87,19 @@ signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 noiseFloorSetByDNL = 10*np.log10((DNL/180 *np.pi)**2/12) - 10*np.log10(numRamps)
 noiseFloorEstFromSignal = 10*np.log10(np.mean(np.sort(signalFFTShiftSpectrum)[0:numRamps-10*numTx_simult]))
 
-print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
+print('Noise Floor Estimated from signal with {} Txs simulataneously ON with phase sweeps: {} dB'.format(numTx_simult, \
+                                                                                                         np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
+
+
 
 plt.figure(1, figsize=(20,10))
 # plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum, lw=2)
+# plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
+# plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
+# plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
 plt.xlabel('Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
