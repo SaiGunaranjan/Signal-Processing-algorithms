@@ -9,12 +9,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 plt.close('all')
+# np.random.seed(0)
 
-noiseFloor_perBin = -100 # dBFs
+numSamples = 1024
+numFFTBins = 1024 #8192
+print('Num FFT points = {}'.format(numFFTBins))
+fftOverSamplingFact = numFFTBins//numSamples
+thermalNoise = -174 # dBm/Hz
+noiseFigure = 10 # dB
+baseBandgain = 34 #dB
+adcSamplingRate = 35e6 # 35 MHz
+dBFs_to_dBm = 10
+totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
+totalNoisePower_dBFs = totalNoisePower_dBm - 10
+noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numFFTBins) # dBFs/bin
+# noiseFloor_perBin = -100 # dBFs
 noisePower_perBin = 10**(noiseFloor_perBin/10)
 binSNR = 20 # dB
-numSamples = 1024
-numFFTBins = 1024
+
 totalNoisePower = noisePower_perBin*numFFTBins # sigmasquare totalNoisePower
 sigma = np.sqrt(totalNoisePower)
 signalPowerdBFs = noiseFloor_perBin + binSNR
@@ -39,12 +51,20 @@ fftsignal = np.fft.fft(receivedSignal, n=numFFTBins)/numSamples
 fftsignal = fftsignal[0:numFFTBins//2]
 spectrum = np.abs(fftsignal)**2
 
-estSignalPower = 10*np.log10(np.sum(spectrum[objectRangeBinInt-3:objectRangeBinInt+4]))
-estNoiseFloor = 10*np.log10(np.mean(np.sort(spectrum)[0:400]))
+estSignalPower = 10*np.log10(np.sum(spectrum[fftOverSamplingFact*(objectRangeBinInt-3):fftOverSamplingFact*(objectRangeBinInt+4)]))
+estNoiseFloor = 10*np.log10(np.mean(np.sort(spectrum)[0:numFFTBins//2]))
 
-print('Estimted SNR = {}'.format(np.round(estSignalPower-estNoiseFloor)))
 
-plt.plot(20*np.log10(np.abs(fftsignal)))
+print('Estimated Signal Power = {} dBFs'.format(np.round(estSignalPower)))
+print('True Noise power/bin = {} dBFs'.format(np.round(noiseFloor_perBin)))
+print('Estimated Noise power/bin = {} dBFs'.format(np.round(estNoiseFloor)))
+print('Estimated SNR = {}'.format(np.round(estSignalPower-estNoiseFloor)))
+
+signalSpectrumdBm = 20*np.log10(np.abs(fftsignal)) + dBFs_to_dBm
+
+plt.figure(1,figsize=(20,10))
+plt.plot(signalSpectrumdBm)
+plt.ylabel('dBm')
 plt.grid(True)
 
 
