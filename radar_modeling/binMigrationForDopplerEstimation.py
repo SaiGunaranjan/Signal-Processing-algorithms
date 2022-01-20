@@ -12,8 +12,10 @@ plt.close('all')
 # np.random.seed(0)
 
 """ System Parameters """
-numSamples = 1024
-numFFTBins = 1024 #8192
+
+""" Below are the system parameters used for the 256v2J platform"""
+numSamples = 2048
+numFFTBins = 2048 #8192
 thermalNoise = -174 # dBm/Hz
 noiseFigure = 10 # dB
 baseBandgain = 34 #dB
@@ -25,7 +27,7 @@ lightSpeed = 3e8 # m/s
 """ Chirp Parameters"""
 chirpBW = 4e9 # Hz
 interRampTime = 44e-6 # us
-chirpOnTime = 39.2e-6
+
 chirpStartFreq = 77e9 # Giga Hz
 numChirps = 168
 
@@ -38,6 +40,7 @@ objectVelocity_mps = 40 # m/s
 
 fftOverSamplingFact = numFFTBins//numSamples
 adcSamplingTime = 1/adcSamplingRate # seconds
+chirpOnTime = numSamples*adcSamplingTime #39.2e-6
 
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
@@ -66,8 +69,10 @@ chirpSlope = chirpBW/chirpOnTime
 chirpCentreFreq = chirpStartFreq + chirpBW/2
 lamda = lightSpeed/chirpCentreFreq
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
+print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 velocityRes = (chirpSamplingRate/numChirps) * (lamda/2)
+print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
@@ -117,7 +122,62 @@ plt.grid(True)
 
 
 
+"""
+Matched Filter construction
 
+rangeTerm = exp(1j*2*pi*S*2*d/c * Ts*n)
+dopplerTerm = exp(1j*2*pi*fc*2v/c * Tc*k)
+rangeMigrationTerm = exp(1j*2*pi*S*2v/c * Tc*Ts*k*n)
+
+"""
+rangeBins_LUT = np.arange(numSamples)
+distanceArray = rangeBins_LUT*rangeRes
+selDistBin = numSamples//4
+selDist =  selDistBin * rangeRes
+# rangeTermModel = np.exp(1j*2*np.pi*(chirpSlope*2*distanceArray[:,None]/lightSpeed)*\
+#                         adcSamplingTime*np.arange(numSamples)[None,:]) # bin x numSamples
+
+rangeTermModel = np.exp(1j*2*np.pi*(chirpSlope*2*selDist/lightSpeed)*\
+                        adcSamplingTime*np.arange(numSamples)) # numSamples
+
+rangeTermModel = rangeTermModel.astype('complex64')
+
+dopplerBin_bipolar = np.arange(numChirps) - numChirps//2
+velocityArray_baseband = dopplerBin_bipolar[:,None]*velocityRes
+doppIntHyp = np.arange(-1,2)
+velocityArray = velocityArray_baseband + doppIntHyp[None,:]*FsEquivalentVelocity
+dopplerTermModel = np.exp(1j*2*np.pi*(2*velocityArray_baseband/lamda)*interRampTime*np.arange(numChirps)[None,:]) # DopplerBin x numChirps
+# dopplerTermModel = dopplerTermModel.astype('complex64')
+
+rangeBinMigrationTermModel = np.exp(1j*2*np.pi*chirpSlope*2*(velocityArray[:,:,None,None]/lightSpeed)*\
+                                    interRampTime*adcSamplingTime*\
+                                        np.arange(numChirps)[None,None,:,None]*np.arange(numSamples)[None,None,None,:]) # DopplerBin x numHyp x numChirps x numSamples
+
+# rangeBinMigrationTermModel = rangeBinMigrationTermModel.astype('complex64')
+
+rangeTerm_binMigrationTerm = rangeTermModel[None,None,None,:] * rangeBinMigrationTermModel # [DoppplerBin, Hyp, numChirps, numSamples]
+rangeTerm_binMigrationTerm_Windowed = np.hanning(numSamples)[None,None,None,:]*rangeTerm_binMigrationTerm
+range_binMigration_fft = np.fft.fft(rangeTerm_binMigrationTerm_Windowed,axis=3)/numSamples
+range_binMigration_fft = range_binMigration_fft[:,:,:,0:numSamples//2]
+
+maxBinMigration = np.ceil(((maxVelBaseband_mps + doppIntHyp[-1]*FsEquivalentVelocity) * numChirps * interRampTime)/rangeRes).astype('int32')
+range_binMigration_fft_pruned = range_binMigration_fft[:,:,:,selDistBin-maxBinMigration:selDistBin+maxBinMigration+1]
+matchedFilter = range_binMigration_fft_pruned * dopplerTermModel[:,None,:,None]
+
+
+rangeBintoDial = objectRangeBinInt
+rangeBinWindow = np.arange(rangeBintoDial-maxBinMigration, rangeBintoDial+maxBinMigration+1)
+# dopplerBintoDial = objectVelocityInt
+
+signalofInterest = rangeFFTSignal[rangeBinWindow,:].T
+correlationEnergy = np.abs(np.sum(matchedFilter * np.conj(signalofInterest)[None,None,:,:],axis=(2,3)))
+flatInd = np.argmax(correlationEnergy)
+estDoppInd, estDoppHypInd = np.unravel_index(flatInd,(correlationEnergy.shape[0],correlationEnergy.shape[1]))
+
+estTrueVelocity = velocityArray_baseband[estDoppInd] + doppIntHyp[estDoppHypInd]*FsEquivalentVelocity
+
+print('True Velocity = {} m/s'.format(objectVelocity_mps))
+print('Estimated Velocity = {0:.2f} m/s'.format(estTrueVelocity[0]))
 
 
 
