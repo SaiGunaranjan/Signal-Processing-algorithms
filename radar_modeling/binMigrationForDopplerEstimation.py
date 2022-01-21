@@ -78,10 +78,6 @@ objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) #
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 objectVelocityInt = np.int(objectVelocityBin)
 
-
-# if (objectVelocity_baseBand_mps >= maxVelBaseband_mps):
-#     objectVelocity_baseBand_mps = objectVelocity_baseBand_mps - FsEquivalentVelocity
-
 dopplerSignal = np.exp(1j*((2*np.pi*objectVelocityBin)/numChirps)*np.arange(numChirps))
 
 """ Range Bin migration term"""
@@ -134,13 +130,10 @@ rangeBins_LUT = np.arange(numSamples)
 distanceArray = rangeBins_LUT*rangeRes
 selDistBin = numSamples//4
 selDist =  selDistBin * rangeRes
-# rangeTermModel = np.exp(1j*2*np.pi*(chirpSlope*2*distanceArray[:,None]/lightSpeed)*\
-#                         adcSamplingTime*np.arange(numSamples)[None,:]) # bin x numSamples
 
 rangeTermModel = np.exp(1j*2*np.pi*(chirpSlope*2*selDist/lightSpeed)*\
                         adcSamplingTime*np.arange(numSamples)) # numSamples
-
-rangeTermModel = rangeTermModel.astype('complex64')
+# rangeTermModel = rangeTermModel.astype('complex64')
 
 dopplerBin_bipolar = np.arange(numChirps) - numChirps//2
 velocityArray_baseband = dopplerBin_bipolar[:,None]*velocityRes
@@ -152,7 +145,6 @@ dopplerTermModel = np.exp(1j*2*np.pi*(2*velocityArray_baseband/lamda)*interRampT
 rangeBinMigrationTermModel = np.exp(1j*2*np.pi*chirpSlope*2*(velocityArray[:,:,None,None]/lightSpeed)*\
                                     interRampTime*adcSamplingTime*\
                                         np.arange(numChirps)[None,None,:,None]*np.arange(numSamples)[None,None,None,:]) # DopplerBin x numHyp x numChirps x numSamples
-
 # rangeBinMigrationTermModel = rangeBinMigrationTermModel.astype('complex64')
 
 rangeTerm_binMigrationTerm = rangeTermModel[None,None,None,:] * rangeBinMigrationTermModel # [DoppplerBin, Hyp, numChirps, numSamples]
@@ -165,9 +157,9 @@ range_binMigration_fft_pruned = range_binMigration_fft[:,:,:,selDistBin-maxBinMi
 matchedFilter = range_binMigration_fft_pruned * dopplerTermModel[:,None,:,None]
 
 
+""" Apply Matched filter on the received range FFT signal to estimte the true aliased velocity"""
 rangeBintoDial = objectRangeBinInt
 rangeBinWindow = np.arange(rangeBintoDial-maxBinMigration, rangeBintoDial+maxBinMigration+1)
-# dopplerBintoDial = objectVelocityInt
 
 signalofInterest = rangeFFTSignal[rangeBinWindow,:].T
 correlationEnergy = np.abs(np.sum(matchedFilter * np.conj(signalofInterest)[None,None,:,:],axis=(2,3)))
