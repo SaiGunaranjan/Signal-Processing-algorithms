@@ -5,6 +5,10 @@ Created on Fri Dec 17 23:04:53 2021
 @author: saiguna
 """
 
+""" In this script, I analyze the phase jump that occurs when a range bin peak moves from one bin to another across chirps.
+ Towards this, I have re-used the radar base band signal model script to observe the phase behaviour."""
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 
