@@ -70,8 +70,8 @@ Signal_binPlus1 = Signal_binPlus1 + noise
 Signal_bin = Signal_bin*np.hanning(numSamples)[:,None]
 Signal_binPlus1 = Signal_binPlus1*np.hanning(numSamples)[:,None]
 
-Phasor_bin = np.sum(Signal_bin,axis=0)
-Phasor_binPlus1 = np.sum(Signal_binPlus1,axis=0)
+Phasor_bin = np.sum(Signal_bin,axis=0) # Equation 2 of the pdf
+Phasor_binPlus1 = np.sum(Signal_binPlus1,axis=0) # Equation 3 of the pdf
 
 plt.figure(1, figsize=(20,10))
 plt.suptitle('Target frequency is made to move from bin to bin+1 from 1st chirp to last chirp')
