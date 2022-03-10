@@ -14,6 +14,15 @@ def angular_distance(theta_1, theta_2, mod=2*np.pi):
     difference = np.abs(theta_1[:,None] % mod - theta_2[None,:] % mod)
     return np.minimum(difference, mod - difference)
 
+def zeros2tf_conv(zeros_sig1):
+    numZeros = len(zeros_sig1)
+    singleStageImpResponse = np.ones((numZeros, 2)).astype('complex64')
+    singleStageImpResponse[:,1] = -1*zeros_sig1
+    tempConv = np.array([1])
+    for ele in np.arange(numSamp-1):
+        tempConv = np.convolve(singleStageImpResponse[ele,:], tempConv)
+
+    return tempConv
 
 plt.close('all')
 
@@ -76,7 +85,8 @@ phase_window_manipulated = phase_window.copy()
 phase_window_manipulated[ind_closest_winZeros] = interfererFreq
 zeros_sig1 = np.exp(1j*phase_window_manipulated)
 
-sig1_tf, _ = sig.zpk2tf(zeros_sig1,[],1)
+# sig1_tf, _ = sig.zpk2tf(zeros_sig1,[],1)
+sig1_tf = zeros2tf_conv(zeros_sig1)
 
 sig1_tf_fft = np.fft.fft(sig1_tf, n=numFFT)
 sig1_tf_fft = np.fft.fftshift(sig1_tf_fft)
@@ -91,7 +101,8 @@ phase_window_manipulated = phase_window.copy()
 phase_window_manipulated[ind_closest_winZeros] = interfererFreq
 zeros_sig2 = np.exp(1j*phase_window_manipulated)
 
-sig2_tf, _ = sig.zpk2tf(zeros_sig2,[],1)
+# sig2_tf, _ = sig.zpk2tf(zeros_sig2,[],1)
+sig2_tf = zeros2tf_conv(zeros_sig2)
 
 sig2_tf_fft = np.fft.fft(sig2_tf, n=numFFT)
 sig2_tf_fft = np.fft.fftshift(sig2_tf_fft)
