@@ -10,6 +10,23 @@ import numpy as np
 import scipy.signal as sig
 import matplotlib.pyplot as plt
 
+
+def angular_distance(theta_1, theta_2, mod=2*np.pi):
+
+    """
+    This function is used to get the difference of two arrays on a modulo scale. ex: 355 is closer to 0 deg than 330 degress on a modulo scale of 360
+    inputs:
+        theta_1: Array 1
+        theta_2: Array 2
+
+    outputs:
+        1. minVal: Minimum Difference value between every element of theta_1 and corresponding element of theta_2
+    """
+    difference = np.abs(theta_1 % mod - theta_2 % mod)
+    minVal = np.minimum(difference, mod - difference)
+
+    return minVal
+
 def min_angular_distance_index(theta_1, theta_2, mod=2*np.pi):
 
     """
