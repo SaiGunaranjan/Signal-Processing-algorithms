@@ -21,10 +21,12 @@ def angular_distance(theta_1, theta_2, mod=2*np.pi):
 
     outputs:
         1. closestInd: Indices of values in array theta_2 closest to values in array theta_1
+        2. minVal: Minimum Difference value between every element of thets_1 and every element of theta_2
     """
     difference = np.abs(theta_1[:,None] % mod - theta_2[None,:] % mod)
-    closestInd = np.minimum(difference, mod - difference)
-    return closestInd
+    minVal = np.minimum(difference, mod - difference)
+    closestInd = np.argmin(minVal,axis=1)
+    return closestInd, minVal
 
 def zeros2tf_conv(zeros_sig):
 
@@ -110,7 +112,7 @@ def filterResponse2zeros(filterResponseSuperSet):
     return zerosFilterResponseSuperSet
 
 
-def impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp):
+def impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp, zerosFilterResponseSuperSet):
 
     """
     Inputs:
@@ -128,16 +130,21 @@ def impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp):
 
     interfererDigFreq = (2*np.pi/numOrigSamp)*(interferFreqArray_bipolar)
     interfererDigFreq_conj = -1*interfererDigFreq
-    ind_closest_InterfererZeros = np.argmin(angular_distance(interfererDigFreq_conj,respStartPhases),axis=1)
+    ind_closest_InterfererZeros, _ = angular_distance(interfererDigFreq_conj,respStartPhases)
 
     respPhaseManipulated = respStartPhases.copy()
     respPhaseManipulated[ind_closest_InterfererZeros] = interfererDigFreq_conj
     manipulatedZeros = np.exp(1j*respPhaseManipulated)
 
-    # sig1_tf, _ = sig.zpk2tf(manipulatedZeros,[],1)
-    # sig1_tf = zeros2tf_conv(manipulatedZeros)
-    # sig1_tf = zeros2tf_fft(manipulatedZeros)
+    # signal_tf, _ = sig.zpk2tf(manipulatedZeros,[],1)
+    # signal_tf = zeros2tf_conv(manipulatedZeros)
     signal_tf = zeros2tf_fft(manipulatedZeros)
+
+    """ The below energy normalization factor has been added so that the signal transfer function has unit energy.
+    This is required because, the pseudo inverse implicitly has an AhA^-1 normalization implicitly.
+    So the generated transfer function too (which mimics the pseudo inverse response)
+    also needs to have an energy normalization."""
+    signal_tf = signal_tf/(np.linalg.norm(signal_tf))**2
 
     return signal_tf, manipulatedZeros
 
@@ -180,49 +187,14 @@ winfft = np.fft.fft(filterResponseSuperSet[:,binIdx_unipolar],n=numFFT, axis=0)
 freAxis_bipolar = np.arange(-numFFT//2,numFFT//2)*2*np.pi/numFFT
 winfftshift = np.fft.fftshift(winfft, axes=0)
 
-x = np.cos(np.linspace(0,2*np.pi,500))
-y = np.sin(np.linspace(0,2*np.pi,500))
-plt.figure(1,figsize=(20,10))
-plt.subplot(2,2,1)
-plt.title('Vandermonde Conjugate spectrum for signal 1')
-plt.plot(freAxis_bipolar, 20*np.log10(np.abs(winfftshift[:,0])));plt.grid(True)
-plt.xlabel('rad/samp')
-for i in range(numSamp-1):
-    plt.axvline(np.angle(signalZeros[i,0]),c='m',lw=2,alpha=0.4)
-plt.grid(True)
 
-plt.subplot(2,2,2)
-plt.title('Zero plot for Vandermonde Conjugate for signal 1')
-plt.plot(signalZeros[:,0].real, signalZeros[:,0].imag, 'o', fillstyle='none', ms=14)
-plt.plot(x,y,color='k');
-plt.axis('equal')
-plt.grid(True)
-plt.xlabel('Real')
-plt.xlabel('Imag')
-
-plt.subplot(2,2,3)
-plt.title('Vandermonde Conjugate spectrum for signal 2')
-plt.plot(freAxis_bipolar, 20*np.log10(np.abs(winfftshift[:,1])));plt.grid(True)
-plt.xlabel('rad/samp')
-for i in range(numSamp-1):
-    plt.axvline(np.angle(signalZeros[i,1]),c='m',lw=2,alpha=0.4)
-plt.grid(True)
-
-plt.subplot(2,2,4)
-plt.title('Zero plot for Vandermonde Conjugate for signal 2')
-plt.plot(signalZeros[:,1].real, signalZeros[:,1].imag, 'o', fillstyle='none', ms=14)
-plt.plot(x,y,color='k');
-plt.axis('equal')
-plt.grid(True)
-plt.xlabel('Real')
-plt.xlabel('Imag')
 
 
 """ Push the window zeros to the place of interferers"""
 # Filter coefficients for signal 1
 sigFreqInd_unipolar = binIdx_unipolar[0]
 interferFreqArray_bipolar = np.array([signalbinsInteger_Bipolar[1]])
-sig1_tf, zeros_sig1 = impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp)
+sig1_tf, zeros_sig1 = impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp, zerosFilterResponseSuperSet)
 
 sig1_tf_fft = np.fft.fft(sig1_tf, n=numFFT)
 sig1_tf_fft = np.fft.fftshift(sig1_tf_fft)
@@ -231,7 +203,7 @@ sig1_tf_fft = np.fft.fftshift(sig1_tf_fft)
 # Filter coefficients for signal 2
 sigFreqInd_unipolar = binIdx_unipolar[1]
 interferFreqArray_bipolar = np.array([signalbinsInteger_Bipolar[0]])
-sig2_tf, zeros_sig2 = impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp)
+sig2_tf, zeros_sig2 = impulseRespGen(sigFreqInd_unipolar, interferFreqArray_bipolar, numOrigSamp, zerosFilterResponseSuperSet)
 
 sig2_tf_fft = np.fft.fft(sig2_tf, n=numFFT)
 sig2_tf_fft = np.fft.fftshift(sig2_tf_fft)
@@ -249,52 +221,126 @@ vandermondeMatrixInv_fft = np.fft.fftshift(vandermondeMatrixInv_fft,axes=1)
 z_vandInv_row1, p_vanInv_row1, k = sig.tf2zpk(vandermondeMatrixInv[0,:],1)
 z_vandInv_row2, p_vanInv_row2, k = sig.tf2zpk(vandermondeMatrixInv[1,:],1)
 
+if 1:
+    x = np.cos(np.linspace(0,2*np.pi,500))
+    y = np.sin(np.linspace(0,2*np.pi,500))
+    plt.figure(1,figsize=(20,10))
+    plt.subplot(2,2,1)
+    plt.title('Vandermonde Conjugate spectrum for signal 1')
+    plt.plot(freAxis_bipolar, 20*np.log10(np.abs(winfftshift[:,0])));plt.grid(True)
+    plt.xlabel('rad/samp')
+    for i in range(numSamp-1):
+        plt.axvline(np.angle(signalZeros[i,0]),c='m',lw=2,alpha=0.4)
+    plt.grid(True)
 
-plt.figure(2,figsize=(20,10))
-plt.suptitle('Frequency Response of Vandermonde pseudo inverse')
-plt.subplot(2,2,1)
-plt.title('Frequency Response of 1st row of pseudo inverse matrix')
-plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[0,:])/np.amax(np.abs(vandermondeMatrixInv_fft[0,:]))), color='k', label='Inv Vand Mat 1st row spectrum')
-plt.axvline(-digFreq[0] ,color='b', label='signal')
-plt.axvline(-digFreq[1] , color='r', label='interferer')
-plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig1_tf_fft)/np.amax(np.abs(sig1_tf_fft))), label='synthesized response for sig1')
-plt.xlabel('Dig Freq (rad/samp)')
-plt.grid(True)
-plt.legend()
+    plt.subplot(2,2,2)
+    plt.title('Zero plot for Vandermonde Conjugate for signal 1')
+    plt.plot(signalZeros[:,0].real, signalZeros[:,0].imag, 'o', fillstyle='none', ms=14)
+    plt.plot(x,y,color='k');
+    plt.axis('equal')
+    plt.grid(True)
+    plt.xlabel('Real')
+    plt.xlabel('Imag')
 
-plt.subplot(2,2,2)
-plt.title('Zeros of 1st row of pseudo inverse matrix')
-plt.plot(z_vandInv_row1.real, z_vandInv_row1.imag, 'o', fillstyle='none', ms=14, label='Inv Vand Mat 1st row zeros')
-plt.plot(phasor[0].real, phasor[0].imag, 'd', fillstyle='none', ms=14, color='b', label='signal')
-plt.plot(phasor[1].real, phasor[1].imag, 's', fillstyle='none', ms=14, color='r', label='interferer')
-plt.plot(zeros_sig1.real, zeros_sig1.imag, '+', fillstyle='none', ms=14, color='k', label='zeros synthesized response for sig1')
-plt.plot(x,y,color='k');
-plt.axis('equal')
-plt.grid(True)
-plt.xlabel('Real')
-plt.xlabel('Imag')
-plt.legend()
+    plt.subplot(2,2,3)
+    plt.title('Vandermonde Conjugate spectrum for signal 2')
+    plt.plot(freAxis_bipolar, 20*np.log10(np.abs(winfftshift[:,1])));plt.grid(True)
+    plt.xlabel('rad/samp')
+    for i in range(numSamp-1):
+        plt.axvline(np.angle(signalZeros[i,1]),c='m',lw=2,alpha=0.4)
+    plt.grid(True)
+
+    plt.subplot(2,2,4)
+    plt.title('Zero plot for Vandermonde Conjugate for signal 2')
+    plt.plot(signalZeros[:,1].real, signalZeros[:,1].imag, 'o', fillstyle='none', ms=14)
+    plt.plot(x,y,color='k');
+    plt.axis('equal')
+    plt.grid(True)
+    plt.xlabel('Real')
+    plt.xlabel('Imag')
 
 
-plt.subplot(2,2,3)
-plt.title('Frequency Response of 2nd row of pseudo inverse matrix')
-plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[1,:])/np.amax(np.abs(vandermondeMatrixInv_fft[1,:]))), color='k', label='Inv Vand Mat 1st row spectrum')
-plt.axvline(-digFreq[1] , color='b', label='signal')
-plt.axvline(-digFreq[0] ,color='r', label='interferer')
-plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig2_tf_fft)/(np.amax(np.abs(sig2_tf_fft)))), label='synthesized response for sig2')
-plt.xlabel('Dig Freq (rad/samp)')
-plt.grid(True)
-plt.legend()
+    plt.figure(2,figsize=(20,10))
+    plt.suptitle('Frequency Response of Vandermonde pseudo inverse')
+    plt.subplot(2,2,1)
+    plt.title('Frequency Response of 1st row of pseudo inverse matrix')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[0,:])/np.amax(np.abs(vandermondeMatrixInv_fft[0,:]))), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[0,:])), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.axvline(-digFreq[0] ,color='b', label='signal')
+    plt.axvline(-digFreq[1] , color='r', label='interferer')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig1_tf_fft)/np.amax(np.abs(sig1_tf_fft))), label='synthesized response for sig1')
+    plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig1_tf_fft)), label='synthesized response for sig1')
+    plt.xlabel('Dig Freq (rad/samp)')
+    plt.grid(True)
+    plt.legend()
 
-plt.subplot(2,2,4)
-plt.title('Zeros of 2nd row of pseudo inverse matrix')
-plt.plot(z_vandInv_row2.real, z_vandInv_row2.imag, 'o', fillstyle='none', ms=14, label='Inv Vand Mat 2nd row zeros')
-plt.plot(phasor[1].real, phasor[1].imag, 'd', fillstyle='none', ms=14, color='b', label='signal')
-plt.plot(phasor[0].real, phasor[0].imag, 's', fillstyle='none', ms=14, color='r', label='interferer')
-plt.plot(zeros_sig2.real, zeros_sig2.imag, '+', fillstyle='none', ms=14, color='k', label='zeros synthesized response for sig2')
-plt.plot(x,y,color='k');
-plt.axis('equal')
-plt.grid(True)
-plt.xlabel('Real')
-plt.xlabel('Imag')
-plt.legend()
+    plt.subplot(2,2,2)
+    plt.title('Zeros of 1st row of pseudo inverse matrix')
+    plt.plot(z_vandInv_row1.real, z_vandInv_row1.imag, 'o', fillstyle='none', ms=14, label='Inv Vand Mat 1st row zeros')
+    plt.plot(phasor[0].real, phasor[0].imag, 'd', fillstyle='none', ms=14, color='b', label='signal')
+    plt.plot(phasor[1].real, phasor[1].imag, 's', fillstyle='none', ms=14, color='r', label='interferer')
+    plt.plot(zeros_sig1.real, zeros_sig1.imag, '+', fillstyle='none', ms=14, color='k', label='zeros synthesized response for sig1')
+    plt.plot(x,y,color='k');
+    plt.axis('equal')
+    plt.grid(True)
+    plt.xlabel('Real')
+    plt.xlabel('Imag')
+    plt.legend()
+
+
+    plt.subplot(2,2,3)
+    plt.title('Frequency Response of 2nd row of pseudo inverse matrix')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[1,:])/np.amax(np.abs(vandermondeMatrixInv_fft[1,:]))), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[1,:])), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.axvline(-digFreq[1] , color='b', label='signal')
+    plt.axvline(-digFreq[0] ,color='r', label='interferer')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig2_tf_fft)/(np.amax(np.abs(sig2_tf_fft)))), label='synthesized response for sig2')
+    plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig2_tf_fft)), label='synthesized response for sig2')
+    plt.xlabel('Dig Freq (rad/samp)')
+    plt.grid(True)
+    plt.legend()
+
+    plt.subplot(2,2,4)
+    plt.title('Zeros of 2nd row of pseudo inverse matrix')
+    plt.plot(z_vandInv_row2.real, z_vandInv_row2.imag, 'o', fillstyle='none', ms=14, label='Inv Vand Mat 2nd row zeros')
+    plt.plot(phasor[1].real, phasor[1].imag, 'd', fillstyle='none', ms=14, color='b', label='signal')
+    plt.plot(phasor[0].real, phasor[0].imag, 's', fillstyle='none', ms=14, color='r', label='interferer')
+    plt.plot(zeros_sig2.real, zeros_sig2.imag, '+', fillstyle='none', ms=14, color='k', label='zeros synthesized response for sig2')
+    plt.plot(x,y,color='k');
+    plt.axis('equal')
+    plt.grid(True)
+    plt.xlabel('Real')
+    plt.xlabel('Imag')
+    plt.legend()
+
+
+
+    plt.figure(3,figsize=(20,10))
+    plt.suptitle('Phase Response of Vandermonde pseudo inverse')
+    plt.subplot(1,2,1)
+    plt.title('Phase Response of 1st row of pseudo inverse matrix')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[0,:])/np.amax(np.abs(vandermondeMatrixInv_fft[0,:]))), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.plot(freAxis_bipolar, np.unwrap(np.angle(vandermondeMatrixInv_fft[0,:])), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.axvline(-digFreq[0] ,color='b', label='signal')
+    plt.axvline(-digFreq[1] , color='r', label='interferer')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig1_tf_fft)/np.amax(np.abs(sig1_tf_fft))), label='synthesized response for sig1')
+    plt.plot(freAxis_bipolar, np.unwrap(np.angle(sig1_tf_fft)), lw=4, alpha=0.5, label='synthesized response for sig1')
+    plt.xlabel('Dig Freq (rad/samp)')
+    plt.grid(True)
+    plt.legend()
+
+
+    plt.subplot(1,2,2)
+    plt.title('Phase Response of 2nd row of pseudo inverse matrix')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(vandermondeMatrixInv_fft[1,:])/np.amax(np.abs(vandermondeMatrixInv_fft[1,:]))), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.plot(freAxis_bipolar, np.unwrap(np.angle(vandermondeMatrixInv_fft[1,:])), color='k', label='Inv Vand Mat 1st row spectrum')
+    plt.axvline(-digFreq[1] , color='b', label='signal')
+    plt.axvline(-digFreq[0] ,color='r', label='interferer')
+    # plt.plot(freAxis_bipolar, 20*np.log10(np.abs(sig2_tf_fft)/(np.amax(np.abs(sig2_tf_fft)))), label='synthesized response for sig2')
+    plt.plot(freAxis_bipolar, np.unwrap(np.angle(sig2_tf_fft)), lw=4, alpha=0.5, label='synthesized response for sig2')
+    plt.xlabel('Dig Freq (rad/samp)')
+    plt.grid(True)
+    plt.legend()
+
+
+
