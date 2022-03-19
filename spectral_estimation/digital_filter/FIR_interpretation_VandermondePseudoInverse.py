@@ -9,6 +9,12 @@ Created on Wed Mar  9 13:54:47 2022
 It turns out that the pseudo inverse based coefficents(for each row of the vandermonde pseudo inverse) can be modelled
 as a simple FIR filter with number of taps equal to the number of columns of the vandermonde pseudo inverse matrix"""
 
+
+""" A good explanation and illustration of how the movement of poles and zeros of a system affects the frequency response
+is availabe in the below link:
+    https://eeweb.engineering.nyu.edu/iselesni/EL6113/notes/pz_freqz.pdf
+    """
+
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal as sig
