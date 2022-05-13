@@ -90,10 +90,10 @@ objectVelocityInt = np.int(objectVelocityBin)
 dopplerSignal = np.exp(1j*((2*np.pi*objectVelocityBin)/numChirps)*np.arange(numChirps))
 
 """ Range Bin migration term"""
-# rangeBinMigration = \
-#     np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numSamples)[:,None]*np.arange(numChirps)[None,:])
+rangeBinMigration = \
+    np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numSamples)[:,None]*np.arange(numChirps)[None,:])
 
-rangeBinMigration = np.exp(1j*((2*np.pi)/(binsMoved*numFFTBins))*np.arange(numSamples)[:,None]*np.arange(numChirps)[None,:])
+# rangeBinMigration = np.exp(1j*((2*np.pi)/(binsMoved*numFFTBins))*np.arange(numSamples)[:,None]*np.arange(numChirps)[None,:])
 
 
 radarSignal = rangeSignal[:,None] * dopplerSignal[None,:] * rangeBinMigration
