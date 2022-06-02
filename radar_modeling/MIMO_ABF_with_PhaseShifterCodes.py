@@ -31,7 +31,9 @@ This is not very clear to me and I need to understand this better!!
 """
 
 """ In this commit, I have also modeled the Txs/Rxs with simulataneous transmission from all Txs
-each with its own phase code per ramp and have also been able to estimate MIMO coeficients"""
+each with its own phase code per ramp and have also been able to estimate MIMO coeficients.
+I have assumed 4 Txs each separated by 2mm (lamda/2) and 8 Rxs each separated by 8mm (2lamda).
+Also added Doppler to the object"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -46,11 +48,34 @@ numAngleFFT = 2048
 txSpacing = 2e-3
 rxSpacing = 4*txSpacing
 lightSpeed = 3e8
-centerFreq = 76.5e9
+
+
+""" Chirp Parameters"""
+# Assuming 280 ramps for both detection and MIMO segments
+numRamps = 280
+chirpBW = 1e9 # Hz
+centerFreq = 76.5e9 # GHz
+interRampTime = 44e-6 # us
+objectVelocity_mps = -10#60 # m/s
 lamda = lightSpeed/centerFreq
-objectAzAngle_deg = 10
+
+objectAzAngle_deg = 50
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
+
+
+chirpSamplingRate = 1/interRampTime
+maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
+print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
+FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
+velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
+print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
+objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
+objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
+
+
+
+dopplerSignal = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
 
 numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
@@ -60,12 +85,14 @@ DNL = 360/(numPhaseCodes) # DNL in degrees
 phaseStepPerTx_deg = 29#29.3
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
-numRamps = 280
+
 phaseShifterCodes = DNL*np.arange(numPhaseCodes)
 phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
 phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
 
-""" A small quadratic term is added to the linear phase term to break the periodicity.
+""" NOT USING THE BELOW QUADRATIC PHASE in this DDMA MIMO scheme
+
+A small quadratic term is added to the linear phase term to break the periodicity.
 The strength of the quadratic term is controlled by the alpha parameter. If alpha is large,
 the quadratic term dominates the linear term thus breaking the periodicity of the Phase shifter DNL but
 at the cost of main lobe widening.
@@ -73,7 +100,6 @@ If alpha is very small, the contribution of the quadratic term diminishes and th
 the phase shifter DNL is back thus resulting in spurs/harmonics in the spectrum.
 Thus the alpha should be moderate to break the periodicity with help
 of the quadratic term at the same time not degrade the main lobe width.
-
 I have observed that for phaseStepPerRamp_deg=30 deg, alpha = 1e-4 is best. We will use this
 to scale the alpha for other step sizes"""
 
@@ -93,7 +119,7 @@ phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 
 txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-phaseCodedTxSignal = signal_phaseCode*txSignal[:,None] # [numTx, numRamps]
+phaseCodedTxSignal = dopplerSignal[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
 signal = np.sum(phaseCodedTxRxSignal, axis=(0)) # [numRamps,numRx]
 
@@ -106,7 +132,10 @@ signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
 signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=0)[None,:] # Normalize the spectrum for each Rx
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 
-dopplerBinsToSample = np.round((phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT).astype('int32')
+objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
+binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
+dopplerBinsToSample = np.round(objectVelocityBinNewScale + binOffset_Txphase).astype('int32')
+dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
 DNL_rad = (DNL/180) * np.pi
 noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps)
