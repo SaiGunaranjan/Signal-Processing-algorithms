@@ -35,6 +35,9 @@ each with its own phase code per ramp and have also been able to estimate MIMO c
 I have assumed 4 Txs each separated by 2mm (lamda/2) and 8 Rxs each separated by 8mm (2lamda).
 Also added Doppler to the object"""
 
+""" The derivation for the DDMA scheme is available in the below location:
+    https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
