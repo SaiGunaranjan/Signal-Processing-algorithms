@@ -97,7 +97,7 @@ binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numRamps
 dopplerBinsToSample = np.round(binOffset_Txphase).astype('int32')
 dopplerBinsToSample = np.mod(dopplerBinsToSample, numRamps)
 
-plt.figure(1, figsize=(20,10),dpi=300)
+plt.figure(1, figsize=(20,10),dpi=200)
 # plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum, lw=2)

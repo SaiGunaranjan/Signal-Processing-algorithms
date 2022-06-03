@@ -191,7 +191,7 @@ print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFr
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
 
-plt.figure(1, figsize=(20,10),dpi=300)
+plt.figure(1, figsize=(20,10),dpi=200)
 plt.title('Range spectrum')
 plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
 # plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
@@ -200,7 +200,7 @@ plt.ylabel('Power dBm')
 plt.grid(True)
 
 
-plt.figure(2, figsize=(20,10), dpi=300)
+plt.figure(2, figsize=(20,10), dpi=200)
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all 8
 plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
@@ -225,7 +225,7 @@ ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:],n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
 
 
-plt.figure(3, figsize=(20,10), dpi=300)
+plt.figure(3, figsize=(20,10), dpi=200)
 plt.subplot(1,2,1)
 plt.title('MIMO phase')
 plt.plot(ULA,'-o')
