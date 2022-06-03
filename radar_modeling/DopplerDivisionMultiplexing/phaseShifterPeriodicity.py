@@ -58,7 +58,7 @@ Thus the alpha should be moderate to break the periodicity with help
 of the quadratic term at the same time not degrade the main lobe width.
 
 I have observed that for phaseStepPerRamp_deg=30 deg, alpha = 1e-4 is best. We will use this
-to scale the alpha for other step sizes"""
+to scale the alpha for other step sizes. Fow now, I have removed the quadratic term by setting alpha to 0"""
 
 
 alpha = 0 # 1e-4
