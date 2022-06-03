@@ -43,25 +43,55 @@ plt.close('all')
 numTx_simult = 4
 numRx = 8
 numMIMO = numTx_simult*numRx
-numDoppFFT = 2048
+numSamp = 2048 # Number of ADC time domain samples
+numSampPostRfft = numSamp//2
 numAngleFFT = 2048
 txSpacing = 2e-3
 rxSpacing = 4*txSpacing
 lightSpeed = 3e8
+c = 3e8
 
 
 """ Chirp Parameters"""
 # Assuming 280 ramps for both detection and MIMO segments
 numRamps = 280
+numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
 interRampTime = 44e-6 # us
-objectVelocity_mps = -10#60 # m/s
+rangeRes = c/(2*chirpBW)
+maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
 
+objectRange = 60.3 # m
+objectVelocity_mps = -10#60 # m/s
 objectAzAngle_deg = 50
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
+
 rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
+
+
+## RF parameters
+thermalNoise = -174 # dBm/Hz
+noiseFigure = 10 # dB
+baseBandgain = 34 #dB
+adcSamplingRate = 56.25e6 # 56.25 MHz
+dBFs_to_dBm = 10
+binSNR = -3 # dB
+
+totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
+totalNoisePower_dBFs = totalNoisePower_dBm - 10
+noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
+# noiseFloor_perBin = -100 # dBFs
+noisePower_perBin = 10**(noiseFloor_perBin/10)
+
+totalNoisePower = noisePower_perBin*numSamp # sigmasquare totalNoisePower
+sigma = np.sqrt(totalNoisePower)
+signalPowerdBFs = noiseFloor_perBin + binSNR
+signalPower = 10**(signalPowerdBFs/10)
+signalAmplitude = np.sqrt(signalPower)
+signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
+signalphasor = signalAmplitude*signalPhase
 
 
 chirpSamplingRate = 1/interRampTime
@@ -73,9 +103,10 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 
+objectRangeBin = objectRange/rangeRes
 
-
-dopplerSignal = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
+rangeTerm = signalphasor*np.exp(1j*((2*np.pi*objectRangeBin)/numSamp)*np.arange(numSamp))
+dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
 
 numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
@@ -119,13 +150,26 @@ phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 
 txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-phaseCodedTxSignal = dopplerSignal[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
+phaseCodedTxSignal = dopplerTerm[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
-signal = np.sum(phaseCodedTxRxSignal, axis=(0)) # [numRamps,numRx]
+phaseCodedTxRxSignal_withRangeTerm = rangeTerm[None,None,None,:] * phaseCodedTxRxSignal[:,:,:,None]
+signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0)) # [numRamps,numRx, numSamp]
 
+# Add noise at this step
+noise = (sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp) + 1j*(sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp)
+noise = noise.reshape(numRamps, numRx, numSamp)
 
+signal = signal + noise
 
-signalWindowed = signal*np.hanning(numRamps)[:,None]
+signal_rangeWin = signal*np.hanning(numSamp)[None,None,:]
+signal_rfft = np.fft.fft(signal_rangeWin,axis=2)/numSamp
+signal_rfft = signal_rfft[:,:,0:numSampPostRfft]
+signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
+
+rangeBinsToSample = np.round(objectRangeBin).astype('int32')
+chirpSamp_givenRangeBin = signal_rfft[:,:,rangeBinsToSample]
+
+signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[:,None]
 signalFFT = np.fft.fft(signalWindowed, axis=0, n = numDoppFFT)/numRamps
 signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
@@ -146,15 +190,24 @@ noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_ar
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
-plt.figure(1, figsize=(20,10), dpi=300)
-# plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
+
+plt.figure(1, figsize=(20,10),dpi=300)
+plt.title('Range spectrum')
+plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
+# plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
+plt.xlabel('Range Bins')
+plt.ylabel('Power dBm')
+plt.grid(True)
+
+
+plt.figure(2, figsize=(20,10), dpi=300)
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all 8
 plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
 plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
 plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
 plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
-plt.xlabel('Bins')
+plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
 
@@ -172,7 +225,7 @@ ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:],n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
 
 
-plt.figure(2, figsize=(20,10), dpi=300)
+plt.figure(3, figsize=(20,10), dpi=300)
 plt.subplot(1,2,1)
 plt.title('MIMO phase')
 plt.plot(ULA,'-o')
@@ -184,7 +237,7 @@ plt.title('MIMO ULA spectrum')
 plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum)),label='Angle spectrum')
 plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
 plt.legend()
-plt.xlabel('Angle')
+plt.xlabel('Angle (deg)')
 plt.ylabel('dB')
 plt.grid(True)
 
