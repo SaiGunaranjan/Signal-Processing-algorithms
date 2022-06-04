@@ -43,6 +43,7 @@ import matplotlib.pyplot as plt
 
 plt.close('all')
 
+
 numTx_simult = 4
 numRx = 8
 numMIMO = numTx_simult*numRx
@@ -53,7 +54,9 @@ txSpacing = 2e-3
 rxSpacing = 4*txSpacing
 lightSpeed = 3e8
 c = 3e8
-
+numBitsPhaseShifter = 5
+numPhaseCodes = 2**numBitsPhaseShifter
+DNL = 360/(numPhaseCodes) # DNL in degrees
 
 """ Chirp Parameters"""
 # Assuming 280 ramps for both detection and MIMO segments
@@ -65,13 +68,15 @@ interRampTime = 44e-6 # us
 rangeRes = c/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
+""" With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
+phaseStepPerTx_deg = 29#29.3
 
+
+""" Target definition"""
 objectRange = 60.3 # m
 objectVelocity_mps = -10#60 # m/s
 objectAzAngle_deg = 50
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
-
-rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
 
 
 ## RF parameters
@@ -81,13 +86,11 @@ baseBandgain = 34 #dB
 adcSamplingRate = 56.25e6 # 56.25 MHz
 dBFs_to_dBm = 10
 binSNR = -3 # dB
-
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
 noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
 # noiseFloor_perBin = -100 # dBFs
 noisePower_perBin = 10**(noiseFloor_perBin/10)
-
 totalNoisePower = noisePower_perBin*numSamp # sigmasquare totalNoisePower
 sigma = np.sqrt(totalNoisePower)
 signalPowerdBFs = noiseFloor_perBin + binSNR
@@ -96,7 +99,7 @@ signalAmplitude = np.sqrt(signalPower)
 signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
 signalphasor = signalAmplitude*signalPhase
 
-
+""" Derived Parameters """
 chirpSamplingRate = 1/interRampTime
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
@@ -105,18 +108,9 @@ velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
 print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
-
 objectRangeBin = objectRange/rangeRes
 
-rangeTerm = signalphasor*np.exp(1j*((2*np.pi*objectRangeBin)/numSamp)*np.arange(numSamp))
-dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
 
-numBitsPhaseShifter = 5
-numPhaseCodes = 2**numBitsPhaseShifter
-DNL = 360/(numPhaseCodes) # DNL in degrees
-
-""" With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
-phaseStepPerTx_deg = 29#29.3
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
 
@@ -137,7 +131,6 @@ of the quadratic term at the same time not degrade the main lobe width.
 I have observed that for phaseStepPerRamp_deg=30 deg, alpha = 1e-4 is best. We will use this
 to scale the alpha for other step sizes"""
 
-
 alpha = 0#1e-4
 rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
 
@@ -145,23 +138,21 @@ rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] +
 # rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alphaPerTx[:,None]/2)*(np.arange(numRamps)[None,:])**2)
 
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
-
 phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
-
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 
+rangeTerm = signalphasor*np.exp(1j*((2*np.pi*objectRangeBin)/numSamp)*np.arange(numSamp))
+dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
+rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
 txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
 phaseCodedTxSignal = dopplerTerm[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
 phaseCodedTxRxSignal_withRangeTerm = rangeTerm[None,None,None,:] * phaseCodedTxRxSignal[:,:,:,None]
 signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0)) # [numRamps,numRx, numSamp]
-
-# Add noise at this step
 noise = (sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp) + 1j*(sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp)
 noise = noise.reshape(numRamps, numRx, numSamp)
-
 signal = signal + noise
 
 signal_rangeWin = signal*np.hanning(numSamp)[None,None,:]
@@ -171,7 +162,6 @@ signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
 
 rangeBinsToSample = np.round(objectRangeBin).astype('int32')
 chirpSamp_givenRangeBin = signal_rfft[:,:,rangeBinsToSample]
-
 signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[:,None]
 signalFFT = np.fft.fft(signalWindowed, axis=0, n = numDoppFFT)/numRamps
 signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
