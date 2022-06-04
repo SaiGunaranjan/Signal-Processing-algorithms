@@ -38,6 +38,14 @@ Also added Doppler to the object"""
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
 
+
+""" To verify if the DDMA modelling has been done correctly and the DDMA is infact a special case of ABF
+    make the following changes
+    1. Set  phaseStepPerTx_deg = 0
+    2. Set objectAzAngle_deg = 0 since ABF holds for object at boresight
+    3. Make numTx_simult vary from 1, 2, 3, 4 to check if the SNR of the target at boresight scales by 6, 9, 12 dB
+    for numTx_simult = 2, 3, 4 respectively"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
