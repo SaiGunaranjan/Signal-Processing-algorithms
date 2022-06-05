@@ -43,7 +43,7 @@ phaseStepPerTx_deg = 29 # 29
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
 
-numRamps = 280
+numRamps = 140
 phaseShifterCodes = DNL*np.arange(numPhaseCodes)
 phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
 phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise

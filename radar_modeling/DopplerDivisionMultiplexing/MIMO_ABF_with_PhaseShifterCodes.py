@@ -68,7 +68,7 @@ DNL = 360/(numPhaseCodes) # DNL in degrees
 
 """ Chirp Parameters"""
 # Assuming 280 ramps for both detection and MIMO segments
-numRamps = 280
+numRamps = 140
 numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
@@ -83,7 +83,7 @@ phaseStepPerTx_deg = 29#29.3
 """ Target definition"""
 objectRange = 60.3 # m
 objectVelocity_mps = -10#60 # m/s
-objectAzAngle_deg = 50
+objectAzAngle_deg = 30
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
 
@@ -97,7 +97,6 @@ binSNR = -3 # dB
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
 noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
-# noiseFloor_perBin = -100 # dBFs
 noisePower_perBin = 10**(noiseFloor_perBin/10)
 totalNoisePower = noisePower_perBin*numSamp # sigmasquare totalNoisePower
 sigma = np.sqrt(totalNoisePower)
