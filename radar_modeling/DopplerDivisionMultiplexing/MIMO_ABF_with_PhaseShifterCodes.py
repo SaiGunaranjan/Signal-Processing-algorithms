@@ -66,6 +66,7 @@ numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 
+
 """ Chirp Parameters"""
 # Assuming 280 ramps for both detection and MIMO segments
 numRamps = 140
@@ -79,6 +80,9 @@ lamda = lightSpeed/centerFreq
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
 phaseStepPerTx_deg = 29#29.3
 
+
+Fs_spatial = lamda/txSpacing
+angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
 
 """ Target definition"""
 objectRange = 60.3 # m
@@ -215,11 +219,10 @@ plt.grid(True)
 mimoCoefficients_eachDoppler_givenRange = signalFFT[dopplerBinsToSample,:] # numTx*numDopp x numRx
 mimoCoefficients_flatten = (mimoCoefficients_eachDoppler_givenRange.T).reshape(-1,numTx_simult*numRx)
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten[0,:]))
-digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
-est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
+# digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
+# est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
 
-Fs_spatial = lamda/txSpacing
-angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
+
 
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:],n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
