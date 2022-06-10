@@ -25,8 +25,8 @@ has a phase of 29 degress while the 14th ramp has a phase of 29*14= 406 = 46 deg
 is not the same as 29 degress. Hence the phase shifter for the 14th ramp
 is not the same as the phase shifter for the 2nd ramp. Hence just by making
 the phase change per ramp not a divisor of 360 degress, we remove the periodicity.
-We also observe that the noise floor increases by 3 dB for each Tx that is added
-to the simultaneous transmission i.e., when we move from 3 Tx to 4 Tx, the noise floor raises by another 3 dB.
+We also observe that the noise floor increases by 6 dB for every doubling of Tx
+to the simultaneous transmission i.e., when we move from 2 Tx to 4 Tx, the noise floor raises by another 6 dB.
 This is not very clear to me and I need to understand this better!!"""
 
 import numpy as np
