@@ -43,7 +43,8 @@ Also added Doppler to the object"""
     make the following changes
     1. Set  phaseStepPerTx_deg = 0
     2. Set objectAzAngle_deg = 0 since ABF holds for object at boresight
-    3. Make numTx_simult vary from 1, 2, 3, 4 to check if the SNR of the target at boresight scales by 6, 9, 12 dB
+    3. Make the binSNR a reasonable number say 10 so that the tone sticks out to begin with in the range spectrum
+    4. Make numTx_simult vary from 1, 2, 3, 4 to check if the SNR of the target at boresight scales by 6, 9, 12 dB
     for numTx_simult = 2, 3, 4 respectively"""
 
 import numpy as np
@@ -68,7 +69,7 @@ DNL = 360/(numPhaseCodes) # DNL in degrees
 
 
 """ Chirp Parameters"""
-# Assuming 280 ramps for both detection and MIMO segments
+# Assuming 140 ramps for both detection and MIMO segments
 numRamps = 140
 numDoppFFT = 2048
 chirpBW = 1e9 # Hz
