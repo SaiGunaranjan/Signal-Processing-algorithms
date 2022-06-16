@@ -85,11 +85,7 @@ phaseStepPerTx_deg = 29#29.3
 Fs_spatial = lamda/txSpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
 
-""" Target definition"""
-objectRange = 60.3 # m
-objectVelocity_mps = 60#-10#60 # m/s
-objectAzAngle_deg = 30
-objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
+
 
 
 ## RF parameters
@@ -121,10 +117,19 @@ print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
 print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
+
+
+""" Target definition"""
+objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
+objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
+                                       maxVelBaseband_mps+2*FsEquivalentVelocity) # 60 # m/s
+objectAzAngle_deg = np.random.uniform(-50,50) #30
+objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
+
+
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 objectRangeBin = objectRange/rangeRes
-
 rangeMoved = objectRange + objectVelocity_mps*interRampTime*np.arange(numRamps)
 rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
 
@@ -226,17 +231,16 @@ print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFr
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
 
-plt.figure(1, figsize=(20,10),dpi=200)
-plt.title('Range spectrum')
-plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
-# plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
-plt.xlabel('Range Bins')
-plt.ylabel('Power dBm')
-plt.grid(True)
+# plt.figure(1, figsize=(20,10),dpi=200)
+# plt.title('Range spectrum')
+# plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
+# plt.xlabel('Range Bins')
+# plt.ylabel('Power dBm')
+# plt.grid(True)
 
 
 plt.figure(2, figsize=(20,10), dpi=200)
-plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
+plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
 plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all 8
 plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
 plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
