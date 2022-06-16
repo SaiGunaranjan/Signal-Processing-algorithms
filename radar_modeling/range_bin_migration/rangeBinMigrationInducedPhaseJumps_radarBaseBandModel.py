@@ -20,6 +20,7 @@ plt.close('all')
 """ Below are the system parameters used for the 256v2J platform"""
 numSamples = 2048
 numFFTBins = 2048 #8192
+numDoppFFT = 2048
 thermalNoise = -174 # dBm/Hz
 noiseFigure = 10 # dB
 baseBandgain = 34 #dB
@@ -31,6 +32,7 @@ lightSpeed = 3e8 # m/s
 """ Chirp Parameters"""
 chirpBW = 4e9 # Hz
 interRampTime = 44e-6 # us
+rampSamplingRate = 1/interRampTime
 
 chirpStartFreq = 77e9 # Giga Hz
 numChirps = 168
@@ -86,6 +88,7 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 objectVelocityInt = np.int(objectVelocityBin)
+objectVelocityBinNewScale = np.int((objectVelocityBin/numChirps)*numDoppFFT)
 
 dopplerSignal = np.exp(1j*((2*np.pi*objectVelocityBin)/numChirps)*np.arange(numChirps))
 
@@ -106,24 +109,34 @@ receivedSignal = signal_noise*np.hanning(numSamples)[:,None]
 
 rangeFFTSignal = np.fft.fft(receivedSignal, n=numFFTBins, axis=0)/numSamples
 rangeFFTSignal = rangeFFTSignal[0:numFFTBins//2,:]
-
-
-
-
 signalSpectrumdBm = 20*np.log10(np.abs(rangeFFTSignal)) + dBFs_to_dBm
-
-
 targetRangeBins = np.argmax(signalSpectrumdBm,axis=0)
 DopplerPhaseMigratedRangeBins = rangeFFTSignal[targetRangeBins[None,:],np.arange(numChirps)][0,:]
 
-
+""" Correcting for the PI-PI/N phase jump that occurs for every 1 bin migration"""
 binDelta = np.abs(targetRangeBins[1::] - targetRangeBins[0:-1])
-tempVar = binDelta*np.pi
+tempVar = binDelta*(np.pi-np.pi/numSamples)
 binMigrationPhaseCorrTerm = np.zeros((targetRangeBins.shape),dtype=np.float32)
 binMigrationPhaseCorrTerm[1::] = tempVar
 binMigrationPhasorCorrTerm = np.exp(-1j*np.cumsum(binMigrationPhaseCorrTerm))
-
 DopplerPhaseMigratedRangeBins_PhaseCorrected = DopplerPhaseMigratedRangeBins*binMigrationPhasorCorrTerm
+
+""" Correcting for the Doppler modulation caused due to the Range bin Migration.
+This correction term is exp(-1j*2*PI*(B/c)*v*n*Tc)"""
+rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
+rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi
+rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq*np.arange(numChirps))
+DopplerPhaseMigratedRangeBins_PhaseCorrectedModulationCorrected = DopplerPhaseMigratedRangeBins_PhaseCorrected*rbmModulationCorrectionTerm
+
+
+rbmPICorrected_dopplerFFT = np.fft.fft(DopplerPhaseMigratedRangeBins_PhaseCorrected,n=numDoppFFT)/numChirps
+rbmCorrected_dopplerFFT = np.fft.fft(DopplerPhaseMigratedRangeBins_PhaseCorrectedModulationCorrected,n=numDoppFFT)/numChirps
+dopplerFFT = np.fft.fft(dopplerSignal,n=numDoppFFT)/numChirps
+
+rbmPICorrected_dopplerSpectrum = np.abs(rbmPICorrected_dopplerFFT)/(np.amax(np.abs(rbmPICorrected_dopplerFFT)))
+rbmCorrected_dopplerSpectrum = np.abs(rbmCorrected_dopplerFFT)/(np.amax(np.abs(rbmCorrected_dopplerFFT)))
+dopplerSpectrum = np.abs(dopplerFFT)/(np.amax(np.abs(dopplerFFT)))
+
 
 plt.figure(1,figsize=(20,10))
 plt.title('Range Spectrum (dBFs) of a high speed target across chirps. Range migrates across chirps')
@@ -133,28 +146,37 @@ plt.xlabel('Range (m)')
 plt.ylabel('dBm')
 plt.grid(True)
 
-plt.figure(2,figsize=(20,10))
+plt.figure(2,figsize=(20,10),dpi=200)
 plt.suptitle('Object moving at ' + str(objectVelocity_mps) + ' m/s;' + 'chirp BW =' + str(int(chirpBW/1e9)) + 'GHz')
-plt.subplot(1,3,1)
+plt.subplot(1,2,1)
 plt.title('Range peak across chirps')
 plt.plot(targetRangeBins, '-o')
 plt.xlabel('Chirp Number')
 plt.ylabel('Range Bin')
 plt.grid(True)
 
-plt.subplot(1,3,2)
+plt.subplot(1,2,2)
 plt.title('Doppler Phase at peak range bin across chirps')
-plt.plot(np.unwrap(np.angle(DopplerPhaseMigratedRangeBins)), linewidth=2)
+plt.plot(np.unwrap(np.angle(DopplerPhaseMigratedRangeBins)), linewidth=2, label='Pre correction')
+plt.plot(np.unwrap(np.angle(DopplerPhaseMigratedRangeBins_PhaseCorrected)), linewidth=2, label='Post PI correction')
+plt.plot(np.unwrap(np.angle(DopplerPhaseMigratedRangeBins_PhaseCorrectedModulationCorrected)), linewidth=2, label='Post PI + Modulation correction')
+plt.plot(np.unwrap(np.angle(dopplerSignal)), linewidth=2, alpha=0.6, label='Ground Truth Doppler Phase')
+plt.legend()
 plt.xlabel('Chirp Number')
 plt.ylabel('Phase (rad)')
 plt.grid(True)
 
-plt.subplot(1,3,3)
-plt.title('Doppler Phase at peak range bin across chirps after pi correction')
-plt.plot(np.unwrap(np.angle(DopplerPhaseMigratedRangeBins_PhaseCorrected)), linewidth=2)
-plt.xlabel('Chirp Number')
-plt.ylabel('Phase (rad)')
+plt.figure(3,figsize=(20,10),dpi=200)
+plt.title('Doppler Spectrum')
+plt.plot(20*np.log10(rbmPICorrected_dopplerSpectrum), label='RBM  PI corrected')
+plt.plot(20*np.log10(rbmCorrected_dopplerSpectrum), label='RBM PI + Modulation corrected')
+plt.plot(20*np.log10(dopplerSpectrum),label='Ground Truth',alpha=0.6)
+plt.axvline(objectVelocityBinNewScale,color='k',label=' Ground Truth Doppler Bin')
+plt.legend()
+plt.xlabel('Doppler Bin')
+plt.ylabel('Power (dBFs)')
 plt.grid(True)
+
 
 
 
