@@ -97,7 +97,7 @@ plt.grid(True)
 plt.subplot(1,3,3)
 plt.title('Phase(bin) - phase(bin+1) for all chirps')
 plt.plot(np.abs(phase_refBin-phase_refbinPlus1), linewidth=4, alpha=0.7, label='Phase(bin) - phase(bin+1)')
-plt.axhline(np.pi, label='3.14',color='k')
+plt.axhline(np.pi-np.pi/numSamples, label='PI-PI/N',color='k')
 plt.grid(True)
 plt.legend()
 plt.xlabel('Chirp number');
@@ -108,12 +108,12 @@ plt.ylim([3.11,3.16])
 targetRangeBins = np.argmax(signalSpectrumdBm,axis=0)
 DopplerPhaseMigratedRangeBins = FFTSignal[targetRangeBins[None,:],np.arange(numChirps)][0,:]
 
+""" Correcting for the PI-PI/N phase jump that occurs for every 1 bin migration"""
 binDelta = np.abs(targetRangeBins[1::] - targetRangeBins[0:-1])
-tempVar = binDelta*np.pi # binDelta*(np.pi-np.pi/numSamples)
+tempVar = binDelta*(np.pi-np.pi/numSamples)
 binMigrationPhaseCorrTerm = np.zeros((targetRangeBins.shape),dtype=np.float32)
 binMigrationPhaseCorrTerm[1::] = tempVar
 binMigrationPhasorCorrTerm = np.exp(-1j*np.cumsum(binMigrationPhaseCorrTerm))
-
 DopplerPhaseMigratedRangeBins_PhaseCorrected = DopplerPhaseMigratedRangeBins*binMigrationPhasorCorrTerm
 
 plt.figure(2,figsize=(20,10))
