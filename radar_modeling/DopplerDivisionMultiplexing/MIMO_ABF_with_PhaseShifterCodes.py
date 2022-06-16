@@ -62,7 +62,6 @@ numAngleFFT = 2048
 txSpacing = 2e-3
 rxSpacing = 4*txSpacing
 lightSpeed = 3e8
-c = 3e8
 numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
@@ -75,7 +74,8 @@ numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
 interRampTime = 44e-6 # us
-rangeRes = c/(2*chirpBW)
+rampSamplingRate = 1/interRampTime
+rangeRes = lightSpeed/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
@@ -87,7 +87,7 @@ angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/n
 
 """ Target definition"""
 objectRange = 60.3 # m
-objectVelocity_mps = -10#60 # m/s
+objectVelocity_mps = -10#60#-10#60 # m/s
 objectAzAngle_deg = 30
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
@@ -97,8 +97,11 @@ thermalNoise = -174 # dBm/Hz
 noiseFigure = 10 # dB
 baseBandgain = 34 #dB
 adcSamplingRate = 56.25e6 # 56.25 MHz
+adcSamplingTime = 1/adcSamplingRate # s
+chirpOnTime = numSamp*adcSamplingTime
+chirpSlope = chirpBW/chirpOnTime
 dBFs_to_dBm = 10
-binSNR = -3 # dB
+binSNR = -3#20# # dB
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
 noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
@@ -122,6 +125,8 @@ objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) #
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 objectRangeBin = objectRange/rangeRes
 
+rangeMoved = objectRange + objectVelocity_mps*interRampTime*np.arange(numRamps)
+rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
 
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
@@ -155,13 +160,20 @@ phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 
 rangeTerm = signalphasor*np.exp(1j*((2*np.pi*objectRangeBin)/numSamp)*np.arange(numSamp))
+# rangeTerm = np.exp(1j*2*np.pi*(chirpSlope*2*objectRange/lightSpeed)*adcSamplingTime*np.arange(numSamp)) # numSamp
 dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
+""" Range Bin migration term"""
+rangeBinMigration = \
+    np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[:,None]*np.arange(numSamp)[None,:])
+
 rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
 txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
 phaseCodedTxSignal = dopplerTerm[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
 phaseCodedTxRxSignal_withRangeTerm = rangeTerm[None,None,None,:] * phaseCodedTxRxSignal[:,:,:,None]
+""" Including the range bin migration term as well"""
+phaseCodedTxRxSignal_withRangeTerm = phaseCodedTxRxSignal_withRangeTerm * rangeBinMigration[None,:,None,:]
 signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0)) # [numRamps,numRx, numSamp]
 noise = (sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp) + 1j*(sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp)
 noise = noise.reshape(numRamps, numRx, numSamp)
@@ -172,8 +184,26 @@ signal_rfft = np.fft.fft(signal_rangeWin,axis=2)/numSamp
 signal_rfft = signal_rfft[:,:,0:numSampPostRfft]
 signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
 
-rangeBinsToSample = np.round(objectRangeBin).astype('int32')
-chirpSamp_givenRangeBin = signal_rfft[:,:,rangeBinsToSample]
+# rangeBinsToSample = np.round(objectRangeBin).astype('int32')
+# chirpSamp_givenRangeBin = signal_rfft[:,:,rangeBinsToSample]
+
+rangeBinsToSample = rangeBinsMoved
+
+chirpSamp_givenRangeBin = signal_rfft[np.arange(numRamps),:,rangeBinsToSample]
+binDelta = np.abs(rangeBinsToSample[1::] - rangeBinsToSample[0:-1])
+tempVar = binDelta*np.pi
+binMigrationPhaseCorrTerm = np.zeros((rangeBinsToSample.shape),dtype=np.float32)
+binMigrationPhaseCorrTerm[1::] = tempVar
+binMigrationPhasorCorrTerm = np.exp(-1j*np.cumsum(binMigrationPhaseCorrTerm))
+chirpSamp_givenRangeBin = chirpSamp_givenRangeBin*binMigrationPhasorCorrTerm[:,None]
+
+""" Correcting for the Doppler modulation caused due to the Range bin Migration"""
+rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
+rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi
+rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq*np.arange(numRamps))
+chirpSamp_givenRangeBin = chirpSamp_givenRangeBin*rbmModulationCorrectionTerm[:,None]
+
+
 signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[:,None]
 signalFFT = np.fft.fft(signalWindowed, axis=0, n = numDoppFFT)/numRamps
 signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
