@@ -195,6 +195,8 @@ signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
 rangeBinsToSample = rangeBinsMoved
 
 chirpSamp_givenRangeBin = signal_rfft[np.arange(numRamps),:,rangeBinsToSample]
+
+""" Correcting for the Pi phase jump caused due to the Range bin Migration"""
 binDelta = np.abs(rangeBinsToSample[1::] - rangeBinsToSample[0:-1])
 tempVar = binDelta*np.pi
 binMigrationPhaseCorrTerm = np.zeros((rangeBinsToSample.shape),dtype=np.float32)
