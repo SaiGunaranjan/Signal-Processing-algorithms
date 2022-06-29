@@ -86,7 +86,7 @@ angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/n
 
 """ Target definition"""
 objectRange = 60.3 # m
-objectVelocity_mps = np.array([-10,23])#60 # m/s
+objectVelocity_mps = np.array([-10,-10.1]) #np.array([-10,23])#60 # m/s
 objectAzAngle_deg = np.array([30,-10])
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
