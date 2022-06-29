@@ -9,6 +9,12 @@ Created on Fri Dec 17 23:04:53 2021
  Towards this, I have re-used the radar base band signal model script to observe the phase behaviour."""
 
 
+""" The derivation for the Doppler phase modulation (Bv/c term) due to range movement is available at the below link:
+    https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/2719745/Doppler+Phase+modulation+due+to+Range+movement+across+chirps+-+Analog+signal
+
+    https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/2949121/Doppler+Phase+modulation+due+to+residual+Range+bin+movement+across+chirps+-+Sampled+signal
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -121,7 +127,7 @@ binMigrationPhaseCorrTerm[1::] = tempVar
 binMigrationPhasorCorrTerm = np.exp(-1j*np.cumsum(binMigrationPhaseCorrTerm))
 DopplerPhaseMigratedRangeBins_PhaseCorrected = DopplerPhaseMigratedRangeBins*binMigrationPhasorCorrTerm
 
-""" Correcting for the Doppler modulation caused due to the Range bin Migration.
+""" Correcting for the Doppler modulation caused due to the Range bin Migration. The link for the derivation is at the beginning
 This correction term is exp(-1j*2*PI*(B/c)*v*n*Tc)"""
 rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
 rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi

@@ -38,6 +38,12 @@ Also added Doppler to the object"""
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
 
+""" The derivation for the Doppler phase modulation due to range movement is available at the below link:
+    https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/2719745/Doppler+Phase+modulation+due+to+Range+movement+across+chirps+-+Analog+signal
+
+    https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/2949121/Doppler+Phase+modulation+due+to+residual+Range+bin+movement+across+chirps+-+Sampled+signal
+"""
+
 
 """ To verify if the DDMA modelling has been done correctly and the DDMA is infact a special case of ABF
     make the following changes
@@ -122,8 +128,8 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 """ Target definition"""
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
-                                       maxVelBaseband_mps+2*FsEquivalentVelocity) # 60 # m/s
-objectAzAngle_deg = np.random.uniform(-50,50) #30
+                                        maxVelBaseband_mps+2*FsEquivalentVelocity) # 60 m/s
+objectAzAngle_deg = np.random.uniform(-50,50) #30 36.3#
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
 
