@@ -38,6 +38,8 @@ Also added Doppler to the object"""
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
 
+""" Haven't introduced the range bin migration term yet. Need to introduce in subsequent commits"""
+
 
 """ To verify if the DDMA modelling has been done correctly and the DDMA is infact a special case of ABF
     make the following changes
@@ -221,7 +223,6 @@ plt.grid(True)
 
 mimoCoefficients_eachDoppler_givenRange = signalFFT[dopplerBinsToSample,:] # numTx*numDopp x numRx
 mimoCoefficients_flatten = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1)).reshape(-1,numTx_simult*numRx)
-# mimoCoefficients_flatten = (mimoCoefficients_eachDoppler_givenRange.T).reshape(-1,numTx_simult*numRx)
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
 # digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
 # est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
