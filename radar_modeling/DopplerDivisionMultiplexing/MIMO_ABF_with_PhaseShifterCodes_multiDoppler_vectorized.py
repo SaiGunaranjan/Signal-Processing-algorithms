@@ -86,10 +86,18 @@ Fs_spatial = lamda/txSpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
 
 
+""" Derived Parameters """
+chirpSamplingRate = 1/interRampTime
+maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
+print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
+FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
+velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
+print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
+
 """ Target definition"""
-objectRange = 60.3 # m
-objectVelocity_mps = np.array([-10,-10.1]) #np.array([-10,23])#60 # m/s
-objectAzAngle_deg = np.array([30,-10])
+objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
+objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps,maxVelBaseband_mps,2) #np.array([-10,-10.1]) #np.array([-10,23])# m/s
+objectAzAngle_deg = np.random.uniform(-50,50, 2) #np.array([30,-10])
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
 
@@ -112,13 +120,7 @@ signalAmplitude = np.sqrt(signalPower)
 signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
 signalphasor = signalAmplitude*signalPhase
 
-""" Derived Parameters """
-chirpSamplingRate = 1/interRampTime
-maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
-print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
-FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
-velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
-print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
+
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 objectRangeBin = objectRange/rangeRes
