@@ -105,7 +105,7 @@ objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
                                         maxVelBaseband_mps+2*FsEquivalentVelocity, 2)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
 numDopUniqRbin = len(objectVelocity_mps)
-# print('Velocities:', objectVelocity_mps)
+print('Velocities (mps):', np.round(objectVelocity_mps,2))
 objectAzAngle_deg = np.random.uniform(-50,50, 2) #np.array([30,-10])
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
@@ -268,9 +268,8 @@ plt.grid(True)
 mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # numTx*numDopp x numRx
 mimoCoefficients_flatten = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1)).reshape(-1,numTx_simult*numRx)
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
-# digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
-# est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
 
+mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
 
