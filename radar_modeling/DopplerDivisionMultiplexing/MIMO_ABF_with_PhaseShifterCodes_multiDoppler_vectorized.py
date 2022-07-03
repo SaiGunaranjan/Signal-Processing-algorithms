@@ -103,7 +103,7 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
                                         maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
-# numDopUniqRbin = len(objectVelocity_mps)
+
 print('Velocities (mps):', np.round(objectVelocity_mps,2))
 objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10])
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
