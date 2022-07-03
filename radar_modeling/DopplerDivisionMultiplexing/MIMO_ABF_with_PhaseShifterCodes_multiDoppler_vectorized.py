@@ -55,10 +55,8 @@ import matplotlib.pyplot as plt
 plt.close('all')
 
 flagRBM = 1
-
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
-
 
 numTx_simult = 4
 numRx = 8
@@ -101,12 +99,13 @@ velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
 print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Target definition"""
+numDopUniqRbin = 3 # Number of Dopplers in a given range bin
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
-                                        maxVelBaseband_mps+2*FsEquivalentVelocity, 2)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
-numDopUniqRbin = len(objectVelocity_mps)
+                                        maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
+# numDopUniqRbin = len(objectVelocity_mps)
 print('Velocities (mps):', np.round(objectVelocity_mps,2))
-objectAzAngle_deg = np.random.uniform(-50,50, 2) #np.array([30,-10])
+objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10])
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
 
@@ -242,24 +241,25 @@ noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_ar
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
-
-plt.figure(1, figsize=(20,10),dpi=200)
-plt.title('Range spectrum')
-plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
-# plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
-plt.xlabel('Range Bins')
-plt.ylabel('Power dBm')
-plt.grid(True)
+if 0:
+    plt.figure(1, figsize=(20,10),dpi=200)
+    plt.title('Range spectrum')
+    plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
+    # plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
+    plt.xlabel('Range Bins')
+    plt.ylabel('Power dBm')
+    plt.grid(True)
 
 
 plt.figure(2, figsize=(20,10), dpi=200)
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum[:,:,0].T, lw=2) # Plotting only the 0th Rx instead of all 8
-plt.vlines(dopplerBinsToSample[0,:],ymin = -70, ymax = 10)
-plt.vlines(dopplerBinsToSample[1,:],ymin = -70, ymax = 10, color = 'r')
+plt.vlines(dopplerBinsToSample ,ymin = -70, ymax = 10)
+
 # plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
 # plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
 # plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
+
 plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
@@ -273,7 +273,6 @@ mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
 
-
 plt.figure(3, figsize=(20,10), dpi=200)
 plt.subplot(1,2,1)
 plt.title('MIMO phase')
@@ -284,9 +283,7 @@ plt.grid(True)
 plt.subplot(1,2,2)
 plt.title('MIMO ULA Angle spectrum')
 plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum.T)),label='Angle spectrum')
-plt.axvline(objectAzAngle_deg[0], color = 'k', label='Ground Truth angle (deg)')
-plt.axvline(objectAzAngle_deg[1], color = 'k', label='Ground Truth angle (deg)')
-# plt.legend()
+plt.vlines(objectAzAngle_deg, ymin = -170, ymax = -110)
 plt.xlabel('Angle (deg)')
 plt.ylabel('dB')
 plt.grid(True)
