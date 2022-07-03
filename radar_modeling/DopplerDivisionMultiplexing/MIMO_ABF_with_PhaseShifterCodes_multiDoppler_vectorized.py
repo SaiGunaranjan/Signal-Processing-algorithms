@@ -54,6 +54,7 @@ import matplotlib.pyplot as plt
 
 plt.close('all')
 
+numDopUniqRbin = 3 # Number of Dopplers in a given range bin
 flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
@@ -99,7 +100,6 @@ velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
 print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Target definition"""
-numDopUniqRbin = 3 # Number of Dopplers in a given range bin
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
                                         maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
