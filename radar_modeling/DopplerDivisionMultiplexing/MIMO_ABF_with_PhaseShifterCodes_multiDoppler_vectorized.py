@@ -54,7 +54,7 @@ import matplotlib.pyplot as plt
 
 plt.close('all')
 
-numDopUniqRbin = 3 # Number of Dopplers in a given range bin
+numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Dopplers in a given range bin
 flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
@@ -92,6 +92,11 @@ angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/n
 
 
 """ Derived Parameters """
+snrGainDDMA = 10*np.log10(numTx_simult**2) #dB
+snrGainDopplerFFT = 10*np.log10(numRamps) #dB
+totalsnrGain = snrGainDDMA + snrGainDopplerFFT
+print('Total SNR gain ( {0:.0f} Tx DDMA + {1:.0f} point Doppler FFT) = {2:.2f} dB'.format(numTx_simult, numRamps, totalsnrGain))
+
 chirpSamplingRate = 1/interRampTime
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
@@ -216,9 +221,15 @@ if (flagRBM == 1):
 
     """ Correcting for the Doppler modulation caused due to the Range bin Migration"""
     rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
-    rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi
-    rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq[:,None]*np.arange(numRamps)[None,:])
-    chirpSamp_givenRangeBin = chirpSamp_givenRangeBin*rbmModulationCorrectionTerm[:,:,None]
+    dopplerBinOffset_rbm = (rbmModulationAnalogFreq/rampSamplingRate)*numDoppFFT
+    # rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi
+    # rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq[:,None]*np.arange(numRamps)[None,:])
+    # chirpSamp_givenRangeBin = chirpSamp_givenRangeBin*rbmModulationCorrectionTerm[:,:,None]
+else:
+    dopplerBinOffset_rbm = np.zeros((numDopUniqRbin,))
+
+
+
 
 signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
 signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
@@ -229,7 +240,7 @@ signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 
 objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
 binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
-dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + binOffset_Txphase[None,:]).astype('int32')
+dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
 dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
 DNL_rad = (DNL/180) * np.pi
@@ -241,25 +252,20 @@ noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_ar
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
-if 0:
-    plt.figure(1, figsize=(20,10),dpi=200)
-    plt.title('Range spectrum')
-    plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
-    # plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
-    plt.xlabel('Range Bins')
-    plt.ylabel('Power dBm')
-    plt.grid(True)
+
+plt.figure(1, figsize=(20,10),dpi=200)
+plt.title('Power mean Range spectrum - Single chirp SNR = ' + str(np.round(binSNR)) + 'dB')
+plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
+# plt.axvline(rangeBinsToSample, color = 'k', linestyle = 'solid')
+plt.xlabel('Range Bins')
+plt.ylabel('Power dBm')
+plt.grid(True)
 
 
 plt.figure(2, figsize=(20,10), dpi=200)
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum[:,:,0].T, lw=2) # Plotting only the 0th Rx instead of all 8
 plt.vlines(dopplerBinsToSample ,ymin = -70, ymax = 10)
-
-# plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
-# plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
-# plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
-
 plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
