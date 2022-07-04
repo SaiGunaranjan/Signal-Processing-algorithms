@@ -38,7 +38,6 @@ Also added Doppler to the object"""
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
 
-""" Haven't introduced the range bin migration term yet. Need to introduce in subsequent commits"""
 
 
 """ To verify if the DDMA modelling has been done correctly and the DDMA is infact a special case of ABF
@@ -262,13 +261,16 @@ plt.ylabel('Power dBm')
 plt.grid(True)
 
 
-plt.figure(2, figsize=(20,10), dpi=200)
-plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
-plt.plot(signalMagSpectrum[:,:,0].T, lw=2) # Plotting only the 0th Rx instead of all 8
-plt.vlines(dopplerBinsToSample ,ymin = -70, ymax = 10)
-plt.xlabel('Doppler Bins')
-plt.ylabel('Power dBFs')
-plt.grid(True)
+plt.figure(2, figsize=(20,10))
+plt.suptitle('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
+for ele in range(numDopUniqRbin):
+    plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+    plt.plot(signalMagSpectrum[ele,:,0].T, lw=2, label='Target speed = ' + str(np.round(objectVelocity_mps[ele],2)) + ' mps') # Plotting only the 0th Rx instead of all 8
+    plt.vlines(dopplerBinsToSample[ele,:] ,ymin = -70, ymax = 10)
+    plt.xlabel('Doppler Bins')
+    plt.ylabel('Power dBFs')
+    plt.grid(True)
+    plt.legend()
 
 
 mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # numTx*numDopp x numRx
@@ -279,19 +281,24 @@ mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
 
-plt.figure(3, figsize=(20,10), dpi=200)
-plt.subplot(1,2,1)
-plt.title('MIMO phase')
-plt.plot(ULA.T,'-o')
-plt.xlabel('Rx')
-plt.ylabel('Phase (rad)')
-plt.grid(True)
-plt.subplot(1,2,2)
-plt.title('MIMO ULA Angle spectrum')
-plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum.T)),label='Angle spectrum')
-plt.vlines(objectAzAngle_deg, ymin = -170, ymax = -110)
-plt.xlabel('Angle (deg)')
-plt.ylabel('dB')
-plt.grid(True)
+
+plt.figure(3, figsize=(20,10))
+plt.suptitle('MIMO phase')
+for ele in range(numDopUniqRbin):
+    plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+    plt.plot(ULA[ele,:], '-o')
+    plt.xlabel('Rx #')
+    plt.ylabel('Phase (rad)')
+    plt.grid(True)
 
 
+# plt.figure(4, figsize=(20,10), dpi=200)
+plt.figure(4, figsize=(20,10))
+plt.suptitle('MIMO ULA Angle spectrum')
+for ele in range(numDopUniqRbin):
+    plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+    plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
+    plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
+    plt.xlabel('Angle (deg)')
+    plt.ylabel('dB')
+    plt.grid(True)
