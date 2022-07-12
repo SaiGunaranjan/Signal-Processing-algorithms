@@ -71,13 +71,10 @@ elif (platform == 'SRIR256'):
     numRx = 16
     numMIMO = 74
 
-
-
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
 numAngleFFT = 2048
-txSpacing = 2e-3
-rxSpacing = 4*txSpacing
+mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
 c = 3e8
 numBitsPhaseShifter = 5
@@ -98,7 +95,7 @@ lamda = lightSpeed/centerFreq
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
 phaseStepPerTx_deg = 29#29.3
 
-Fs_spatial = lamda/txSpacing
+Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
 
 
@@ -187,10 +184,6 @@ to scale the alpha for other step sizes"""
 
 alpha = 0#1e-4
 rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
-
-# alphaPerTx = (phaseStepPerRamp_deg/30) * 1e-4
-# rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alphaPerTx[:,None]/2)*(np.arange(numRamps)[None,:])**2)
-
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
 phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
