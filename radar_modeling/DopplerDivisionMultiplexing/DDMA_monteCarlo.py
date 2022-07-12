@@ -126,8 +126,8 @@ maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
 """ MonteCarlo Parameters"""
-numChirpsDDMA = np.arange(50,170,20) #np.arange(50,170,40) #np.arange(50,170,20) # np.array([140])
-range_binSNRArray = np.arange(-20, 30, 2) #np.arange(-20, 30, 4) # np.arange(-20, 30, 2) # dB
+numChirpsDDMA = np.arange(50,190,20) #np.arange(50,190,20) #np.arange(50,170,40) #np.arange(50,170,20) #
+range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 2) #np.arange(-20, 30, 4) # np.arange(-20, 30, 2) # dB
 numMonteCarloRuns = 100#50 #100 # 1
 numChirpsMC = len(numChirpsDDMA)
 numSnrMC = len(range_binSNRArray)
@@ -136,7 +136,6 @@ count_rampMC = 0
 
 
 for numRamps in numChirpsDDMA:
-    # numRamps = 140
     rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:])
     rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
     phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
@@ -147,7 +146,6 @@ for numRamps in numChirpsDDMA:
 
     for binSNR in range_binSNRArray:
         tstart_snr = time.time()
-        # binSNR = -3 # dB
         signalPowerdBFs = noiseFloor_perBin + binSNR
         signalPower = 10**(signalPowerdBFs/10)
         signalAmplitude = np.sqrt(signalPower)
@@ -156,11 +154,12 @@ for numRamps in numChirpsDDMA:
         errorAngArray = np.empty([0])
         for iter_num in np.arange(numMonteCarloRuns):
             """ Target definition"""
-            numDopUniqRbin = int(np.random.randint(low=3, high=9, size=1)) #2 # Number of Dopplers in a given range bin
+            # numDopUniqRbin = int(np.random.randint(low=3, high=9, size=1)) #2 # Number of Dopplers in a given range bin
+            numDopUniqRbin = np.random.choice(np.arange(3, 10), p=[1/6, 1/6, 1/6, 2/6, 1/18, 1/18, 1/18])
             objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
             objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
                                                     maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
-            # print('Velocities (mps):', np.round(objectVelocity_mps,2))
+
             objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10])
             objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
@@ -217,16 +216,13 @@ for numRamps in numChirpsDDMA:
                 """ Correcting for the Doppler modulation caused due to the Range bin Migration"""
                 rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
                 dopplerBinOffset_rbm = (rbmModulationAnalogFreq/rampSamplingRate)*numDoppFFT
-                # rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi
-                # rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq[:,None]*np.arange(numRamps)[None,:])
-                # chirpSamp_givenRangeBin = chirpSamp_givenRangeBin*rbmModulationCorrectionTerm[:,:,None]
             else:
                 dopplerBinOffset_rbm = np.zeros((numDopUniqRbin,))
 
 
             signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
             signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
-            signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
+            signalFFTShift = signalFFT
             signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
             signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
             signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
@@ -235,20 +231,6 @@ for numRamps in numChirpsDDMA:
             binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
             dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
             dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
-
-
-
-            # plt.figure(2, figsize=(20,10))
-            # plt.suptitle('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
-            # for ele in range(numDopUniqRbin):
-            #     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
-            #     plt.plot(signalMagSpectrum[ele,:,0].T, lw=2, label='Target speed = ' + str(np.round(objectVelocity_mps[ele],2)) + ' mps') # Plotting only the 0th Rx instead of all 8
-            #     plt.vlines(dopplerBinsToSample[ele,:] ,ymin = -70, ymax = 10)
-            #     plt.xlabel('Doppler Bins')
-            #     plt.ylabel('Power dBFs')
-            #     plt.grid(True)
-            #     plt.legend()
-
 
             mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # numTx*numDopp x numRx
             mimoCoefficients_flatten = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1)).reshape(-1,numTx_simult*numRx)
@@ -261,20 +243,24 @@ for numRamps in numChirpsDDMA:
             errorAng = objectAzAngle_deg - estAngDeg
             errorAngArray = np.hstack((errorAngArray,errorAng))
 
-            # plt.figure(4, figsize=(20,10))
-            # plt.suptitle('MIMO ULA Angle spectrum')
-            # for ele in range(numDopUniqRbin):
-            #     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
-            #     plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
-            #     plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
-            #     plt.xlabel('Angle (deg)')
-            #     plt.ylabel('dB')
-            #     plt.grid(True)
+            # if any(np.abs(errorAngArray)>3):
+            #     print('Im here')
+            #     print('Velocities (mps):', np.round(objectVelocity_mps,2))
+            #     print('True Angles (mps):', np.round(objectAzAngle_deg,2))
+            #     print('Estimated Angles (mps):', np.round(estAngDeg,2))
+
+            #     plt.figure(4, figsize=(20,10))
+            #     plt.suptitle('MIMO ULA Angle spectrum')
+            #     for ele in range(numDopUniqRbin):
+            #         plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+            #         plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
+            #         plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
+            #         plt.xlabel('Angle (deg)')
+            #         plt.ylabel('dB')
+            #         plt.grid(True)
 
         angErrorStd = np.std(errorAngArray)
         angleErrorMatrix[count_rampMC,count_snrMC] = angErrorStd
-
-        # print('Monte Carlo completed for {}/{} ramp steps, {}/{} SNR steps'.format(count_rampMC, numChirpsMC, count_snrMC, numSnrMC))
 
         count_snrMC += 1
         tstop_snr = time.time()
