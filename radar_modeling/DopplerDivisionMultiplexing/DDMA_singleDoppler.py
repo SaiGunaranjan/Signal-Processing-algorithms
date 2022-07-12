@@ -55,18 +55,26 @@ Also added Doppler to the object"""
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mimoPhasorSynthesis import mimoPhasorSynth
+
 
 plt.close('all')
 
+platform = 'SRIR256' # 'SRIR256', 'SRIR144'
 
-numTx_simult = 4
-numRx = 8
-numMIMO = numTx_simult*numRx
+if (platform == 'SRIR144'):
+    numTx_simult = 12
+    numRx = 12
+    numMIMO = 48
+elif (platform == 'SRIR256'):
+    numTx_simult = 13
+    numRx = 16
+    numMIMO = 74
+
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
 numAngleFFT = 2048
-txSpacing = 2e-3
-rxSpacing = 4*txSpacing
+mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
 numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
@@ -88,7 +96,7 @@ lamda = lightSpeed/centerFreq
 phaseStepPerTx_deg = 29#29.3
 
 
-Fs_spatial = lamda/txSpacing
+Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
 
 
@@ -132,6 +140,11 @@ objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocit
 objectAzAngle_deg = np.random.uniform(-50,50) #30 36.3#
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
+objectElAngle_deg = 0 # phi=0 plane angle
+objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
+
+mimoPhasor, mimoPhasor_txrx, ulaInd = mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad)
+
 
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
@@ -161,10 +174,6 @@ to scale the alpha for other step sizes"""
 
 alpha = 0#1e-4
 rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
-
-# alphaPerTx = (phaseStepPerRamp_deg/30) * 1e-4
-# rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alphaPerTx[:,None]/2)*(np.arange(numRamps)[None,:])**2)
-
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
 phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
@@ -177,8 +186,12 @@ dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamp
 rangeBinMigration = \
     np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[:,None]*np.arange(numSamp)[None,:])
 
-rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
-txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
+# rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
+# txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
+
+rxSignal = mimoPhasor_txrx[0,0,:]
+txSignal = mimoPhasor_txrx[0,:,0]
+
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
 phaseCodedTxSignal = dopplerTerm[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
@@ -260,14 +273,17 @@ plt.grid(True)
 
 
 mimoCoefficients_eachDoppler_givenRange = signalFFT[dopplerBinsToSample,:] # numTx*numDopp x numRx
-mimoCoefficients_flatten = (mimoCoefficients_eachDoppler_givenRange.T).reshape(-1,numTx_simult*numRx)
+mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
+mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten[0,:]))
+
+
 # digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
 # est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
 
 
 
-ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:],n=numAngleFFT)/(numMIMO)
+ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:]*np.hanning(numMIMO),n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
 
 
