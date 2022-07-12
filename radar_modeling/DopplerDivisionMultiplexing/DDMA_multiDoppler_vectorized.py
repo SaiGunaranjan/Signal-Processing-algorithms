@@ -50,6 +50,8 @@ Also added Doppler to the object"""
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mimoPhasorSynthesis import mimoPhasorSynth
+
 
 plt.close('all')
 
@@ -58,9 +60,19 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-numTx_simult = 4
-numRx = 8
-numMIMO = numTx_simult*numRx
+platform = 'SRIR256' # 'SRIR256', 'SRIR144'
+
+if (platform == 'SRIR144'):
+    numTx_simult = 12
+    numRx = 12
+    numMIMO = 48
+elif (platform == 'SRIR256'):
+    numTx_simult = 13
+    numRx = 16
+    numMIMO = 74
+
+
+
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
 numAngleFFT = 2048
@@ -109,8 +121,13 @@ objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocit
                                         maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
 
 print('Velocities (mps):', np.round(objectVelocity_mps,2))
-objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10])
+objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10]) Theta plane angle
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
+
+objectElAngle_deg = np.zeros((numDopUniqRbin,)) # phi=0 plane angle
+objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
+
+mimoPhasor, mimoPhasor_txrx, ulaInd = mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad)
 
 
 ## RF parameters
@@ -185,9 +202,12 @@ dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin[:,None])/numRamps)*np.arange
 rangeBinMigration = \
     np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps[:,None,None]/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[None,:,None]*np.arange(numSamp)[None,None, :])
 
+# rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numRx)[None,:]) # [number of Angles/RD, numRx]
+# txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numTx_simult)[None,:]) # [number of Angles/RD, numTx]
 
-rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numRx)[None,:]) # [number of Angles/RD, numRx]
-txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numTx_simult)[None,:]) # [number of Angles/RD, numTx]
+rxSignal = mimoPhasor_txrx[:,0,:]
+txSignal = mimoPhasor_txrx[:,:,0]
+
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
 phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,:,None]*rxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
@@ -273,8 +293,9 @@ for ele in range(numDopUniqRbin):
     plt.legend()
 
 
-mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # numTx*numDopp x numRx
-mimoCoefficients_flatten = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1)).reshape(-1,numTx_simult*numRx)
+mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # [numObj, numTx, numRx]
+mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
+mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
 
 mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
