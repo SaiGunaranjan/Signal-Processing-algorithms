@@ -50,6 +50,7 @@ Also added Doppler to the object"""
 
 import numpy as np
 import matplotlib.pyplot as plt
+from mimoPhasorSynthesis import mimoPhasorSynth
 import time as time
 
 tstart = time.time()
@@ -61,14 +62,22 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-numTx_simult = 4
-numRx = 8
-numMIMO = numTx_simult*numRx
+
+platform = 'SRIR256' # 'SRIR256', 'SRIR144'
+
+if (platform == 'SRIR144'):
+    numTx_simult = 12
+    numRx = 12
+    numMIMO = 48
+elif (platform == 'SRIR256'):
+    numTx_simult = 13
+    numRx = 16
+    numMIMO = 74
+
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
 numAngleFFT = 2048
-txSpacing = 2e-3
-rxSpacing = 4*txSpacing
+mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
 c = 3e8
 numBitsPhaseShifter = 5
@@ -88,7 +97,7 @@ lamda = lightSpeed/centerFreq
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
 phaseStepPerTx_deg = 29#29.3
 
-Fs_spatial = lamda/txSpacing
+Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
 
 """ Phase Shifter settings"""
@@ -127,11 +136,12 @@ FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
 """ MonteCarlo Parameters"""
 numChirpsDDMA = np.arange(50,190,20) #np.arange(50,190,20) #np.arange(50,170,40) #np.arange(50,170,20) #
-range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 2) #np.arange(-20, 30, 4) # np.arange(-20, 30, 2) # dB
-numMonteCarloRuns = 100#50 #100 # 1
+range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 4)#np.arange(-20, 30, 2)#np.arange(-20, 30, 2) #np.arange(-20, 30, 4) # np.arange(-20, 30, 2) # dB
+numMonteCarloRuns = 100#100#50 # 1
 numChirpsMC = len(numChirpsDDMA)
 numSnrMC = len(range_binSNRArray)
 angleErrorMatrix = np.zeros((numChirpsMC, numSnrMC))
+angleErrorMatrix_percentile = np.zeros((numChirpsMC, numSnrMC))
 count_rampMC = 0
 
 
@@ -154,14 +164,18 @@ for numRamps in numChirpsDDMA:
         errorAngArray = np.empty([0])
         for iter_num in np.arange(numMonteCarloRuns):
             """ Target definition"""
-            # numDopUniqRbin = int(np.random.randint(low=3, high=9, size=1)) #2 # Number of Dopplers in a given range bin
-            numDopUniqRbin = np.random.choice(np.arange(3, 10), p=[1/6, 1/6, 1/6, 2/6, 1/18, 1/18, 1/18])
+            numDopUniqRbin = np.random.choice(np.arange(1, 4), p=[3/6, 2/6, 1/6]) # Number of Dopplers in a given range bin with the corresponding pmf
             objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
             objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
                                                     maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
 
             objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10])
             objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
+
+            objectElAngle_deg = np.zeros((numDopUniqRbin,)) # phi=0 plane angle
+            objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
+
+            mimoPhasor, mimoPhasor_txrx, ulaInd = mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad)
 
             objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
             objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
@@ -181,8 +195,12 @@ for numRamps in numChirpsDDMA:
                 np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps[:,None,None]/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[None,:,None]*np.arange(numSamp)[None,None, :])
 
 
-            rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numRx)[None,:]) # [number of Angles/RD, numRx]
-            txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numTx_simult)[None,:]) # [number of Angles/RD, numTx]
+            # rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numRx)[None,:]) # [number of Angles/RD, numRx]
+            # txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numTx_simult)[None,:]) # [number of Angles/RD, numTx]
+
+            rxSignal = mimoPhasor_txrx[:,0,:]
+            txSignal = mimoPhasor_txrx[:,:,0]
+
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
             phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
             phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,:,None]*rxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
@@ -232,8 +250,9 @@ for numRamps in numChirpsDDMA:
             dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
             dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
-            mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # numTx*numDopp x numRx
-            mimoCoefficients_flatten = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1)).reshape(-1,numTx_simult*numRx)
+            mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # # [numObj, numTx, numRx]
+            mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
+            mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
             mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
             ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
             ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
@@ -243,11 +262,11 @@ for numRamps in numChirpsDDMA:
             errorAng = objectAzAngle_deg - estAngDeg
             errorAngArray = np.hstack((errorAngArray,errorAng))
 
-            # if any(np.abs(errorAngArray)>3):
+            # if any(np.abs(errorAng)>3):
             #     print('Im here')
             #     print('Velocities (mps):', np.round(objectVelocity_mps,2))
-            #     print('True Angles (mps):', np.round(objectAzAngle_deg,2))
-            #     print('Estimated Angles (mps):', np.round(estAngDeg,2))
+            #     print('True Angles (deg):', np.round(objectAzAngle_deg,2))
+            #     print('Estimated Angles (deg):', np.round(estAngDeg,2))
 
             #     plt.figure(4, figsize=(20,10))
             #     plt.suptitle('MIMO ULA Angle spectrum')
@@ -259,8 +278,12 @@ for numRamps in numChirpsDDMA:
             #         plt.ylabel('dB')
             #         plt.grid(True)
 
+
         angErrorStd = np.std(errorAngArray)
         angleErrorMatrix[count_rampMC,count_snrMC] = angErrorStd
+
+        angleErrorMatrix_percentile[count_rampMC,count_snrMC] = np.percentile(np.abs(errorAngArray),98)
+
 
         count_snrMC += 1
         tstop_snr = time.time()
@@ -282,6 +305,15 @@ plt.xlabel('SNR (dB)')
 plt.ylabel('Angle Error std (deg)')
 plt.grid(True)
 plt.legend(legend_list)
+
+plt.figure(2,figsize=(20,10), dpi=200)
+plt.title('Abs Angle Error(98 percentile) vs SNR')
+plt.plot(range_binSNRArray, angleErrorMatrix_percentile.T, '-o')
+plt.xlabel('SNR (dB)')
+plt.ylabel('Angle Error std (deg)')
+plt.grid(True)
+plt.legend(legend_list)
+plt.ylim([0,1])
 
 
 
