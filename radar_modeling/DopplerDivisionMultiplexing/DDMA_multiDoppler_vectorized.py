@@ -241,29 +241,48 @@ else:
     dopplerBinOffset_rbm = np.zeros((numDopUniqRbin,))
 
 
-
-
-signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
-signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
-signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
-signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
-signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
-signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
-
 objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
 binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
 dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
 dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
-DNL_rad = (DNL/180) * np.pi
-noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps)
 
+""" To obtain the signal coefficients, we could either do an FFT and evaluate at the required bins
+or we could simply perform a single point DFT by correlating the signal with the phasor constructed out of the required bins.
+In this commit, I'm evaluating the coefficients by doing a single point DFT at the known Doppler bins.
+This way, we don't have to perform a huge FFT and then evaluate at the dopplerBinsToSample which is compute heavy.
+Rather, we evaluate a single point DFT at the dopplerBinsToSample. T
+This has a much smaller compute as compared to performing a huge FFT for 16 Rx channels.
+Here, I'm computing the Doppler FFT for plotting purpose only"""
+signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
+signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
+signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
+
+""" Coefficients estimated using FFT and sampling the required bins"""
+# mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # [numObj, numTx, numRx]
+
+"""DFT based coefficient estimation """
+DFT_vec = np.exp(1j*2*np.pi*(dopplerBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed[:,:,:,None]*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
+mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1))
+
+mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
+mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
+ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
+mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
+ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
+ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
+
+signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
+signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
+signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 powerMeanSpectrum_arossRxs = np.mean(signalFFTShiftSpectrum,axis=1) # Take mean spectrum across Rxs
 noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_arossRxs),70))
 
+DNL_rad = (DNL/180) * np.pi
+noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps)
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
-
 
 plt.figure(1, figsize=(20,10),dpi=200)
 plt.title('Power mean Range spectrum - Single chirp SNR = ' + str(np.round(binSNR)) + 'dB')
@@ -284,16 +303,6 @@ for ele in range(numDopUniqRbin):
     plt.ylabel('Power dBFs')
     plt.grid(True)
     plt.legend()
-
-
-mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # [numObj, numTx, numRx]
-mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
-mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
-ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
-
-mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
-ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
-ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
 
 
 plt.figure(3, figsize=(20,10))

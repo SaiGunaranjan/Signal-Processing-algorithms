@@ -136,7 +136,7 @@ FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
 """ MonteCarlo Parameters"""
 numChirpsDDMA = np.arange(50,190,20) #np.arange(50,190,20) #np.arange(50,170,40) #np.arange(50,170,20) #
-range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 4)#np.arange(-20, 30, 2)#np.arange(-20, 30, 2) #np.arange(-20, 30, 4) # np.arange(-20, 30, 2) # dB
+range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 4)#np.arange(-20, 30, 2)  # dB
 numMonteCarloRuns = 100#100#50 # 1
 numChirpsMC = len(numChirpsDDMA)
 numSnrMC = len(range_binSNRArray)
@@ -192,8 +192,7 @@ for numRamps in numChirpsDDMA:
             dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin[:,None])/numRamps)*np.arange(numRamps)[None,:]) # [number of Dopplers/range, numRamps]
             """ Range Bin migration term"""
             rangeBinMigration = \
-                np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps[:,None,None]/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[None,:,None]*np.arange(numSamp)[None,None, :])
-
+                np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps[:,None,None]/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[None,:,None]*np.arange(numSamp)[None,None,:])
 
             # rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numRx)[None,:]) # [number of Angles/RD, numRx]
             # txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad[:,None])*np.arange(numTx_simult)[None,:]) # [number of Angles/RD, numTx]
@@ -217,7 +216,7 @@ for numRamps in numChirpsDDMA:
             signal_rangeWin = signal*np.hanning(numSamp)[None,None,:]
             signal_rfft = np.fft.fft(signal_rangeWin,axis=2)/numSamp
             signal_rfft = signal_rfft[:,:,0:numSampPostRfft]
-            signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
+
 
             rangeBinsToSample = rangeBinsMoved
             chirpSamp_givenRangeBin = signal_rfft[np.arange(numRamps)[None,:],:,rangeBinsToSample]
@@ -238,19 +237,20 @@ for numRamps in numChirpsDDMA:
                 dopplerBinOffset_rbm = np.zeros((numDopUniqRbin,))
 
 
-            signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
-            signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
-            signalFFTShift = signalFFT
-            signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
-            signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
-            signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
-
             objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
             binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
             dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
             dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
-            mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # # [numObj, numTx, numRx]
+            signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
+            # signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
+            # mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # # [numObj, numTx, numRx]
+
+            """ Replaced large FFT with single point DFT for faster compute"""
+            DFT_vec = np.exp(1j*2*np.pi*(dopplerBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+            mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed[:,:,:,None]*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
+            mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1))
+
             mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
             mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
             mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
