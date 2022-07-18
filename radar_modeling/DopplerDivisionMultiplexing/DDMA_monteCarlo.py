@@ -32,8 +32,8 @@ This is not very clear to me and I need to understand this better!!
 
 """ In this commit, I have also modeled the Txs/Rxs with simulataneous transmission from all Txs
 each with its own phase code per ramp and have also been able to estimate MIMO coeficients.
-I have assumed 4 Txs each separated by 2mm (lamda/2) and 8 Rxs each separated by 8mm (2lamda).
-Also added Doppler to the object"""
+I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
+"""
 
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
