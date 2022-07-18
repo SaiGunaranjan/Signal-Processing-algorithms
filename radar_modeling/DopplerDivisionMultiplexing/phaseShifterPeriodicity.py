@@ -25,8 +25,8 @@ has a phase of 29 degress while the 14th ramp has a phase of 29*14= 406 = 46 deg
 is not the same as 29 degress. Hence the phase shifter for the 14th ramp
 is not the same as the phase shifter for the 2nd ramp. Hence just by making
 the phase change per ramp not a divisor of 360 degress, we remove the periodicity.
-We also observe that the noise floor increases by 3 dB for each Tx that is added
-to the simultaneous transmission i.e., when we move from 3 Tx to 4 Tx, the noise floor raises by another 3 dB.
+We also observe that the noise floor increases by 6 dB for every doubling of Tx
+to the simultaneous transmission i.e., when we move from 2 Tx to 4 Tx, the noise floor raises by another 6 dB.
 This is not very clear to me and I need to understand this better!!"""
 
 import numpy as np
@@ -39,10 +39,11 @@ numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 numTx_simult = 4
 """ With 30 deg we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
-phaseStepPerTx_deg = 30
+phaseStepPerTx_deg = 29 # 29
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
-# phaseStepPerRamp_deg = 30
-numRamps = 280
+phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
+
+numRamps = 140
 phaseShifterCodes = DNL*np.arange(numPhaseCodes)
 phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
 phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
@@ -57,10 +58,10 @@ Thus the alpha should be moderate to break the periodicity with help
 of the quadratic term at the same time not degrade the main lobe width.
 
 I have observed that for phaseStepPerRamp_deg=30 deg, alpha = 1e-4 is best. We will use this
-to scale the alpha for other step sizes"""
+to scale the alpha for other step sizes. Fow now, I have removed the quadratic term by setting alpha to 0"""
 
 
-alpha = 1e-4 # 1e-3
+alpha = 0 # 1e-4
 rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
 
 # alphaPerTx = (phaseStepPerRamp_deg/30) * 1e-4
@@ -79,28 +80,32 @@ signal = np.sum(np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
 
 signalWindowed = signal*np.hanning(numRamps)
 signalFFT = np.fft.fft(signalWindowed)/numRamps
-signalFFTShift = np.fft.fftshift(signalFFT)
+signalFFTShift = signalFFT #np.fft.fftshift(signalFFT)
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
 signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum)
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 
 noiseFloorSetByDNL = 10*np.log10((DNL/180 *np.pi)**2/12) - 10*np.log10(numRamps)
-noiseFloorEstFromSignal = 10*np.log10(np.mean(np.sort(signalFFTShiftSpectrum)[0:numRamps-10*numTx_simult]))
+# noiseFloorEstFromSignal = 10*np.log10(np.mean(np.sort(signalFFTShiftSpectrum)[0:numRamps-10*numTx_simult]))
+noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(signalFFTShiftSpectrum),65))
 
 print('Noise Floor Estimated from signal with {} Txs simulataneously ON with phase sweeps: {} dB'.format(numTx_simult, \
                                                                                                          np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
+binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numRamps
+dopplerBinsToSample = np.round(binOffset_Txphase).astype('int32')
+dopplerBinsToSample = np.mod(dopplerBinsToSample, numRamps)
 
-
-plt.figure(1, figsize=(20,10))
+plt.figure(1, figsize=(20,10),dpi=200)
 # plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
 plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 plt.plot(signalMagSpectrum, lw=2)
-# plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
-# plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
-# plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
-plt.xlabel('Bins')
+# plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
+plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
+plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
+plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
+plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
 
