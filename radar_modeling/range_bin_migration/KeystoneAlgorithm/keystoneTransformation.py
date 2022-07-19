@@ -39,16 +39,10 @@ lightSpeed = 3e8 # m/s
 chirpBW = 4e9 # Hz
 interRampTime = 44e-6#13e-6#44e-6 # us
 rampSamplingRate = 1/interRampTime
-
 chirpStartFreq = 77e9 # Giga Hz
 numChirps = 168#500#168
 
-
-""" Object parameters"""
-objectRange_m = 10
-objectVelocity_mps = 20#60 # 20 m/s
-
-
+""" Derived Parameters"""
 adcSamplingTime = 1/adcSamplingRate # seconds
 chirpOnTime = numSamples*adcSamplingTime #39.2e-6
 chirpSamplingRate = 1/interRampTime
@@ -56,12 +50,20 @@ chirpSlope = chirpBW/chirpOnTime
 chirpCentreFreq = chirpStartFreq + chirpBW/2
 lamda = lightSpeed/chirpCentreFreq
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
-rangeRes = lightSpeed/(2*chirpBW)
-
-print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 velocityRes = (chirpSamplingRate/numChirps) * (lamda/2)
+rangeRes = lightSpeed/(2*chirpBW)
+maxRange = (numSamples//2)*rangeRes
+
+print('Max Range = {0:.2f} m'.format(maxRange))
+print('Range resolution = {0:.2f} cm'.format(rangeRes*100))
+print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
 print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
+
+
+""" Object parameters"""
+objectRange_m = 10
+objectVelocity_mps = 20#60 # 20 m/s
 
 
 rangeTerm = np.exp(1j*2*np.pi*(chirpSlope*2*objectRange_m/lightSpeed)*\
