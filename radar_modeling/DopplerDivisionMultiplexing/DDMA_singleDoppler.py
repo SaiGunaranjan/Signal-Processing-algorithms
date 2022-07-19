@@ -44,15 +44,6 @@ Also added Doppler to the object"""
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/2949121/Doppler+Phase+modulation+due+to+residual+Range+bin+movement+across+chirps+-+Sampled+signal
 """
 
-
-""" To verify if the DDMA modelling has been done correctly and the DDMA is infact a special case of ABF
-    make the following changes
-    1. Set  phaseStepPerTx_deg = 0
-    2. Set objectAzAngle_deg = 0 since ABF holds for object at boresight
-    3. Make the binSNR a reasonable number say 10 so that the tone sticks out to begin with in the range spectrum
-    4. Make numTx_simult vary from 1, 2, 3, 4 to check if the SNR of the target at boresight scales by 6, 9, 12 dB
-    for numTx_simult = 2, 3, 4 respectively"""
-
 import numpy as np
 import matplotlib.pyplot as plt
 from mimoPhasorSynthesis import mimoPhasorSynth
