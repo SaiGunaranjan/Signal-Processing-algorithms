@@ -91,7 +91,6 @@ chirpAxis = np.arange(numChirps)*interRampTime
 
 
 """ KeyStone Transformation"""
-# interpFact = ((chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None]*adcSamplingTime)/chirpCentreFreq)*interRampTime*np.arange(numChirps)[None,:]
 interpFact = (chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None]*adcSamplingTime))*np.arange(numChirps)[None,:]*interRampTime
 
 allChirpsDuration = (numChirps-1)*interRampTime
@@ -101,11 +100,14 @@ chirpSampPoints = np.arange(numChirps)*interRampTime
 interpreceivedSignal = np.zeros((receivedSignal.shape),dtype=np.complex64)
 for ele in range(numSamples):
     if 0:
+        """ 1-D linear interpolation. Valid only when there is a single Doppler in the scene"""
         doppPhaseInterpFunc = interp1d(chirpSampPoints, doppPhase[ele,:], kind='linear')
         xnew = interpFact[ele,:]
         doppPhaseInterpVals = doppPhaseInterpFunc(xnew)
     if 1:
-        doppPhaseInterpFunc = interpolate.splrep(chirpSampPoints, doppPhase[ele,:], s=0, k=1)
+        """ Spline interpolation. Valid even when there are multiple Dopplers in the scene"""
+        # doppPhaseInterpFunc = interpolate.splrep(chirpSampPoints, doppPhase[ele,:], s=0, k=1)
+        doppPhaseInterpFunc = interpolate.splrep(chirpSampPoints, doppPhase[ele,:], k=3) # cubic spline interpolation
         xnew = interpFact[ele,:]
         doppPhaseInterpVals = interpolate.splev(xnew, doppPhaseInterpFunc, der=0)
 
