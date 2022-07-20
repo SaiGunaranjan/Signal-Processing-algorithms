@@ -161,7 +161,7 @@ plt.ylabel('Range bin')
 plt.figure(2,figsize=(20,10),dpi=200)
 plt.title('Range bins moved across chirps for object with speed = ' + str(objectVelocity_mps) + ' mps.' + ' Chirp BW = ' + str(int(chirpBW/1e9)) + ' GHz')
 plt.plot(binsMovedPreCorr,'-o',label='Pre correction')
-plt.plot(binsMovedPostCorr,'-o',label='Post Keystone transformation')
+plt.plot(binsMovedPostCorr,'-o',label='Post Keystone correction')
 plt.xlabel('chirp number')
 plt.ylabel('range bins');
 plt.grid(True)
@@ -169,20 +169,15 @@ plt.legend()
 
 plt.figure(3,figsize=(20,10),dpi=200)
 plt.suptitle('Doppler Spectrum')
-
-plt.subplot(1,2,1)
-plt.title('Before Keystone correction')
-plt.plot(dopplerAxis, receivedSignalRfftDfftMagSpec[binsMovedPreCorr[0],:])
+plt.plot(dopplerAxis, receivedSignalRfftDfftMagSpec[binsMovedPreCorr[0],:], label='Before Keystone correction')
+plt.plot(dopplerAxis, interpreceivedSignalRfftDfftMagSpec[binsMovedPostCorr[0],:],label='After Keystone correction')
 plt.axvline(objectVelocity_mps,color='k',label='Ground truth velocity')
 plt.xlabel('Velocity (mps)')
 plt.ylim([-174,-5])
 plt.grid('True')
+plt.legend()
 
-plt.subplot(1,2,2)
-plt.title('After Keystone correction')
-plt.plot(dopplerAxis, interpreceivedSignalRfftDfftMagSpec[binsMovedPostCorr[0],:])
-plt.axvline(objectVelocity_mps,color='k',label='Ground truth velocity')
-plt.xlabel('Velocity (mps)')
-plt.ylim([-174,-5])
-plt.grid('True')
+
+
+
 
