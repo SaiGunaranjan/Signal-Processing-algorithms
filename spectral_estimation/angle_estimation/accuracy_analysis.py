@@ -23,7 +23,7 @@ angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/n
 thermalNoise = -174 # dBm/Hz
 noiseFigure = 10 # dB
 baseBandgain = 34 #dB
-adcSamplingRate = 56.25e6 # 56.25 MHz
+adcSamplingRate = 56.25e6 # MHz
 adcSamplingTime = 1/adcSamplingRate # s
 
 dBFs_to_dBm = 10
@@ -35,10 +35,12 @@ totalNoisePower = noisePower_perBin*numRx # sigmasquare totalNoisePower
 sigma = np.sqrt(totalNoisePower)
 
 numMonteCarloRuns = 1000
-binSNRdBArray = np.arange(-10,60,2) #np.arange(18,70,5)
+binSNRdBArray = np.arange(-10,44,2)
 binSNRlinArray = 10**(binSNRdBArray/10)
 
-crlb = 1*1.2/(np.sqrt(2*binSNRlinArray))
+""" The below formula is the Cramer Rao Lower bound limit for accuracy of an estimator.
+It is given by resolution/sqrt(2*binSNRLinearScale)"""
+crlb = 1.2/(np.sqrt(2*binSNRlinArray))
 
 numSNRPoints = len(binSNRdBArray)
 angErrorArray = np.zeros((numSNRPoints,numMonteCarloRuns))
