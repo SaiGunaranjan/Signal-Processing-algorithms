@@ -19,7 +19,11 @@ def computeTwoLargestLocalMaxima(x):
     for i in range(Ncases):
         data=x[i,:]
         inx= argrelextrema(data,np.greater,order=1)[0]
-        twoLargestLocalPeaks = inx[np.argsort(data[inx])][-2::]
+        if (len(inx) >= 2):
+            twoLargestLocalPeaks = inx[np.argsort(data[inx])][-2::]
+        else:
+            twoLargestLocalPeaks = np.array([0,len(data)-1])
+
         twoLargestLocalPeaks_matrix = np.vstack((twoLargestLocalPeaks_matrix, twoLargestLocalPeaks))
 
     return twoLargestLocalPeaks_matrix
