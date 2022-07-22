@@ -68,9 +68,15 @@ for binSNR in binSNRdBArray:
     angErrorArray[count,:] = angDegError
     count += 1
 
-mseAngle = np.mean(np.abs(angErrorArray)**2,axis=1) #np.std(angErrorArray,axis=1)#np.mean(np.abs(angErrorArray)**2,axis=1)
-varianceAngEst = mseAngle #mseAngle**2
-stdAngEst = np.sqrt(varianceAngEst) #mseAngle #np.sqrt(varianceAngEst)
+""" Both the below methods of computing the variance and std are similar,
+but better to go with the second method that I'm using currently """
+
+# mseAngle = np.mean(np.abs(angErrorArray)**2,axis=1)
+# varianceAngEst = mseAngle
+# stdAngEst = np.sqrt(varianceAngEst)
+
+stdAngEst = np.std(angErrorArray,axis=1)
+varianceAngEst = stdAngEst**2
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
