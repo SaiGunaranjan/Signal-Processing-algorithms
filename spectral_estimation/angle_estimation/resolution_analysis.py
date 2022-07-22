@@ -45,7 +45,7 @@ totalNoisePower = noisePower_perBin*numRx # sigmasquare totalNoisePower
 sigma = np.sqrt(totalNoisePower)
 
 numMonteCarloRuns = 100#1000
-binSNRdBArray = np.array([60]) #np.arange(18,70,5)
+binSNRdBArray = np.array([18]) #np.arange(18,70,5)
 binSNRlinArray = 10**(binSNRdBArray/10)
 numSNRPoints = len(binSNRdBArray)
 
@@ -156,7 +156,8 @@ plt.plot(angSepDeg,percent90estAngSepArrIAA.T, '-o', label='IAA')
 plt.plot(angSepDeg, angSepDeg, color='k', label='Expectation')
 plt.xlabel('GT angular separation (deg)')
 plt.ylabel('estimated angular separation (deg)')
-plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+# plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+plt.ylim([0,10])
 plt.grid(True)
 plt.legend()
 
@@ -169,6 +170,7 @@ plt.plot(angSepDeg,percent50estAngSepArrIAA.T, '-o', label='IAA')
 plt.plot(angSepDeg, angSepDeg, color='k', label='Expectation')
 plt.xlabel('GT angular separation (deg)')
 plt.ylabel('estimated angular separation (deg)')
-plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+# plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+plt.ylim([0,10])
 plt.grid(True)
 plt.legend()
