@@ -11,7 +11,7 @@ import sys
 sys.path.append("../..")
 sys.path.append("..")
 from function_utilities.libraryFunctions import computeTwoLargestLocalMaxima
-from spectral_estimation_lib import iaa_recursive
+from spectral_estimation_lib import iaa_recursive, capon_backward
 import time
 
 
@@ -19,6 +19,7 @@ tstart = time.time()
 plt.close('all')
 
 numRx = 74
+# nativeResolution = 1.2 #deg
 numAngleFFT = 2048 # 8192
 mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
@@ -64,6 +65,7 @@ signalPhase = signalPhase.reshape(numTargets,numAngSepPoints,numMonteCarloRuns)
 estAngSepArrFFT = np.zeros((numSNRPoints,numAngSepPoints, numMonteCarloRuns))
 estAngSepArrFFTWin = np.zeros((numSNRPoints,numAngSepPoints, numMonteCarloRuns))
 estAngSepArrIAA = np.zeros((numSNRPoints,numAngSepPoints, numMonteCarloRuns))
+estAngSepArrCapon = np.zeros((numSNRPoints,numAngSepPoints, numMonteCarloRuns))
 
 numIAAiterations = 10
 count = 0
@@ -128,6 +130,22 @@ for binSNR in binSNRdBArray:
     estAngSepDegIAA = estAngSepDegIAA.reshape(numAngSepPoints, numMonteCarloRuns) # [numbinSep, numMonteCarlo]
     estAngSepArrIAA[count,:,:] = estAngSepDegIAA
 
+    """ Capon """
+    corr_mat_model_order = numRx//2-2
+    caponFormatSignal1 = np.transpose(signal,(2,0,1)) # [numRx, numbinSep, numMonteCarlo]
+    caponFormatSignal2 = caponFormatSignal1.reshape(numRx, numMonteCarloRuns*numAngSepPoints) # [numRx, numbinSep x numMonteCarlo]
+    magSpecCapon = np.zeros((numMonteCarloRuns*numAngSepPoints, numAngleFFT)) # [numbinSep x numMonteCarlo, numRxFFT]
+    for ele in np.arange(numMonteCarloRuns*numAngSepPoints):
+        spectrum_capon = capon_backward(caponFormatSignal2[:,ele][:,None], corr_mat_model_order, digital_freq_grid)
+        magSpec_capon = np.abs(spectrum_capon)
+        magSpecCapon[ele,:] = magSpec_capon
+
+    twoLargestLocalPeaksMatrixCapon = computeTwoLargestLocalMaxima(magSpecCapon) # [numbinSep x numMonteCarlo, 2]
+    estAngDegCapon = angAxis_deg[twoLargestLocalPeaksMatrixCapon] # [numbinSep x numMonteCarlo, 2]
+    estAngSepDegCapon = np.abs(np.diff(estAngDegCapon,axis=1)) # [numbinSep x numMonteCarlo]
+    estAngSepDegCapon = estAngSepDegCapon.reshape(numAngSepPoints, numMonteCarloRuns) # [numbinSep, numMonteCarlo]
+    estAngSepArrCapon[count,:,:] = estAngSepDegCapon
+
 
     count += 1
 
@@ -135,10 +153,12 @@ for binSNR in binSNRdBArray:
 percent90estAngSepArrFFTWin = np.percentile(estAngSepArrFFTWin,90,axis=2)
 percent90estAngSepArrFFT = np.percentile(estAngSepArrFFT,90,axis=2)
 percent90estAngSepArrIAA = np.percentile(estAngSepArrIAA,90,axis=2)
+percent90estAngSepArrCapon = np.percentile(estAngSepArrCapon,90,axis=2)
 
 percent50estAngSepArrFFTWin = np.percentile(estAngSepArrFFTWin,50,axis=2)
 percent50estAngSepArrFFT = np.percentile(estAngSepArrFFT,50,axis=2)
 percent50estAngSepArrIAA = np.percentile(estAngSepArrIAA,50,axis=2)
+percent50estAngSepArrCapon = np.percentile(estAngSepArrCapon,50,axis=2)
 
 
 tstop = time.time()
@@ -150,10 +170,12 @@ plt.figure(1,figsize=(20,10),dpi=200)
 plt.suptitle('Target SNR = ' + str(binSNRdBArray[0]) + ' dB')
 plt.subplot(1,2,1)
 plt.title('90 percentile separation')
-plt.plot(angSepDeg,percent90estAngSepArrFFTWin.T, '-o', label='Windowed FFT')
-plt.plot(angSepDeg,percent90estAngSepArrFFT.T, '-o', label='Unwindowed FFT')
-plt.plot(angSepDeg,percent90estAngSepArrIAA.T, '-o', label='IAA')
+plt.plot(angSepDeg,percent90estAngSepArrFFTWin.T, '-*', label='Windowed FFT')
+plt.plot(angSepDeg,percent90estAngSepArrFFT.T, '-d', label='Unwindowed FFT',alpha=0.5)
+plt.plot(angSepDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
+plt.plot(angSepDeg,percent90estAngSepArrIAA.T, '-o', label='IAA', alpha=0.7)
 plt.plot(angSepDeg, angSepDeg, color='k', label='Expectation')
+# plt.axvline(nativeResolution, color='k',ls = '--',label='Native Res=1.2 deg')
 plt.xlabel('GT angular separation (deg)')
 plt.ylabel('estimated angular separation (deg)')
 # plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
@@ -164,9 +186,10 @@ plt.legend()
 
 plt.subplot(1,2,2)
 plt.title('50 percentile separation')
-plt.plot(angSepDeg,percent50estAngSepArrFFTWin.T, '-o', label='Windowed FFT')
-plt.plot(angSepDeg,percent50estAngSepArrFFT.T, '-o', label='Unwindowed FFT')
-plt.plot(angSepDeg,percent50estAngSepArrIAA.T, '-o', label='IAA')
+plt.plot(angSepDeg,percent50estAngSepArrFFTWin.T, '-*', label='Windowed FFT')
+plt.plot(angSepDeg,percent50estAngSepArrFFT.T, '-d', label='Unwindowed FFT',alpha=0.5)
+plt.plot(angSepDeg,percent50estAngSepArrCapon.T, '-s', label='Capon',alpha=0.6)
+plt.plot(angSepDeg,percent50estAngSepArrIAA.T, '-o', label='IAA',alpha=0.7)
 plt.plot(angSepDeg, angSepDeg, color='k', label='Expectation')
 plt.xlabel('GT angular separation (deg)')
 plt.ylabel('estimated angular separation (deg)')
