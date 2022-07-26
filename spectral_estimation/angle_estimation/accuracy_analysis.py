@@ -10,13 +10,14 @@ import matplotlib.pyplot as plt
 
 plt.close('all')
 numRx = 74
-numAngleFFT = 8192 # 8192
+numPointsAngleFFT = np.array([256,512,1024,2048,4096,8192])
+lenNumAngFFTInstances = len(numPointsAngleFFT)
 mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
 centerFreq = 76.5e9 # GHz
 lamda = lightSpeed/centerFreq
 Fs_spatial = lamda/mimoArraySpacing
-angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
+
 
 
 """ RF parameters """
@@ -43,7 +44,7 @@ It is given by resolution/sqrt(2*binSNRLinearScale)"""
 crlb = 1.2/(np.sqrt(2*binSNRlinArray))
 
 numSNRPoints = len(binSNRdBArray)
-angErrorArray = np.zeros((numSNRPoints,numMonteCarloRuns))
+angErrorArray = np.zeros((numSNRPoints,numMonteCarloRuns, lenNumAngFFTInstances))
 count = 0
 
 for binSNR in binSNRdBArray:
@@ -53,7 +54,7 @@ for binSNR in binSNRdBArray:
     signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi, numMonteCarloRuns))
     signalphasor = signalAmplitude*signalPhase
 
-    objectAngle_deg = np.zeros((numMonteCarloRuns,)) #np.random.uniform(-50,50, numMonteCarloRuns)
+    objectAngle_deg = np.random.uniform(-50,50, numMonteCarloRuns)#np.zeros((numMonteCarloRuns,))
     objectAngle_rad = (objectAngle_deg/360) * (2*np.pi)
 
     rxSignal = signalphasor[:,None]*np.exp(1j*(2*np.pi/lamda)*mimoArraySpacing*np.sin(objectAngle_rad[:,None])*np.arange(numRx)[None,:]) # [numAngMonteCarlo, numRx]
@@ -61,13 +62,20 @@ for binSNR in binSNRdBArray:
     noise = noise.reshape(numMonteCarloRuns,numRx) # [numMonteCarlo, numRx]
     signal = rxSignal + noise
 
-    signalFFT = np.fft.fft(signal,axis=1,n=numAngleFFT)/numRx
-    signalFFTshift = np.fft.fftshift(signalFFT,axes=(1,))
-    magSpec = np.abs(signalFFTshift)**2
-    angInd = np.argmax(magSpec,axis=1)
-    estAngDeg = angAxis_deg[angInd]
-    angDegError = objectAngle_deg - estAngDeg
-    angErrorArray[count,:] = angDegError
+    countNumAngFFT = 0
+    for numAngleFFT in numPointsAngleFFT:
+        signalFFT = np.fft.fft(signal,axis=1,n=numAngleFFT)/numRx
+        signalFFTshift = np.fft.fftshift(signalFFT,axes=(1,))
+        magSpec = np.abs(signalFFTshift)**2
+        angInd = np.argmax(magSpec,axis=1)
+        angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
+        estAngDeg = angAxis_deg[angInd]
+        angDegError = objectAngle_deg - estAngDeg
+        angErrorArray[count,:, countNumAngFFT] = angDegError
+
+        countNumAngFFT += 1
+
+
     count += 1
 
 """ Both the below methods of computing the variance and std are similar,
@@ -80,22 +88,24 @@ but better to go with the second method that I'm using currently """
 stdAngEst = np.std(angErrorArray,axis=1)
 varianceAngEst = stdAngEst**2
 
-
+legendArray = [str(x) + " point FFT" for x in numPointsAngleFFT]
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.title('Angle error std(dB) vs SNR (dB)')
-plt.plot(binSNRdBArray,20*np.log10(stdAngEst), '-o', label='estimated error')
-plt.plot(binSNRdBArray, 20*np.log10(crlb), label='CRLB limit')
+plt.plot(binSNRdBArray,20*np.log10(stdAngEst), '-o')
+plt.plot(binSNRdBArray, 20*np.log10(crlb), color='k')
 plt.xlabel('SNR (dB)')
 plt.ylabel('std (dB)')
 plt.grid(True)
-plt.legend()
+legendArray.append('CRLB limit')
+plt.legend(legendArray)
 
 
 plt.figure(2,figsize=(20,10),dpi=200)
 plt.title('Angle error std(deg)  vs SNR (dB)')
-plt.plot(binSNRdBArray,stdAngEst, '-o', label='estimated error')
-plt.plot(binSNRdBArray, crlb, label='CRLB limit')
+plt.plot(binSNRdBArray,stdAngEst, '-o')
+plt.plot(binSNRdBArray, crlb, color='k')
 plt.xlabel('SNR (dB)')
 plt.ylabel('std (deg)')
 plt.grid(True)
-plt.legend()
+legendArray.append('CRLB limit')
+plt.legend(legendArray)
