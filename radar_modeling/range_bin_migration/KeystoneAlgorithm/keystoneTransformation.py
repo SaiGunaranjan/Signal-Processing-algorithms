@@ -63,7 +63,8 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Object parameters"""
 objectRange_m = 10
-objectVelocity_mps = 20#60 # 20 m/s
+objectVelocity_mps = 20# 20 m/s
+# objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps, maxVelBaseband_mps) # 5 m/s
 
 
 rangeTerm = np.exp(1j*2*np.pi*(chirpSlope*2*objectRange_m/lightSpeed)*\
