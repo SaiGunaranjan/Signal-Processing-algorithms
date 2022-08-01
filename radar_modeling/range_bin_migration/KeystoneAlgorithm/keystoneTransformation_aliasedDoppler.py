@@ -63,15 +63,11 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Object parameters"""
 objectRange_m = 10
-objectVelocity_mps = 50#60 # 20 m/s
-# objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps, maxVelBaseband_mps) # 5 m/s
-basebandVelocity = np.mod(objectVelocity_mps,FsEquivalentVelocity)
-if (basebandVelocity>=maxVelBaseband_mps):
-    basebandVelocity = np.round(basebandVelocity - FsEquivalentVelocity,2)
-else:
-    basebandVelocity = np.round(basebandVelocity,2)
+doppHyp = np.arange(-2,3)#np.array([1])#np.arange(-2,3)
 
-
+basebandVelocity = 5#np.random.uniform(-maxVelBaseband_mps, maxVelBaseband_mps)
+selectDoppIntHyp = np.random.randint(doppHyp[0], doppHyp[-1])#1
+objectVelocity_mps = basebandVelocity + selectDoppIntHyp*FsEquivalentVelocity
 
 rangeTerm = np.exp(1j*2*np.pi*(chirpSlope*2*objectRange_m/lightSpeed)*\
                         adcSamplingTime*np.arange(numSamples)) # numSamples
@@ -103,7 +99,7 @@ chirpAxis = np.arange(numChirps)*interRampTime
 """ KeyStone Transformation"""
 interpFact = (chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None]*adcSamplingTime))*np.arange(numChirps)[None,:]*interRampTime
 
-allChirpsDuration = (numChirps-1)*interRampTime
+# allChirpsDuration = (numChirps-1)*interRampTime
 
 doppPhase = np.unwrap(np.angle(radarSignal),axis=1)
 chirpSampPoints = np.arange(numChirps)*interRampTime
@@ -123,19 +119,26 @@ for ele in range(numSamples):
 
     interpreceivedSignal[ele,:] = np.exp(1j*doppPhaseInterpVals)
 
-doppHyp = np.array([1])#np.arange(-2,3)
+
 DoppHypCorrFactor = np.exp(+1j*2*np.pi*((chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None,None]*adcSamplingTime))*np.arange(numChirps)[None,:,None]*doppHyp[None,None,:]))
-interpreceivedSignalDoppHypCorrected = interpreceivedSignal*DoppHypCorrFactor[:,:,0]
-doppPhaseInterp = np.unwrap(np.angle(interpreceivedSignalDoppHypCorrected),axis=1)
-interpreceivedSignalWind = interpreceivedSignalDoppHypCorrected*np.hanning(numSamples)[:,None]
+interpreceivedSignalDoppHypCorrected = interpreceivedSignal[:,:,None]*DoppHypCorrFactor # [numADCSamp, numRamps, numDoppHyp]
+# doppPhaseInterp = np.unwrap(np.angle(interpreceivedSignalDoppHypCorrected),axis=1)
+interpreceivedSignalWind = interpreceivedSignalDoppHypCorrected*np.hanning(numSamples)[:,None,None]
 interpreceivedSignalRfft = np.fft.fft(interpreceivedSignalWind,axis=0)/numSamples
-interpreceivedSignalRfft = interpreceivedSignalRfft[0:numSamples//2,:]
+interpreceivedSignalRfft = interpreceivedSignalRfft[0:numSamples//2,:,:]
 
-interpreceivedSignalRfftDoppWin = interpreceivedSignalRfft*np.hanning(numChirps)[None,:]
+interpreceivedSignalRfftDoppWin = interpreceivedSignalRfft*np.hanning(numChirps)[None,:,None]
 interpreceivedSignalRfftDoppFFT = np.fft.fft(interpreceivedSignalRfftDoppWin,axis=1,n=numDoppFFT)/numChirps
-interpreceivedSignalRfftDoppFFT = np.fft.fftshift(interpreceivedSignalRfftDoppFFT,axes=(1,))
 
-interpreceivedSignalRfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfft))
+targetRbinToSamp = np.round(objectRange_m/rangeRes).astype(np.int32)
+targetDbinToSamp = np.round(((basebandVelocity/velocityRes)/numChirps)*numDoppFFT).astype(np.int32)
+powerSpectrumVals = np.abs(interpreceivedSignalRfftDoppFFT[targetRbinToSamp,targetDbinToSamp,:])
+DoppHypMaxInd = np.argmax(powerSpectrumVals)
+estDoppHyp = doppHyp[DoppHypMaxInd]
+
+""" Sampling the correct Doppler Ambiguity number/Hyp for plotting the energy"""
+interpreceivedSignalRfftDoppFFT = np.fft.fftshift(interpreceivedSignalRfftDoppFFT[:,:,DoppHypMaxInd],axes=(1,))
+interpreceivedSignalRfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfft[:,:,DoppHypMaxInd]))
 interpreceivedSignalRfftDfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfftDoppFFT))
 
 binsMovedPreCorr = np.argmax(receivedSignalRfftMagSpec,axis=0)
@@ -168,7 +171,7 @@ plt.xlabel('Doppler bin')
 plt.ylabel('Range bin')
 
 plt.figure(2,figsize=(20,10),dpi=200)
-plt.title('Range bins moved across chirps for object with speed = ' + str(objectVelocity_mps) + ' mps.' + ' Chirp BW = ' + str(int(chirpBW/1e9)) + ' GHz')
+plt.title('Range bins moved across chirps for object with speed = ' + str(np.round(objectVelocity_mps,2)) + ' mps.' + ' Chirp BW = ' + str(int(chirpBW/1e9)) + ' GHz')
 plt.plot(binsMovedPreCorr,'-o',label='Pre correction')
 plt.plot(binsMovedPostCorr,'-o',label='Post Keystone correction')
 plt.xlabel('chirp number')
@@ -177,7 +180,8 @@ plt.grid(True)
 plt.legend()
 
 plt.figure(3,figsize=(20,10),dpi=200)
-plt.suptitle('Doppler Spectrum: ' + str(objectVelocity_mps) + ' mps velocity folded back to ' + str(basebandVelocity) + ' mps')
+plt.suptitle('Doppler Spectrum: ' + str(np.round(objectVelocity_mps,2)) + \
+             ' mps velocity folded back to ' + str(np.round(basebandVelocity,2)) + ' mps')
 plt.plot(dopplerAxis, receivedSignalRfftDfftMagSpec[binsMovedPreCorr[0],:], label='Before Keystone correction')
 plt.plot(dopplerAxis, interpreceivedSignalRfftDfftMagSpec[binsMovedPostCorr[0],:],label='After Keystone correction')
 plt.axvline(basebandVelocity,color='k',label='Ground truth velocity')
@@ -185,6 +189,17 @@ plt.xlabel('Velocity (mps)')
 plt.ylim([-174,-5])
 plt.grid('True')
 plt.legend()
+
+
+plt.figure(4,figsize=(20,10),dpi=200)
+plt.suptitle('Energy(dB) vs Dopp Ambiguity number')
+plt.bar(doppHyp, 20*np.log10(powerSpectrumVals),label='Energy')
+plt.axvline(selectDoppIntHyp,color='k',label='Ground truth')
+plt.xlabel('Doppler Ambiguity Number')
+plt.ylabel('dB')
+plt.legend()
+plt.grid('True')
+
 
 
 
