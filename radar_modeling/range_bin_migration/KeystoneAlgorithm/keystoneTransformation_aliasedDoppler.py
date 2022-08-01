@@ -8,7 +8,7 @@ Created on Sun Jul 17 00:16:44 2022
 """
 Reference paper used for Keystone transformation is available at the below link:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/4227073/Keystone+Transformation
-I have dervied and coded the keystone algorithm to cater to the FMCW architecture.
+I have derived and coded the keystone algorithm to cater to the FMCW architecture.
 """
 
 import numpy as np
