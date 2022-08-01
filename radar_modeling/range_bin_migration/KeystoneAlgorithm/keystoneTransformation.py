@@ -101,7 +101,8 @@ allChirpsDuration = (numChirps-1)*interRampTime
 
 doppPhase = np.unwrap(np.angle(radarSignal),axis=1)
 chirpSampPoints = np.arange(numChirps)*interRampTime
-interpreceivedSignal = np.zeros((receivedSignal.shape),dtype=np.complex64) # interpolated and resampled signal
+""" interpolated and resampled signal"""
+interpreceivedSignal = np.zeros((receivedSignal.shape),dtype=np.complex64)
 for ele in range(numSamples):
     if 0:
         """ 1-D linear interpolation. Valid only when there is a single Doppler in the scene"""

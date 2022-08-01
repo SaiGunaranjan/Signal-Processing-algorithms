@@ -100,7 +100,9 @@ interpFact = (chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples
 
 doppPhase = np.unwrap(np.angle(radarSignal),axis=1)
 chirpSampPoints = np.arange(numChirps)*interRampTime
-interpreceivedSignal = np.zeros((receivedSignal.shape),dtype=np.complex64) # interpolated and resampled signal
+""" interpolated and resampled signal.
+interpreceivedSignal satnds for interpolated and resampled received signal"""
+interpreceivedSignal = np.zeros((receivedSignal.shape),dtype=np.complex64)
 for ele in range(numSamples):
     if 0:
         """ 1-D linear interpolation. Valid only when there is a single Doppler in the scene"""
@@ -118,6 +120,8 @@ for ele in range(numSamples):
 
 """ Doppler Ambiguity Correction Term"""
 DoppHypCorrFactor = np.exp(+1j*2*np.pi*((chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None,None]*adcSamplingTime))*np.arange(numChirps)[None,:,None]*doppHyp[None,None,:]))
+
+""" Apply Doppler Ambiguity Correction Term to the Keystone transformation based interpolated and resampled signal"""
 interpreceivedSignalDoppHypCorrected = interpreceivedSignal[:,:,None]*DoppHypCorrFactor # [numADCSamp, numRamps, numDoppHyp]
 interpreceivedSignalWind = interpreceivedSignalDoppHypCorrected*np.hanning(numSamples)[:,None,None]
 interpreceivedSignalRfft = np.fft.fft(interpreceivedSignalWind,axis=0)/numSamples
@@ -129,10 +133,11 @@ interpreceivedSignalRfftDoppFFT = np.fft.fft(interpreceivedSignalRfftDoppWin,axi
 targetRbinToSamp = np.round(objectRange_m/rangeRes).astype(np.int32)
 targetDbinToSamp = np.round(((basebandVelocity/velocityRes)/numChirps)*numDoppFFT).astype(np.int32)
 powerSpectrumVals = np.abs(interpreceivedSignalRfftDoppFFT[targetRbinToSamp,targetDbinToSamp,:])
+""" Search for the Doppler Integer Hypothesis which gives the maximum energy """
 DoppHypMaxInd = np.argmax(powerSpectrumVals)
 estDoppHyp = doppHyp[DoppHypMaxInd]
 
-""" Sampling the correct Doppler Ambiguity number/Hyp for plotting the energy"""
+""" Sampling the range Doppler signal corresponding to the correct Doppler Ambiguity number/Hyp"""
 interpreceivedSignalRfftDoppFFT = np.fft.fftshift(interpreceivedSignalRfftDoppFFT[:,:,DoppHypMaxInd],axes=(1,))
 interpreceivedSignalRfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfft[:,:,DoppHypMaxInd]))
 interpreceivedSignalRfftDfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfftDoppFFT))
