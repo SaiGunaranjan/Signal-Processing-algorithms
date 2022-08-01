@@ -37,10 +37,10 @@ lightSpeed = 3e8 # m/s
 
 """ Chirp Parameters"""
 chirpBW = 4e9 # Hz
-interRampTime = 44e-6#13e-6#44e-6 # us
+interRampTime = 44e-6 # us
 rampSamplingRate = 1/interRampTime
 chirpStartFreq = 77e9 # Giga Hz
-numChirps = 168#500#168
+numChirps = 168
 
 """ Derived Parameters"""
 adcSamplingTime = 1/adcSamplingRate # seconds
@@ -63,10 +63,9 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Object parameters"""
 objectRange_m = 10
-doppHyp = np.arange(-2,3)#np.array([1])#np.arange(-2,3)
-
-basebandVelocity = 5#np.random.uniform(-maxVelBaseband_mps, maxVelBaseband_mps)
-selectDoppIntHyp = np.random.randint(doppHyp[0], doppHyp[-1])#1
+doppHyp = np.arange(-2,3) #np.array([1])
+basebandVelocity = np.random.uniform(-maxVelBaseband_mps+2, maxVelBaseband_mps-2) #15
+selectDoppIntHyp = np.random.randint(doppHyp[0], doppHyp[-1]+1)#1 # low value is inclusive and high value is exclusive and hence +1
 objectVelocity_mps = basebandVelocity + selectDoppIntHyp*FsEquivalentVelocity
 
 rangeTerm = np.exp(1j*2*np.pi*(chirpSlope*2*objectRange_m/lightSpeed)*\
@@ -92,14 +91,12 @@ receivedSignalRfftDoppFFT = np.fft.fftshift(receivedSignalRfftDoppFFT,axes=(1,))
 receivedSignalRfftMagSpec = 20*np.log10(np.abs(receivedSignalRfft))
 receivedSignalRfftDfftMagSpec = 20*np.log10(np.abs(receivedSignalRfftDoppFFT))
 
-# rangeAxis = np.arange(numSamples//2)*rangeRes
+
 chirpAxis = np.arange(numChirps)*interRampTime
 
 
 """ KeyStone Transformation"""
 interpFact = (chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None]*adcSamplingTime))*np.arange(numChirps)[None,:]*interRampTime
-
-# allChirpsDuration = (numChirps-1)*interRampTime
 
 doppPhase = np.unwrap(np.angle(radarSignal),axis=1)
 chirpSampPoints = np.arange(numChirps)*interRampTime
@@ -119,10 +116,9 @@ for ele in range(numSamples):
 
     interpreceivedSignal[ele,:] = np.exp(1j*doppPhaseInterpVals)
 
-
+""" Doppler Ambiguity Correction Term"""
 DoppHypCorrFactor = np.exp(+1j*2*np.pi*((chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples)[:,None,None]*adcSamplingTime))*np.arange(numChirps)[None,:,None]*doppHyp[None,None,:]))
 interpreceivedSignalDoppHypCorrected = interpreceivedSignal[:,:,None]*DoppHypCorrFactor # [numADCSamp, numRamps, numDoppHyp]
-# doppPhaseInterp = np.unwrap(np.angle(interpreceivedSignalDoppHypCorrected),axis=1)
 interpreceivedSignalWind = interpreceivedSignalDoppHypCorrected*np.hanning(numSamples)[:,None,None]
 interpreceivedSignalRfft = np.fft.fft(interpreceivedSignalWind,axis=0)/numSamples
 interpreceivedSignalRfft = interpreceivedSignalRfft[0:numSamples//2,:,:]
@@ -142,6 +138,7 @@ interpreceivedSignalRfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfft[:,
 interpreceivedSignalRfftDfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfftDoppFFT))
 
 binsMovedPreCorr = np.argmax(receivedSignalRfftMagSpec,axis=0)
+totalBinsMoved = np.abs(binsMovedPreCorr[-1] - binsMovedPreCorr[0])
 binsMovedPostCorr = np.argmax(interpreceivedSignalRfftMagSpec,axis=0)
 
 doppResFFTScale = (chirpSamplingRate/numDoppFFT) * (lamda/2)
@@ -151,7 +148,7 @@ dopplerAxis = np.arange(-numDoppFFT//2, numDoppFFT//2)*doppResFFTScale
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.subplot(2,2,1)
 plt.title('Range bin vs Chirp number')
-plt.imshow(receivedSignalRfftMagSpec[260:275,:])
+plt.imshow(receivedSignalRfftMagSpec[targetRbinToSamp-totalBinsMoved:targetRbinToSamp+totalBinsMoved,:])
 plt.xlabel('Chirp number')
 plt.ylabel('Range bin')
 plt.subplot(2,2,2)
@@ -161,7 +158,7 @@ plt.colorbar()
 plt.xlabel('Doppler bin')
 plt.ylabel('Range bin')
 plt.subplot(2,2,3)
-plt.imshow(interpreceivedSignalRfftMagSpec[260:275,:])
+plt.imshow(interpreceivedSignalRfftMagSpec[targetRbinToSamp-totalBinsMoved:targetRbinToSamp+totalBinsMoved,:])
 plt.xlabel('Chirp number')
 plt.ylabel('Range bin')
 plt.subplot(2,2,4)
