@@ -9,6 +9,10 @@ Created on Sun Jul 17 00:16:44 2022
 Reference paper used for Keystone transformation is available at the below link:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/4227073/Keystone+Transformation
 I have derived and coded the keystone algorithm to cater to the FMCW architecture.
+
+This script caters to the Keystone transformation for a single Range Doppler target
+with any Doppler(aliased/unaliased).
+
 """
 
 import numpy as np
@@ -123,10 +127,10 @@ DoppHypCorrFactor = np.exp(+1j*2*np.pi*((chirpCentreFreq/(chirpCentreFreq + chir
 
 """ Apply Doppler Ambiguity Correction Term to the Keystone transformation based interpolated and resampled signal"""
 interpreceivedSignalDoppHypCorrected = interpreceivedSignal[:,:,None]*DoppHypCorrFactor # [numADCSamp, numRamps, numDoppHyp]
+
 interpreceivedSignalWind = interpreceivedSignalDoppHypCorrected*np.hanning(numSamples)[:,None,None]
 interpreceivedSignalRfft = np.fft.fft(interpreceivedSignalWind,axis=0)/numSamples
 interpreceivedSignalRfft = interpreceivedSignalRfft[0:numSamples//2,:,:]
-
 interpreceivedSignalRfftDoppWin = interpreceivedSignalRfft*np.hanning(numChirps)[None,:,None]
 interpreceivedSignalRfftDoppFFT = np.fft.fft(interpreceivedSignalRfftDoppWin,axis=1,n=numDoppFFT)/numChirps
 
