@@ -141,6 +141,10 @@ powerSpectrumVals = np.abs(interpreceivedSignalRfftDoppFFT[targetRbinToSamp,targ
 DoppHypMaxInd = np.argmax(powerSpectrumVals)
 estDoppHyp = doppHyp[DoppHypMaxInd]
 
+estTrueVel = basebandVelocity + estDoppHyp*FsEquivalentVelocity
+print('\n True Velocity = {0:.2f} m/s'.format(objectVelocity_mps))
+print('Estimated True Velocity = {0:.2f} m/s'.format(estTrueVel))
+
 """ Sampling the range Doppler signal corresponding to the correct Doppler Ambiguity number/Hyp"""
 interpreceivedSignalRfftDoppFFT = np.fft.fftshift(interpreceivedSignalRfftDoppFFT[:,:,DoppHypMaxInd],axes=(1,))
 interpreceivedSignalRfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRfft[:,:,DoppHypMaxInd]))
