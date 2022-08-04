@@ -159,6 +159,7 @@ dopplerAxis = np.arange(-numDoppFFT//2, numDoppFFT//2)*doppResFFTScale
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
+plt.suptitle('Target speed = ' + str(np.round(objectVelocity_mps,2)) + ' mps.' + ' Chirp BW = ' + str(int(chirpBW/1e9)) + ' GHz')
 plt.subplot(2,2,1)
 plt.title('Range bin vs Chirp number')
 plt.imshow(receivedSignalRfftMagSpec[targetRbinToSamp-totalBinsMoved:targetRbinToSamp+totalBinsMoved,:])
