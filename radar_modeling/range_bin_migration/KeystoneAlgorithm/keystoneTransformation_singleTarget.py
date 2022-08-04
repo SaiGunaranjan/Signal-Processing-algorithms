@@ -8,7 +8,8 @@ Created on Sun Jul 17 00:16:44 2022
 """
 Reference paper used for Keystone transformation is available at the below link:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/4227073/Keystone+Transformation
-I have derived and coded the keystone algorithm to cater to the FMCW architecture.
+I have derived and coded the keystone algorithm to cater to the FMCW architecture. The derivation is available in the below link:
+https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/4227073/Keystone+Transformation+for+FMCW+RADAR+architecture+My+derivation
 
 This script caters to the Keystone transformation for a single Range Doppler target
 with any Doppler(aliased/unaliased).
