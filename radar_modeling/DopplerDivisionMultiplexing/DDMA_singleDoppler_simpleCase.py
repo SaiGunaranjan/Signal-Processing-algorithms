@@ -44,28 +44,31 @@ Also added Doppler to the object"""
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/2949121/Doppler+Phase+modulation+due+to+residual+Range+bin+movement+across+chirps+-+Sampled+signal
 """
 
+
+""" To verify if the DDMA modelling has been done correctly and the DDMA is infact a special case of ABF
+    make the following changes
+    0. Disable the Doppler and angle spectrum plots (figures 2 and 3)
+    1. Set  phaseStepPerTx_deg = 0
+    2. Set objectAzAngle_deg = 0 since ABF holds for object at boresight
+    3. Set object velocity also to a low value(5mps) to remove effect of bin movement causing slight loss in SNR
+    4. Make the binSNR a reasonable number say 10 so that the tone sticks out to begin with in the range spectrum
+    5. Make numTx_simult vary from 1, 2, 3, 4 to check if the SNR of the target at boresight scales by 6, 9, 12 dB
+    for numTx_simult = 2, 3, 4 respectively"""
+
 import numpy as np
 import matplotlib.pyplot as plt
-from mimoPhasorSynthesis import mimoPhasorSynth
-
 
 plt.close('all')
 
-platform = 'SRIR256' # 'SRIR256', 'SRIR144'
 
-if (platform == 'SRIR144'):
-    numTx_simult = 12
-    numRx = 12
-    numMIMO = 48
-elif (platform == 'SRIR256'):
-    numTx_simult = 13
-    numRx = 16
-    numMIMO = 74
-
+numTx_simult = 4
+numRx = 8
+numMIMO = numTx_simult*numRx
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
 numAngleFFT = 2048
-mimoArraySpacing = 2e-3 # 2mm
+txSpacing = 2e-3
+rxSpacing = 4*txSpacing
 lightSpeed = 3e8
 numBitsPhaseShifter = 5
 numPhaseCodes = 2**numBitsPhaseShifter
@@ -87,10 +90,8 @@ lamda = lightSpeed/centerFreq
 phaseStepPerTx_deg = 29#29.3
 
 
-Fs_spatial = lamda/mimoArraySpacing
+Fs_spatial = lamda/txSpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
-
-
 
 
 ## RF parameters
@@ -102,7 +103,7 @@ adcSamplingTime = 1/adcSamplingRate # s
 chirpOnTime = numSamp*adcSamplingTime
 chirpSlope = chirpBW/chirpOnTime
 dBFs_to_dBm = 10
-binSNR = -3#20# # dB
+binSNR = -3#10 # dB
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
 noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
@@ -126,15 +127,9 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Target definition"""
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
-objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
-                                        maxVelBaseband_mps+2*FsEquivalentVelocity) # 60 m/s
-objectAzAngle_deg = np.random.uniform(-50,50) #30 36.3#
+objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, maxVelBaseband_mps+2*FsEquivalentVelocity) # 5 m/s
+objectAzAngle_deg = np.random.uniform(-50,50) #0
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
-
-objectElAngle_deg = 0 # phi=0 plane angle
-objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
-
-mimoPhasor, mimoPhasor_txrx, ulaInd = mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad)
 
 
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
@@ -165,6 +160,10 @@ to scale the alpha for other step sizes"""
 
 alpha = 0#1e-4
 rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
+
+# alphaPerTx = (phaseStepPerRamp_deg/30) * 1e-4
+# rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alphaPerTx[:,None]/2)*(np.arange(numRamps)[None,:])**2)
+
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
 phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
@@ -177,12 +176,8 @@ dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamp
 rangeBinMigration = \
     np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[:,None]*np.arange(numSamp)[None,:])
 
-# rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
-# txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
-
-rxSignal = mimoPhasor_txrx[0,0,:]
-txSignal = mimoPhasor_txrx[0,:,0]
-
+rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
+txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
 phaseCodedTxSignal = dopplerTerm[None,:] * signal_phaseCode * txSignal[:,None] # [numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
@@ -199,11 +194,11 @@ signal_rfft = np.fft.fft(signal_rangeWin,axis=2)/numSamp
 signal_rfft = signal_rfft[:,:,0:numSampPostRfft]
 signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
 
+# Use this when range bin migration term is not considered
 # rangeBinsToSample = np.round(objectRangeBin).astype('int32')
 # chirpSamp_givenRangeBin = signal_rfft[:,:,rangeBinsToSample]
 
 rangeBinsToSample = rangeBinsMoved
-
 chirpSamp_givenRangeBin = signal_rfft[np.arange(numRamps),:,rangeBinsToSample]
 
 """ Correcting for the Pi phase jump caused due to the Range bin Migration"""
@@ -242,56 +237,46 @@ noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_ar
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
-
-# plt.figure(1, figsize=(20,10),dpi=200)
-# plt.title('Range spectrum')
-# plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
-# plt.xlabel('Range Bins')
-# plt.ylabel('Power dBm')
-# plt.grid(True)
-
-
-plt.figure(2, figsize=(20,10), dpi=200)
-plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
-plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all 8
-plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
-plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
-plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
-plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
-plt.xlabel('Doppler Bins')
-plt.ylabel('Power dBFs')
-plt.grid(True)
-
-
 mimoCoefficients_eachDoppler_givenRange = signalFFT[dopplerBinsToSample,:] # numTx*numDopp x numRx
-mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
-mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
+mimoCoefficients_flatten = (mimoCoefficients_eachDoppler_givenRange.T).reshape(-1,numTx_simult*numRx)
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten[0,:]))
 
-
-# digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
-# est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
-
-
-
-ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:]*np.hanning(numMIMO),n=numAngleFFT)/(numMIMO)
+ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:],n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
 
+plt.figure(1, figsize=(20,10),dpi=200)
+plt.title('Range spectrum')
+plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
+plt.xlabel('Range Bins')
+plt.ylabel('Power dBm')
+plt.grid(True)
 
-plt.figure(3, figsize=(20,10), dpi=200)
-plt.subplot(1,2,1)
-plt.title('MIMO phase')
-plt.plot(ULA,'-o')
-plt.xlabel('Rx')
-plt.ylabel('Phase (rad)')
-plt.grid(True)
-plt.subplot(1,2,2)
-plt.title('MIMO ULA spectrum')
-plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum)),label='Angle spectrum')
-plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
-plt.legend()
-plt.xlabel('Angle (deg)')
-plt.ylabel('dB')
-plt.grid(True)
+if 1:
+    plt.figure(2, figsize=(20,10), dpi=200)
+    plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
+    plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all 8
+    plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
+    plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
+    plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
+    plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
+    plt.xlabel('Doppler Bins')
+    plt.ylabel('Power dBFs')
+    plt.grid(True)
+
+    plt.figure(3, figsize=(20,10), dpi=200)
+    plt.subplot(1,2,1)
+    plt.title('MIMO phase')
+    plt.plot(ULA,'-o')
+    plt.xlabel('Rx')
+    plt.ylabel('Phase (rad)')
+    plt.grid(True)
+    plt.subplot(1,2,2)
+    plt.title('MIMO ULA spectrum')
+    plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum)),label='Angle spectrum')
+    plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
+    plt.legend()
+    plt.xlabel('Angle (deg)')
+    plt.ylabel('dB')
+    plt.grid(True)
 
 
