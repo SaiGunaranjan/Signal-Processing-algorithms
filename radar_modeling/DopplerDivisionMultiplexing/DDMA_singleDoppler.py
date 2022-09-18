@@ -149,6 +149,8 @@ phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
 phaseShifterCodes = DNL*np.arange(numPhaseCodes)
 phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
 phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
+""" Ensure that the phase shifter LUT is without any bias and is from 0 to 360 degrees"""
+phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
 
 """ NOT USING THE BELOW QUADRATIC PHASE in this DDMA MIMO scheme
 
