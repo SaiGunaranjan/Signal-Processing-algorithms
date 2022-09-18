@@ -47,6 +47,8 @@ numRamps = 140
 phaseShifterCodes = DNL*np.arange(numPhaseCodes)
 phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
 phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
+""" Ensure that the phase shifter LUT is without any bias and is from 0 to 360 degrees"""
+phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
 
 """ A small quadratic term is added to the linear phase term to break the periodicity.
 The strength of the quadratic term is controlled by the alpha parameter. If alpha is large,
