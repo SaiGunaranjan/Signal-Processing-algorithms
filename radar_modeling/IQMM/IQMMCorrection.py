@@ -51,7 +51,7 @@ plt.close('all')
 
 numSamp = 128
 numFFTBins = 128
-freqBin = 6 +  np.random.uniform(0,1)#np.random.randint(0,numSamp) + np.random.uniform(0,1)
+freqBin = 6 + np.random.uniform(0,1)#np.random.randint(0,numSamp) + np.random.uniform(0,1)
 
 """ Actual I channel and Q channel signals"""
 iChannelSignal = np.cos(2*np.pi*freqBin*np.arange(numSamp)/numSamp)
@@ -61,8 +61,8 @@ complexSignal = iChannelSignal + 1j*qChannelSignal
 
 
 
-amplitudeMismatchFactor = 0.3
-phaseMismatchFactorDeg = 10
+amplitudeMismatchFactor = np.random.uniform(0.03,0.5) #0.3
+phaseMismatchFactorDeg = np.random.uniform(0,80) #10
 phaseMismatchFactorRad = (phaseMismatchFactorDeg/180) * np.pi
 """ I channel and Q channel signals at the receiver chain due to receiver chain having an IQ imbalance i.e
 I channel and Q channel and not exactly orthogonal to each other and have
@@ -90,6 +90,7 @@ amplitudeMismatchFactorEst = np.sqrt(2*innerProductII)
 innerProductIQ = np.inner(iChannelSignalWithIQMM, qChannelSignalWithIQMM)/numSamp
 phaseMismatchFactorRadEst = np.arcsin(2*innerProductIQ/amplitudeMismatchFactorEst)
 phaseMismatchFactorDegEst = (phaseMismatchFactorRadEst/np.pi) * 180
+phaseMismatchFactorDegEst = np.mod(phaseMismatchFactorDegEst,360)
 
 print('Actual Amplitude Mismatch factor (alpha) = {0:.2f}'.format(amplitudeMismatchFactor))
 print('Estimated Amplitude Mismatch factor = {0:.2f}'.format(amplitudeMismatchFactorEst))
@@ -113,6 +114,7 @@ complexBaseBandSignalPostIQMMCorrectionFFT = np.fft.fftshift(complexBaseBandSign
 
 
 fftAxis = np.arange(-numFFTBins//2, numFFTBins//2)
+eps = 1e-10
 
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.suptitle('IQMM correction')
@@ -125,7 +127,7 @@ plt.legend()
 
 plt.subplot(2,2,2)
 plt.title('Frequency domain')
-plt.plot(fftAxis, np.abs(complexBaseBandSignalWithIQMMFFT)**2,label='IQMM signal spectrum')
+plt.plot(fftAxis, 10*np.log10(np.abs(complexBaseBandSignalWithIQMMFFT)**2 + eps),label='IQMM signal spectrum')
 plt.grid(True)
 plt.legend()
 
@@ -137,7 +139,7 @@ plt.grid(True)
 plt.legend()
 
 plt.subplot(2,2,4)
-plt.plot(fftAxis, np.abs(complexBaseBandSignalPostIQMMCorrectionFFT)**2, label='Signal spectrum post IQMM correction')
+plt.plot(fftAxis, 10*np.log10(np.abs(complexBaseBandSignalPostIQMMCorrectionFFT)**2 + eps), label='Signal spectrum post IQMM correction')
 plt.xlabel('Frequency bin')
 plt.grid(True)
 plt.legend()
