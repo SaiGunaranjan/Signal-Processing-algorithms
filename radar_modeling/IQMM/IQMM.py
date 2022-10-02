@@ -4,7 +4,19 @@ Created on Sun Oct  2 10:29:28 2022
 
 @author: Sai Gunaranjan
 """
-
+"""
+In this script, I have modelled and plotted the variation of the image frequency strength as a function of
+the amplitude mismatch factor alpha. alpha is the amplitude imbalance factor between the I channel and Q channel.
+When alpha is small (close to 0), the signal in the I channel is very weak and the signal in the Q channel is strong.
+Also, the spectrum of the complex signal when alpha is very small, has both the true frequency signal as well as
+ the image frequency. As alpha grows and comes close to 1, both the I channle and Q channel signals gain equal
+strength. In the frequency domain, as alpha grows and comes close to 1, the strength of the image frequency
+component starts to drop while the strength of the true frequency component picks up. When alpha reaches close to 1,
+the image frequency becomes very tiny and all the energy is pushed to the true signal frequency component.
+When alpha is close to 0, the true frequency and image frequency have similar strenghts and the power is about
+1/4 th that of the case when alpha is close to 1(in which case the spectrum has only the true frequency component
+with strength close to 1)
+"""
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -48,11 +60,15 @@ for alpha in amplitudeMismatchFactor:
     plt.ylim([-1,1])
 
     plt.subplot(1,2,2)
-    plt.title('Frequency domain')
+
+    # plt.title('Frequency domain (dB scale)')
     # plt.plot(fftAxis, 10*np.log10(np.abs(complexBaseBandSignalWithIQMMFFT)**2 + eps),label='IQMM signal spectrum')
-    # plt.ylim([-60,0])
+    # plt.ylim([-110,0])
+
+    plt.title('Frequency domain (linear scale)')
     plt.plot(fftAxis, np.abs(complexBaseBandSignalWithIQMMFFT)**2,label='IQMM signal spectrum')
     plt.ylim([-0.2,1])
+
     plt.axvline(freqBin,label='True freq bin',color='k',alpha=0.4)
     plt.axvline(-freqBin,label='Image freq bin',color='k',alpha=0.4,ls='--')
     plt.xlabel('Frequency bin')
