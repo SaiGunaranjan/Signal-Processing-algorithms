@@ -98,12 +98,10 @@ rangeSpectrumFFTshift = np.fft.fftshift(rangeSpectrum)
 # plt.grid(True)
 
 
-# targetFrequenciesBipolar =
 plt.figure(3,figsize=(20,10),dpi=200)
 plt.title('Range Spectrum post ADC sampling. Fs = ' + str(adcSamplingRate/1e6) + ' MHz')
 plt.plot(ADCSampledSignalFreqGrid/1e6,rangeSpectrumFFTshift)
 plt.xlabel('Freq(MHz)')
-# plt.vlines(rangeBins,ymin=-160,ymax=20)
 plt.vlines(DACSignalFreq/1e6,ymin=-160,ymax=20,label='Positive DAC frequency',color='k')
 plt.vlines(-DACSignalFreq/1e6,ymin=-160,ymax=20,label='Negative DAC frequency',color='r')
 plt.grid(True)
