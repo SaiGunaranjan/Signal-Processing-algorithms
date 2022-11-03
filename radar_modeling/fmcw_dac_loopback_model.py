@@ -42,6 +42,20 @@ This is the FMCW+DAC loopback mechanism. The DAC tone in our RADAR architecture 
 The DAC tone should have a DC for the target frequencies(targets in open space) to appear. Similarly,
 there should be a 0 delay path or internal loopback (which essentially translates to DC in the baseband spectrum)
 for the DAC tone to appear in the baseband ADC spectrum. This point is very important.
+Another important point to note is that in this simulation model, in addition to the target frequencies,
+we obtain the (DAC + target frequencies) and -(DAC-target frequencies).
+In other words, we don't observe the DAC-target frequencies and -(DAC+target frequencies).
+This is because, the DAC signal is real, while the target signal is complex.
+Further explanation: Since we have positive ramps(positive slope) in the FMCW,
+we will obtain the target frequencies as positive. Now these positive frequencies get added/modulated by the DAC signal
+which has both positive and negative frequencies (since the DAC signal is real).
+Ex: if the DAC signal has frequencies f0 and -f0, and if the taregt frequencies are f1, f2, ..., then we will obtain
+f0+f1, fo+f2, .... and -f0+f1, -f0+f2, ... and so on. This is in addition to the actual target frequencies
+f1, f2, .. which are obatined due to the FMCW path. Hence, in the FMCW + DAC mode,
+1. Target tones(only positive side) appear due to the FMCW mode.
+2. DAC tones (both positive and negative since DAC signal is real) appear due to 0 delay/internal loopback path.
+3. DAC + target frequencies , -DAC + target frequencies due to DAC signal being real and target signal being complex.
+
 
 Simulation environment:
 Coming to the simulation aspect of this model, I have made the following asumptions.
