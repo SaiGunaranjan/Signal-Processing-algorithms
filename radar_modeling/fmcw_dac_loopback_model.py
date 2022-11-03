@@ -21,16 +21,16 @@ slope = chirpBW/chirp_time #25e6/1e-6 # MHz/us
 Fstart_hz = 10e9 # GHz
 
 overSampFact = 1500
-
 Fs = overSampFact*adcSamplingRate #50e9 # GHz
 Ts = 1/Fs
 
 DACFreqBin = 512 # ADC sampling rate scale
-dacDC = 10
+dacDC = 10 # DC for the DAC tone
 
 num_samples = np.int32(chirp_time//Ts) #2048
 time_s = np.arange(num_samples)*Ts
-freq_grid = np.arange(-num_samples//2, num_samples//2,1)*Fs/num_samples
+analogSignalFreqGrid = np.arange(-num_samples//2, num_samples//2,1)*Fs/num_samples
+ADCSampledSignalFreqGrid = np.arange(-numChirpSamples//2, numChirpSamples//2,1)*adcSamplingRate/numChirpSamples
 fre_vs_time = slope*time_s + Fstart_hz
 #chirp_phase = 2*np.pi*(0.5*slope*time_s**2 + Fstart_hz*time_s) + initial_phase_rad;
 chirp_phase = 2*np.pi*np.cumsum(fre_vs_time)*Ts + initial_phase_rad
@@ -46,7 +46,6 @@ transmittedSignal = localOscillator*DACSignal
 numTargets = 3
 rangeRes = lightSpeed/(2*chirpBW) #m
 targetDistances = np.array([0,2,10]) # in m
-# targetDistances = np.array([0,0.01,26]) # in m
 rangeBins = (targetDistances//rangeRes)
 targetDelays = (2*targetDistances)/lightSpeed
 delaySamples = np.round(targetDelays/Ts).astype(np.int32)
@@ -68,31 +67,44 @@ windowedADCSignal = adcSignal*windowFunction
 
 rangeFFTSignal = np.fft.fft(windowedADCSignal)/numChirpSamples
 rangeSpectrum = 20*np.log10(np.abs(rangeFFTSignal))
+rangeSpectrumFFTshift = np.fft.fftshift(rangeSpectrum)
 
-plt.figure(1,figsize=(20,9))
-plt.subplot(1,2,1)
-plt.title('Local oscillator signal: Freq vs Time')
-plt.plot(time_s/(1e-6),fre_vs_time/1e9)
-plt.xlabel('Time (us)')
-plt.ylabel('Freq (GHz)')
-plt.grid(True)
-plt.subplot(1,2,2)
-plt.title('Local oscillator signal: Magnitude spectrum (dB)')
-plt.plot(freq_grid/1e9, 20*np.log10(np.fft.fftshift(np.abs(localOscillator_fft))))
-plt.xlabel('Freq(GHz)')
-plt.grid(True)
+# plt.figure(1,figsize=(20,9))
+# plt.subplot(1,2,1)
+# plt.title('Local oscillator signal: Freq vs Time')
+# plt.plot(time_s/(1e-6),fre_vs_time/1e9)
+# plt.xlabel('Time (us)')
+# plt.ylabel('Freq (GHz)')
+# plt.grid(True)
+# plt.subplot(1,2,2)
+# plt.title('Local oscillator signal: Magnitude spectrum (dB)')
+# plt.plot(freq_grid/1e9, 20*np.log10(np.fft.fftshift(np.abs(localOscillator_fft))))
+# plt.xlabel('Freq(GHz)')
+# plt.grid(True)
 
 
-plt.figure(2,figsize=(20,10))
-plt.subplot(1,2,1)
-plt.title('Range Spectrum before ADC sampling')
-plt.plot(20*np.log10(np.abs(basebandSignalFFT[0:1000])))
-plt.vlines(rangeBins,ymin=20,ymax=160)
-plt.vlines(rangeBins+DACFreqBin,ymin=20,ymax=160)
+# plt.figure(2,figsize=(20,10))
+# plt.subplot(1,2,1)
+# plt.title('Range Spectrum before ADC sampling')
+# plt.plot(20*np.log10(np.abs(basebandSignalFFT[0:1000])))
+# plt.vlines(rangeBins,ymin=20,ymax=160)
+# plt.vlines(rangeBins+DACFreqBin,ymin=20,ymax=160)
+# plt.grid(True)
+# plt.subplot(1,2,2)
+# plt.title('Range Spectrum post ADC sampling')
+# plt.plot(rangeSpectrum[0:1000])
+# plt.vlines(rangeBins,ymin=-160,ymax=20)
+# plt.vlines(rangeBins+DACFreqBin,ymin=-160,ymax=20)
+# plt.grid(True)
+
+
+# targetFrequenciesBipolar =
+plt.figure(3,figsize=(20,10),dpi=200)
+plt.title('Range Spectrum post ADC sampling. Fs = ' + str(adcSamplingRate/1e6) + ' MHz')
+plt.plot(ADCSampledSignalFreqGrid/1e6,rangeSpectrumFFTshift)
+plt.xlabel('Freq(MHz)')
+# plt.vlines(rangeBins,ymin=-160,ymax=20)
+plt.vlines(DACSignalFreq/1e6,ymin=-160,ymax=20,label='Positive DAC frequency',color='k')
+plt.vlines(-DACSignalFreq/1e6,ymin=-160,ymax=20,label='Negative DAC frequency',color='r')
 plt.grid(True)
-plt.subplot(1,2,2)
-plt.title('Range Spectrum post ADC sampling')
-plt.plot(rangeSpectrum[0:1000])
-plt.vlines(rangeBins,ymin=-160,ymax=20)
-plt.vlines(rangeBins+DACFreqBin,ymin=-160,ymax=20)
-plt.grid(True)
+plt.legend()
