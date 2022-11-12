@@ -31,12 +31,19 @@ This is not very clear to me and I need to understand this better!!"""
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//..')
+from spectral_estimation.digital_filter.digital_filter_functions import min_angular_distance_index
 
 plt.close('all')
 
 numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
+effectiveBitsPhaseShifter = 7
+effectivenumPhaseCodes = 2**effectiveBitsPhaseShifter
+effectiveDNL = 360/(effectivenumPhaseCodes)
+
 numTx_simult = 1#2#4
 numRamps = 448#140
 """ With 30 deg we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
@@ -51,25 +58,40 @@ harmonicsFFTShifted = np.zeros(harmonics.shape,dtype=np.int32)
 harmonicsFFTShifted[harmonics<numRamps//2] =  harmonics[harmonics<numRamps//2] + numRamps//2
 harmonicsFFTShifted[harmonics>=numRamps//2] = harmonics[harmonics>=numRamps//2] - numRamps//2
 
-phaseStepPerRamp_deg = (1+np.arange(numTx_simult))*phaseStepPerTx_deg # Phase step per ramp per Tx
-# phaseStepPerRamp_deg = np.array([1])*phaseStepPerTx_deg
+phaseStepPerRamp_deg = (1+np.arange(numTx_simult))*phaseStepPerTx_deg # Phase step per ramp per Tx. 1 is added to not have a zero phase sweep Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
 
 
-phaseShifterCodes = DNL*np.arange(numPhaseCodes) #+ 0.01*np.arange(numPhaseCodes)**2
-phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
+# phaseShifterCodes = DNL*np.arange(numPhaseCodes)
+# phaseShifterNoise = np.random.uniform(-DNL/2, DNL/2, numPhaseCodes)
+# phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
+# phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
+
+phaseCodeLineFitParameters = np.array([-2.94362165e+00,  2.34255150e+00,  2.04137253e-02, -2.27937796e-06, -4.01606178e-07])
+codes = np.arange(1,numPhaseCodes+1)[:,None]
+polyOrder = 4
+designMatrix = codes**np.arange(polyOrder+1)[None,:]
+phaseShifterCodes = designMatrix @ phaseCodeLineFitParameters
+phaseShifterNoise = np.random.uniform(effectiveDNL/2, effectiveDNL/2, numPhaseCodes)
 phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
+phaseShifterCodes_withNoise[0] = 0
+phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
 
-# lut_rx = 2
-# phaseShifterLUTFromDevice = np.load('phaseSweep_FFTCapture.npy')
-# phaseShifterCodes_withNoise = phaseShifterLUTFromDevice[0:128,lut_rx]
-# # ###phaseShifterCodes_withNoise -= phaseShifterCodes_withNoise[0]
+
+# phaseShifterCodes = np.load('phase_lut11.npy')
+# numPhaseCodes = len(phaseShifterCodes)
+# phaseShifterCodes_withNoise = phaseShifterCodes
 # phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
 
+numBitsPhaseShifterAmplitude = 1
+numPhaseCodesAmp = 2**numBitsPhaseShifterAmplitude
+# phaseShifterCodesAmplitude = np.random.uniform(-0.09,0.09,numPhaseCodesAmp)
+phaseShifterCodesAmplitude = np.random.uniform(-0.54,0.54,numPhaseCodesAmp)
+numAmpLevels = np.ceil(numPhaseCodes/numPhaseCodesAmp).astype('int32')
+amplitudeLevels = np.repeat(phaseShifterCodesAmplitude,numAmpLevels)[0:numPhaseCodes]
 
-# phaseShifterLUTFromDevice = np.load('phase_lut11.npy')
-# phaseShifterCodes_withNoise = phaseShifterLUTFromDevice
-# phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
+# phaseShifterCodesAmplitude = np.random.uniform(-0.09,0.09,numPhaseCodes)
+# phaseShifterCodesAmplitude = np.random.choice(np.array([1,0.9]), size=numPhaseCodes, p=[98/100,2/100])
 
 
 
@@ -88,15 +110,20 @@ to scale the alpha for other step sizes. Fow now, I have removed the quadratic t
 
 alpha = 0#1e-5#0 # 1e-4
 rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
-
-# alphaPerTx = (phaseStepPerRamp_deg/30) * 1e-4
-# rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alphaPerTx[:,None]/2)*(np.arange(numRamps)[None,:])**2)
-
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
-phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
+# rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, phaseShifterCodes_withNoise[92])
+""" There is a bug in the below statement. It sould be circular distance and not absolute distance"""
+# phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
+
+phaseCodesIndexToBeApplied,_ = min_angular_distance_index(rampPhaseIdeal_degWrapped[0,:], phaseShifterCodes_withNoise, mod=360)
+phaseCodesIndexToBeApplied = phaseCodesIndexToBeApplied[None,:]
+
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
-signal = np.sum(np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
+# amplitudeToBeApplied = phaseShifterCodesAmplitude[phaseCodesIndexToBeApplied]
+amplitudeToBeApplied = amplitudeLevels[phaseCodesIndexToBeApplied]
+signal = np.sum((0*amplitudeToBeApplied+3)* np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
+# signal = np.sum((amplitudeToBeApplied)* np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
 
 
 signalWindowed = signal*np.hanning(numRamps)
@@ -106,8 +133,19 @@ signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
 signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum)
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 
+signalMagnitude = np.sqrt(signal*np.conj(signal))
+signalMagnitudeOnlySpectrum = np.fft.fft(signalMagnitude*np.hanning(numRamps))/numRamps
+signalMagnitudeOnlySpectrum = np.fft.fftshift(signalMagnitudeOnlySpectrum)
+signalMagnitudeOnlySpectrum = 20*np.log10(np.abs(signalMagnitudeOnlySpectrum))
+signalMagnitudeOnlySpectrum -= np.amax(signalMagnitudeOnlySpectrum)
+
+signalPhase = signal/np.abs(signal)
+signalPhaseOnlySpectrum = np.fft.fft(signalPhase*np.hanning(numRamps))/numRamps
+signalPhaseOnlySpectrum = np.fft.fftshift(signalPhaseOnlySpectrum)
+signalPhaseOnlySpectrum = 20*np.log10(np.abs(signalPhaseOnlySpectrum))
+signalPhaseOnlySpectrum -= np.amax(signalPhaseOnlySpectrum)
+
 noiseFloorSetByDNL = 10*np.log10((DNL/180 *np.pi)**2/12) - 10*np.log10(numRamps)
-# noiseFloorEstFromSignal = 10*np.log10(np.mean(np.sort(signalFFTShiftSpectrum)[0:numRamps-10*numTx_simult]))
 noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(signalFFTShiftSpectrum),65))
 
 print('Noise Floor Estimated from signal with {} Txs simulataneously ON with phase sweeps: {} dB'.format(numTx_simult, \
@@ -118,37 +156,85 @@ binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numRamps
 dopplerBinsToSample = np.round(binOffset_Txphase).astype('int32')
 dopplerBinsToSample = np.mod(dopplerBinsToSample, numRamps)
 
-plt.figure(2, figsize=(20,10),dpi=200)
-plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
-# plt.title('Doppler Spectrum with ' + str(numTx_simult) + ' Tx sweeping by 29 deg per ramp' + '. LUT of Rx ' + str(lut_rx) + ' used')
-plt.plot(signalMagSpectrum, lw=2)
-# plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
 
+residualSignal = signal*np.exp(-1j*rampPhaseIdeal_deg[0,:]*np.pi/180)
+residualSignalFFT = np.fft.fft(residualSignal*np.hanning(numRamps))/numRamps
+residualSignalFFT = np.fft.fftshift(residualSignalFFT)
+residualSignalSpectrum = 20*np.log10(np.abs(residualSignalFFT))
+residualSignalSpectrum -= np.amax(residualSignalSpectrum)
+
+residualSignalMag = np.sqrt(residualSignal*np.conj(residualSignal))
+residualSignalPhase = residualSignal/np.abs(residualSignal)
+
+residualSignalMagFFT = np.fft.fft(residualSignalMag*np.hanning(numRamps))/numRamps
+residualSignalMagFFT = np.fft.fftshift(residualSignalMagFFT)
+residualSignalMagnitudeOnlySpectrum = 20*np.log10(np.abs(residualSignalMagFFT))
+residualSignalMagnitudeOnlySpectrum -= np.amax(residualSignalMagnitudeOnlySpectrum)
+
+residualSignalPhFFT = np.fft.fft(residualSignalPhase*np.hanning(numRamps))/numRamps
+residualSignalPhFFT = np.fft.fftshift(residualSignalPhFFT)
+residualSignalPhaseOnlySpectrum = 20*np.log10(np.abs(residualSignalPhFFT))
+residualSignalPhaseOnlySpectrum -= np.amax(residualSignalPhaseOnlySpectrum)
+
+
+plt.figure(2, figsize=(20,10))
+plt.subplot(1,3,1)
+plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
+plt.plot(signalMagSpectrum, lw=2)
 plt.axvline(harmonicsFFTShifted[0],color='k',alpha=0.3)
 plt.axvline(harmonicsFFTShifted[1],color='k',alpha=0.3)
 plt.axvline(harmonicsFFTShifted[2],color='k',alpha=0.3)
-
 plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
+plt.ylim([-80,5])
 
-if 0:
-    phaseShifterLUTFromDevice = phaseShifterLUTFromDevice - phaseShifterLUTFromDevice[0,:][None,:]
-    plt.figure(1, figsize=(20,10),dpi=200)
-    plt.subplot(1,2,1)
-    plt.title('Phase response with Phase code sweep')
-    plt.plot(phaseShifterLUTFromDevice[0:128,:])
-    plt.xlabel('Phase shifter code #')
-    plt.ylabel('Phase (deg)')
-    plt.grid(True)
-    plt.legend(['Rx0', 'Rx1', 'Rx2', 'Rx3'])
+plt.subplot(1,3,2)
+plt.title('Signal Magnitude only spectrum')
+plt.plot(signalMagnitudeOnlySpectrum, lw=2)
+# plt.axvline(harmonicsFFTShifted[0],color='k',alpha=0.3)
+# plt.axvline(harmonicsFFTShifted[1],color='k',alpha=0.3)
+# plt.axvline(harmonicsFFTShifted[2],color='k',alpha=0.3)
+plt.xlabel('Doppler Bins')
+plt.ylabel('Power dBFs')
+plt.grid(True)
+plt.ylim([-80,5])
 
-    plt.subplot(1,2,2)
-    plt.title('Phase response with Phase code sweep')
-    plt.plot(np.diff(phaseShifterLUTFromDevice[0:128,:],axis=0))
-    plt.xlabel('Phase shifter code #')
-    plt.ylabel('Phase (deg)')
-    plt.grid(True)
-    plt.legend(['Rx0', 'Rx1', 'Rx2', 'Rx3'])
+plt.subplot(1,3,3)
+plt.title('Signal Phase only spectrum')
+plt.plot(signalPhaseOnlySpectrum, lw=2)
+plt.axvline(harmonicsFFTShifted[0],color='k',alpha=0.3)
+plt.axvline(harmonicsFFTShifted[1],color='k',alpha=0.3)
+plt.axvline(harmonicsFFTShifted[2],color='k',alpha=0.3)
+plt.xlabel('Doppler Bins')
+plt.ylabel('Power dBFs')
+plt.grid(True)
+plt.ylim([-80,5])
+
+
+
+plt.figure(3, figsize=(20,10))
+plt.subplot(1,3,1)
+plt.title('Doppler Spectrum of residual signal')
+plt.plot(residualSignalSpectrum, lw=2)
+plt.xlabel('Doppler Bins')
+plt.ylabel('Power dBFs')
+plt.grid(True)
+plt.ylim([-100,0])
+plt.subplot(1,3,2)
+plt.title('Doppler Spectrum of magnitude residual signal')
+plt.plot(residualSignalMagnitudeOnlySpectrum, lw=2)
+plt.xlabel('Doppler Bins')
+plt.ylabel('Power dBFs')
+plt.grid(True)
+plt.ylim([-100,0])
+plt.subplot(1,3,3)
+plt.title('Doppler Spectrum of phase residual signal')
+plt.plot(residualSignalPhaseOnlySpectrum, lw=2)
+plt.xlabel('Doppler Bins')
+plt.ylabel('Power dBFs')
+plt.grid(True)
+plt.ylim([-100,0])
+
 
 
