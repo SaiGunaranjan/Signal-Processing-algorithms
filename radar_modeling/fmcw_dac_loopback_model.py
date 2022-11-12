@@ -88,10 +88,11 @@ There is no need for anti-aliasing filter before downsampling since there are no
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.signal as sig
 
 plt.close('all')
 lightSpeed = 3e8 #mps
-initial_phase_deg = 30
+initial_phase_deg = 0#30
 initial_phase_rad = initial_phase_deg*np.pi/180
 numChirpSamples = 2048
 adcSamplingRate = 56.25e6 #Hz
@@ -100,6 +101,11 @@ chirpBW = 2e9#250e6#2e9
 slope = chirpBW/chirp_time #25e6/1e-6 # MHz/us
 Fstart_hz = 10e9 # GHz
 rangeRes = lightSpeed/(2*chirpBW) #m
+
+numPhaseCodes = 40
+phaseShifter = np.linspace(0,360,numPhaseCodes)
+phaseShifterRad = (phaseShifter/180) * np.pi
+phaseShifterPhasor = np.exp(1j*phaseShifterRad)
 
 overSampFact = 1500
 Fs = overSampFact*adcSamplingRate #50e9 # GHz
@@ -116,38 +122,52 @@ fre_vs_time = slope*time_s + Fstart_hz
 #chirp_phase = 2*np.pi*(0.5*slope*time_s**2 + Fstart_hz*time_s) + initial_phase_rad;
 chirp_phase = 2*np.pi*np.cumsum(fre_vs_time)*Ts + initial_phase_rad
 localOscillator = np.exp(1j*chirp_phase)
-localOscillator_InstFreq = (np.diff(np.unwrap(np.angle(localOscillator)))/(2*np.pi))/Ts;
-localOscillator_fft = np.fft.fft(localOscillator)/num_samples
+localOscillatorRxChain = localOscillator.copy()
+localOscillatorwithPhaseSweep = localOscillator[None,:]*phaseShifterPhasor[:,None]
+# localOscillator_InstFreq = (np.diff(np.unwrap(np.angle(localOscillator)))/(2*np.pi))/Ts;
+# localOscillator_fft = np.fft.fft(localOscillatorwithPhaseSweep,axis=1)/num_samples
 
 DACSignalFreq = DACFreqBin*(adcSamplingRate/numChirpSamples) #Hz
 DACSignal = 1*(np.exp(1j*2*np.pi*DACSignalFreq*time_s) + np.exp(-1j*2*np.pi*DACSignalFreq*time_s))/2 + dacDC
 
-transmittedSignal = localOscillator*DACSignal
+transmittedSignal = localOscillatorwithPhaseSweep*DACSignal[None,:]
 
 numTargets = 3
 targetDistances = np.array([0,2,10]) # in m
+# targetDistances = np.array([0,2,0.15]) # in m
 rangeBins = (targetDistances//rangeRes)
 targetDelays = (2*targetDistances)/lightSpeed
 delaySamples = np.round(targetDelays/Ts).astype(np.int32)
 
-receivedSignalVec = np.zeros((numTargets,num_samples),dtype=np.complex128)
+receivedSignalVec = np.zeros((numTargets,numPhaseCodes,num_samples),dtype=np.complex128)
 for sourceNum in np.arange(numTargets):
-    receivedSignalVec[sourceNum,delaySamples[sourceNum]::] = transmittedSignal[0:num_samples-delaySamples[sourceNum]]
+    receivedSignalVec[sourceNum,:,delaySamples[sourceNum]::] = transmittedSignal[:,0:num_samples-delaySamples[sourceNum]]
 
 receivedSignal = np.sum(receivedSignalVec,axis=0)
 
-# basebandSignal = receivedSignal * np.conj(localOscillator)
-basebandSignal = localOscillator * np.conj(receivedSignal)
-basebandSignalFFT = np.fft.fft(basebandSignal*np.hanning(num_samples))
+del receivedSignalVec, transmittedSignal
 
-downSampledSignal = basebandSignal[0::overSampFact]
-adcSignal = downSampledSignal[0:numChirpSamples]
+# basebandSignal = receivedSignal * np.conj(localOscillatorRxChain)
+basebandSignal = localOscillatorRxChain[None,:] * np.conj(receivedSignal)
+# basebandSignalFFT = np.fft.fft(basebandSignal*np.hanning(num_samples)[None,:],axis=1)/num_samples
+del localOscillatorRxChain,receivedSignal
+downSampledSignal = basebandSignal[:,0::overSampFact]
+adcSignal = downSampledSignal[:,0:numChirpSamples]
+del basebandSignal
 windowFunction = np.hanning(numChirpSamples)
-windowedADCSignal = adcSignal*windowFunction
+windowedADCSignal = adcSignal*windowFunction[None,:]
 
-rangeFFTSignal = np.fft.fft(windowedADCSignal)/numChirpSamples
+rangeFFTSignal = np.fft.fft(windowedADCSignal,axis=1)/numChirpSamples
 rangeSpectrum = 20*np.log10(np.abs(rangeFFTSignal))
-rangeSpectrumFFTshift = np.fft.fftshift(rangeSpectrum)
+rangeSpectrumFFTshift = np.fft.fftshift(rangeSpectrum,axes=(1,))
+
+crBin = np.int32(rangeBins[1])
+binsToSample = np.array([crBin,DACFreqBin])
+
+phasorSignal = rangeFFTSignal[:,binsToSample]
+phaseRad = np.unwrap(np.angle(phasorSignal),axis=0)
+phaseDeg = phaseRad*180/np.pi
+phaseDegNorm = phaseDeg - phaseDeg[0,:]
 
 # plt.figure(1,figsize=(20,9))
 # plt.subplot(1,2,1)
@@ -166,7 +186,7 @@ rangeSpectrumFFTshift = np.fft.fftshift(rangeSpectrum)
 # plt.figure(2,figsize=(20,10))
 # plt.subplot(1,2,1)
 # plt.title('Range Spectrum before ADC sampling')
-# plt.plot(20*np.log10(np.abs(basebandSignalFFT[0:1000])))
+# plt.plot(20*np.log10(np.abs(basebandSignalFFT[:,0:1000].T)))
 # plt.vlines(rangeBins,ymin=20,ymax=160)
 # plt.vlines(rangeBins+DACFreqBin,ymin=20,ymax=160)
 # plt.grid(True)
@@ -182,12 +202,22 @@ dacGenFreqPos = DACSignalFreq + targetFrequencies[1::]
 dacGenFreqNeg = -DACSignalFreq + targetFrequencies[1::]
 plt.figure(3,figsize=(20,10),dpi=200)
 plt.title('Range Spectrum post ADC sampling. Fs = ' + str(adcSamplingRate/1e6) + ' MHz')
-plt.plot(ADCSampledSignalFreqGrid/1e6,rangeSpectrumFFTshift)
+plt.plot(ADCSampledSignalFreqGrid/1e6,rangeSpectrumFFTshift[0,:])
 plt.xlabel('Freq(MHz)')
 plt.vlines(DACSignalFreq/1e6,ymin=-160,ymax=20,label='Positive DAC frequency',color='orange')
 plt.vlines(-DACSignalFreq/1e6,ymin=-160,ymax=20,label='Negative DAC frequency',color='r')
 plt.vlines(targetFrequencies/1e6,ymin=-160,ymax=20,linestyle='dashed',label='Target frequencies')
-plt.vlines(dacGenFreqPos/1e6,ymin=-160,ymax=20,linestyle='dashdot',label='DAC + frequencies',color='orange')
-plt.vlines(dacGenFreqNeg/1e6,ymin=-160,ymax=20,linestyle='dashdot',label='- (DAC  frequencies)',color='r')
+plt.vlines(dacGenFreqPos/1e6,ymin=-160,ymax=20,linestyle='dashdot',label='DAC + target frequencies',color='orange')
+plt.vlines(dacGenFreqNeg/1e6,ymin=-160,ymax=20,linestyle='dashdot',label='- (DAC  - target frequencies)',color='r')
 plt.grid(True)
 plt.legend()
+
+
+plt.figure(4,figsize=(20,10),dpi=200)
+plt.title('Received phase vs phase code sweep in FMCW + DAC mode')
+plt.plot(phaseDegNorm[:,0])
+plt.plot(phaseDegNorm[:,1],'o')
+plt.grid(True)
+plt.xlabel('Chirp number')
+plt.ylabel('Phase (Deg)')
+plt.legend(['CR tone phase', 'DAC tone phase'])
