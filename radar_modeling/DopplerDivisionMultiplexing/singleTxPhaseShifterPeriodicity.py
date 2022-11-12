@@ -122,6 +122,7 @@ phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 # amplitudeToBeApplied = phaseShifterCodesAmplitude[phaseCodesIndexToBeApplied]
 amplitudeToBeApplied = amplitudeLevels[phaseCodesIndexToBeApplied]
+
 signal = np.sum((0*amplitudeToBeApplied+3)* np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
 # signal = np.sum((amplitudeToBeApplied)* np.exp(1j*phaseCodesToBeApplied_rad), axis=0)
 
@@ -178,7 +179,7 @@ residualSignalPhaseOnlySpectrum -= np.amax(residualSignalPhaseOnlySpectrum)
 
 
 plt.figure(2, figsize=(20,10))
-plt.subplot(1,3,1)
+plt.subplot(2,3,1)
 plt.title('Doppler Spectrum: Floor set by DNL = ' + str(np.round(noiseFloorSetByDNL)) + ' dB/bin')
 plt.plot(signalMagSpectrum, lw=2)
 plt.axvline(harmonicsFFTShifted[0],color='k',alpha=0.3)
@@ -189,7 +190,7 @@ plt.ylabel('Power dBFs')
 plt.grid(True)
 plt.ylim([-80,5])
 
-plt.subplot(1,3,2)
+plt.subplot(2,3,2)
 plt.title('Signal Magnitude only spectrum')
 plt.plot(signalMagnitudeOnlySpectrum, lw=2)
 # plt.axvline(harmonicsFFTShifted[0],color='k',alpha=0.3)
@@ -200,7 +201,7 @@ plt.ylabel('Power dBFs')
 plt.grid(True)
 plt.ylim([-80,5])
 
-plt.subplot(1,3,3)
+plt.subplot(2,3,3)
 plt.title('Signal Phase only spectrum')
 plt.plot(signalPhaseOnlySpectrum, lw=2)
 plt.axvline(harmonicsFFTShifted[0],color='k',alpha=0.3)
@@ -213,22 +214,22 @@ plt.ylim([-80,5])
 
 
 
-plt.figure(3, figsize=(20,10))
-plt.subplot(1,3,1)
+# plt.figure(3, figsize=(20,10))
+plt.subplot(2,3,4)
 plt.title('Doppler Spectrum of residual signal')
 plt.plot(residualSignalSpectrum, lw=2)
 plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
 plt.ylim([-100,0])
-plt.subplot(1,3,2)
+plt.subplot(2,3,5)
 plt.title('Doppler Spectrum of magnitude residual signal')
 plt.plot(residualSignalMagnitudeOnlySpectrum, lw=2)
 plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
 plt.ylim([-100,0])
-plt.subplot(1,3,3)
+plt.subplot(2,3,6)
 plt.title('Doppler Spectrum of phase residual signal')
 plt.plot(residualSignalPhaseOnlySpectrum, lw=2)
 plt.xlabel('Doppler Bins')
