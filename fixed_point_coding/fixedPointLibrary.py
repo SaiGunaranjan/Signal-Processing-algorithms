@@ -33,6 +33,33 @@ def convert_float_to_fixedPointInt(floatArr, numIntBits, numFracBits, numSignBit
     return scaledValue.astype('int32') # can also be type cast as float 32. In that case, it will be an integer but with a .0
 
 
+def dropFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, outputArrFracBits):
+
+    """
+    inputFixedPointArr : should be an array of integers in int32 format
+    """
+
+    numFracBitsToBeDropped = inputArrFracBits - outputArrFracBits # Works only when inputArrFracBits >= outputArrFracBits
+
+    # outputFixedPointArr = (inputFixedPointArr + 2**(numFracBitsToBeDropped-1)) >> numFracBitsToBeDropped
+    outputFixedPointArr = (inputFixedPointArr + (1<<(numFracBitsToBeDropped-1))) >> numFracBitsToBeDropped # Replaced 2**(n-1) with bit shift operation of shifting binary 1 by n-1 bits
+
+    return outputFixedPointArr
+
+
+def addFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, outputArrFracBits):
+
+    """
+    inputFixedPointArr : should be an array of integers in int32 format
+    """
+
+    numFracBitsToBeAdded = outputArrFracBits - inputArrFracBits # Works only when inputArrFracBits >= outputArrFracBits
+
+    outputFixedPointArr = inputFixedPointArr << numFracBitsToBeAdded
+
+    return outputFixedPointArr
+
+
 # def convert_Complexfloat_to_fixedPointInt(complexArr, numIntBits, numFracBits, numSignBits):
 
 #     """
@@ -63,33 +90,3 @@ def convert_float_to_fixedPointInt(floatArr, numIntBits, numFracBits, numSignBit
 #     scaledcomplexArr = (scaledValueRealPart + 1j*scaledValueImagPart).astype('complex64') # can also be type cast as float 32. In that case, it will be an integer but with a .0
 
 #     return scaledcomplexArr
-
-
-def dropFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, outputArrFracBits):
-
-    """
-    inputFixedPointArr : should be an array of integers in int32 format
-    """
-
-    numFracBitsToBeDropped = inputArrFracBits - outputArrFracBits # Works only when inputArrFracBits >= outputArrFracBits
-
-    # outputFixedPointArr = (inputFixedPointArr + 2**(numFracBitsToBeDropped-1)) >> numFracBitsToBeDropped
-    outputFixedPointArr = (inputFixedPointArr + (1<<(numFracBitsToBeDropped-1))) >> numFracBitsToBeDropped # Replaced 2**(n-1) with bit shift operation of shifting binary 1 by n-1 bits
-
-    return outputFixedPointArr
-
-
-def addFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, outputArrFracBits):
-
-    """
-    inputFixedPointArr : should be an array of integers in int32 format
-    """
-
-    numFracBitsToBeAdded = outputArrFracBits - inputArrFracBits # Works only when inputArrFracBits >= outputArrFracBits
-
-    outputFixedPointArr = inputFixedPointArr << numFracBitsToBeAdded
-
-    return outputFixedPointArr
-
-
-
