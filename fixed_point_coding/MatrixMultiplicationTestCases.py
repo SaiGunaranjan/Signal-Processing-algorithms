@@ -30,7 +30,7 @@ A1fixed = convert_float_to_fixedPointInt(A1, numIntBits, numFracBits, numSignBit
 B1fixed = convert_float_to_fixedPointInt(B1, numIntBits, numFracBits, numSignBits)
 
 inputArrFracBits = numFracBits
-outputArrFracBits = inputArrFracBits
+outputArrFracBits = inputArrFracBits # Can also be set to 31 bits. Doesnt alter the result too much. Surprising!
 C1fixed = matrixMultiplicationFixedPoint(A1fixed, B1fixed, inputArrFracBits, outputArrFracBits)
 C1fixedConvFloat = C1fixed/(2**outputArrFracBits)
 
@@ -70,7 +70,7 @@ A1fixed = convert_Complexfloat_to_fixedPointInt(A1,numIntBits, numFracBits, numS
 B1fixed = convert_Complexfloat_to_fixedPointInt(B1,numIntBits, numFracBits, numSignBits)
 
 inputArrFracBits = numFracBits
-outputArrFracBits = inputArrFracBits
+outputArrFracBits = inputArrFracBits # Can also be set to 31 bits. Doesnt alter the result too much. Surprising!
 C1fixed = matrixMultiplicationFixedPointComplexInput(A1fixed, B1fixed, inputArrFracBits, outputArrFracBits)
 C1fixedConvFloat = C1fixed/(2**outputArrFracBits)
 
