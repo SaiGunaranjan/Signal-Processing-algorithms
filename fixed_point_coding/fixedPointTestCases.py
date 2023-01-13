@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fixedPointLibrary import convert_float_to_fixedPointInt, dropFractionalBits_fixedPointInt,\
     convert_Complexfloat_to_fixedPointInt, matrixMultiplicationFixedPointComplexInput
+import time as time
 
 
 
@@ -31,17 +32,18 @@ totalNoiseSigma = np.sqrt(totalNoisePower)
 """ Case 1 : Dynamic range test post Range FFT
 """
 windowFunction = np.hanning(numTimeSamples)
-dynamicRangedB = 20 # Eg. -10 dBsm and +10 dBsm Rcs targets have an effective dynamic range of 20 dB
-referenceSNR = 20
-objectSNR_perBin = np.array([referenceSNR+dynamicRangedB])
+# dynamicRangedB = 20 # Eg. -10 dBsm and +10 dBsm RCS targets have an effective dynamic range of 20 dB
+# referenceSNR = 20
+# objectSNR_perBin = np.array([referenceSNR+dynamicRangedB])
+objectSNR_perBin = np.array([40])
 signalPowerdBFs = objectSNR_perBin + noiseFloorPerBindBFs
 signalPower = 10**(signalPowerdBFs/10)
 signalAmplitude = np.sqrt(signalPower)
 signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
 signalphasor = signalAmplitude*signalPhase
 
-targetRangeBins = 612 + 0*np.random.uniform(-0.5,0.5,1)[0]
-signal = np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
+targetRangeBins = 612 + np.random.uniform(-0.5,0.5,1)[0]
+signal = signalphasor*np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
 noise = (totalNoiseSigma/np.sqrt(2))*np.random.randn(numTimeSamples) + 1j*(totalNoiseSigma/np.sqrt(2))*np.random.randn(numTimeSamples)
 noisySignal = signal + noise
 
@@ -53,10 +55,6 @@ rfft = np.fft.fft(signalWindowedFloat)[0:numRangeSamples]/numTimeSamples
 IntBitsSignal = 1
 FracBitsSignal = 31
 signBitSignal = 1
-
-# noisySignalFixedPointReal = convert_float_to_fixedPointInt(np.real(noisySignal),IntBitsSignal,FracBitsSignal,signBitSignal)
-# noisySignalFixedPointImag = convert_float_to_fixedPointInt(np.imag(noisySignal),IntBitsSignal,FracBitsSignal,signBitSignal)
-# noisySignalFixedPoint = noisySignalFixedPointReal + 1j*noisySignalFixedPointImag # 1Q31
 
 noisySignalFixedPoint = convert_Complexfloat_to_fixedPointInt(noisySignal,IntBitsSignal,FracBitsSignal,signBitSignal)
 
@@ -138,15 +136,29 @@ DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBit
 
 inputArrFracBits = 31
 outputArrFracBits = 31
+t1 = time.time()
 rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalWindowedBitsDropped[:,None], inputArrFracBits, outputArrFracBits)
+t2 = time.time()
 rfft_dftFixedPoint = (rfft_dftFixedPoint[0:numRangeSamples].squeeze())/numTimeSamples
 rfft_dftFixedPointConvertToFloat = rfft_dftFixedPoint/(2**outputArrFracBits)
 
+timeForFixedPointDFT = t2-t1
+print('Total time for Fixed point DFT = {0:.2f} sec'.format(timeForFixedPointDFT))
+
+rfftSpec = 20*np.log10(np.abs(rfft))
+rfftSpec -= np.amax(rfftSpec)
+
+rfft_dftMethodSpec = 20*np.log10(np.abs(rfft_dftMethod))
+rfft_dftMethodSpec -= np.amax(rfft_dftMethodSpec)
+
+rfft_dftFixedPointConvertToFloatSpec = 20*np.log10(np.abs(rfft_dftFixedPointConvertToFloat))
+rfft_dftFixedPointConvertToFloatSpec -= np.amax(rfft_dftFixedPointConvertToFloatSpec)
+
 plt.figure(2,figsize=(20,10))
 plt.title('Range spectrum')
-plt.plot(20*np.log10(np.abs(rfft)),label='Spectrum using FFT')
-plt.plot(20*np.log10(np.abs(rfft_dftMethod)),label='Spectrum using DFT')
-plt.plot(20*np.log10(np.abs(rfft_dftFixedPointConvertToFloat)),label='Spectrum using DFT Fixed Point')
+plt.plot(rfftSpec,label='Spectrum using FFT')
+plt.plot(rfft_dftMethodSpec,alpha=0.5,label='Spectrum using DFT')
+plt.plot(rfft_dftFixedPointConvertToFloatSpec,label='Spectrum using ' + str(outputArrFracBits) + ' bit Fixed Point DFT')
 plt.xlabel('bins')
 plt.grid('True')
 plt.legend()
