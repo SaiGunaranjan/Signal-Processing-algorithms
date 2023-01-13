@@ -8,7 +8,8 @@ Created on Fri Dec 30 20:33:51 2022
 
 import numpy as np
 from fixedPointLibrary import convert_float_to_fixedPointInt, dropFractionalBits_fixedPointInt,\
-    matrixMultiplicationFixedPoint, matrixMultiplicationFixedPointComplexInput
+    matrixMultiplicationFixedPoint, matrixMultiplicationFixedPointComplexInput, \
+        convert_Complexfloat_to_fixedPointInt
 
 # np.random.seed(10)
 print('\n\n Real Multiplication')
@@ -58,14 +59,15 @@ numIntBits = np.ceil(np.log2(maxVal)).astype('int64') + 1 # (includes signed bit
 numFracBits = totalBitWidth - numIntBits #28
 numSignBits = 1
 
-A1fixedReal = convert_float_to_fixedPointInt(A1.real, numIntBits, numFracBits, numSignBits)
-A1fixedImag = convert_float_to_fixedPointInt(A1.imag, numIntBits, numFracBits, numSignBits)
-B1fixedReal = convert_float_to_fixedPointInt(B1.real, numIntBits, numFracBits, numSignBits)
-B1fixedImag = convert_float_to_fixedPointInt(B1.imag, numIntBits, numFracBits, numSignBits)
+# A1fixedReal = convert_float_to_fixedPointInt(A1.real, numIntBits, numFracBits, numSignBits)
+# A1fixedImag = convert_float_to_fixedPointInt(A1.imag, numIntBits, numFracBits, numSignBits)
+# B1fixedReal = convert_float_to_fixedPointInt(B1.real, numIntBits, numFracBits, numSignBits)
+# B1fixedImag = convert_float_to_fixedPointInt(B1.imag, numIntBits, numFracBits, numSignBits)
+# A1fixed = (A1fixedReal + 1j*A1fixedImag).astype('complex64')
+# B1fixed = (B1fixedReal + 1j*B1fixedImag).astype('complex64')
 
-A1fixed = A1fixedReal + 1j*A1fixedImag
-B1fixed = B1fixedReal + 1j*B1fixedImag
-
+A1fixed = convert_Complexfloat_to_fixedPointInt(A1,numIntBits, numFracBits, numSignBits)
+B1fixed = convert_Complexfloat_to_fixedPointInt(B1,numIntBits, numFracBits, numSignBits)
 
 inputArrFracBits = numFracBits
 outputArrFracBits = inputArrFracBits
