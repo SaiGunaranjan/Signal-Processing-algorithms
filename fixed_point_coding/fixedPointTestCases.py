@@ -8,7 +8,8 @@ Created on Thu Dec 29 21:13:23 2022
 
 import numpy as np
 import matplotlib.pyplot as plt
-from fixedPointLibrary import convert_float_to_fixedPointInt, dropFractionalBits_fixedPointInt
+from fixedPointLibrary import convert_float_to_fixedPointInt, dropFractionalBits_fixedPointInt,\
+    convert_Complexfloat_to_fixedPointInt, matrixMultiplicationFixedPointComplexInput
 
 
 
@@ -52,9 +53,12 @@ rfft = np.fft.fft(signalWindowedFloat)[0:numRangeSamples]/numTimeSamples
 IntBitsSignal = 1
 FracBitsSignal = 31
 signBitSignal = 1
-noisySignalFixedPointReal = convert_float_to_fixedPointInt(np.real(noisySignal),IntBitsSignal,FracBitsSignal,signBitSignal)
-noisySignalFixedPointImag = convert_float_to_fixedPointInt(np.imag(noisySignal),IntBitsSignal,FracBitsSignal,signBitSignal)
-noisySignalFixedPoint = noisySignalFixedPointReal + 1j*noisySignalFixedPointImag # 1Q31
+
+# noisySignalFixedPointReal = convert_float_to_fixedPointInt(np.real(noisySignal),IntBitsSignal,FracBitsSignal,signBitSignal)
+# noisySignalFixedPointImag = convert_float_to_fixedPointInt(np.imag(noisySignal),IntBitsSignal,FracBitsSignal,signBitSignal)
+# noisySignalFixedPoint = noisySignalFixedPointReal + 1j*noisySignalFixedPointImag # 1Q31
+
+noisySignalFixedPoint = convert_Complexfloat_to_fixedPointInt(noisySignal,IntBitsSignal,FracBitsSignal,signBitSignal)
 
 IntBitsWindow = 1
 FracBitsWindow = 31
@@ -113,15 +117,39 @@ plt.plot(np.imag(signalWindowedFloat) - np.imag(signalWindowedCovertFloat))
 plt.grid(True)
 
 
-# """
-# Fourier transform using matrix based DFT
+"""
+Fourier transform using matrix based DFT
 
-# """
-# timeInd = np.arange(numTimeSamples)
-# numFFTBins = numTimeSamples # For now assume same number of FFT bins as number of samples.
-# freqInd = np.arange(numFFTBins)
-# #Also, assume for now that the signal length is always a power of 2. This is because, for fixed point integer operations, it is easy to work with scale factors which are powers of 2
-# DFTMatrix = np.exp(-1j*2*np.pi*freqInd[:,None]*timeInd[None,:]/numFFTBins)
+"""
+timeInd = np.arange(numTimeSamples)
+numFFTBins = numTimeSamples # For now assume same number of FFT bins as number of samples.
+freqInd = np.arange(numFFTBins)
+#Also, assume for now that the signal length is always a power of 2. This is because, for fixed point integer operations, it is easy to work with scale factors which are powers of 2
+DFTMatrix = np.exp(-1j*2*np.pi*freqInd[:,None]*timeInd[None,:]/numFFTBins)
+
+rfft_dftMethod = (DFTMatrix @ signalWindowedFloat)/numTimeSamples
+rfft_dftMethod = rfft_dftMethod[0:numRangeSamples]
+
+
+numIntBits = 1
+numFracBits = 31
+numSignBits = 1
+DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBits, numFracBits, numSignBits)
+
+inputArrFracBits = 31
+outputArrFracBits = 31
+rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalWindowedBitsDropped[:,None], inputArrFracBits, outputArrFracBits)
+rfft_dftFixedPoint = (rfft_dftFixedPoint[0:numRangeSamples].squeeze())/numTimeSamples
+rfft_dftFixedPointConvertToFloat = rfft_dftFixedPoint/(2**outputArrFracBits)
+
+plt.figure(2,figsize=(20,10))
+plt.title('Range spectrum')
+plt.plot(20*np.log10(np.abs(rfft)),label='Spectrum using FFT')
+plt.plot(20*np.log10(np.abs(rfft_dftMethod)),label='Spectrum using DFT')
+plt.plot(20*np.log10(np.abs(rfft_dftFixedPointConvertToFloat)),label='Spectrum using DFT Fixed Point')
+plt.xlabel('bins')
+plt.grid('True')
+plt.legend()
 
 
 
