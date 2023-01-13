@@ -33,6 +33,37 @@ def convert_float_to_fixedPointInt(floatArr, numIntBits, numFracBits, numSignBit
     return scaledValue.astype('int32') # can also be type cast as float 32. In that case, it will be an integer but with a .0
 
 
+def convert_Complexfloat_to_fixedPointInt(complexArr, numIntBits, numFracBits, numSignBits):
+
+    """
+    complexArr: must be a complex valued array
+    """
+
+    effectiveNumBits = numIntBits + numFracBits - numSignBits # Number of integer bits also includes the signed bit
+
+    posmaxVal = 2**effectiveNumBits - 1
+    negativeminVal = -(2**effectiveNumBits)
+
+    realPart = np.real(complexArr)
+    imagPart = np.imag(complexArr)
+
+    scaledValueRealPart = np.floor(realPart*(2**numFracBits) + 0.5)
+    scaledValueImagPart = np.floor(imagPart*(2**numFracBits) + 0.5)
+
+    scaledValueRealPart[scaledValueRealPart>posmaxVal] = posmaxVal # clip/saturate values above posmaxVal to posmaxVal to avoid overflow
+    scaledValueImagPart[scaledValueImagPart>posmaxVal] = posmaxVal # clip/saturate values above posmaxVal to posmaxVal to avoid overflow
+
+    if numSignBits:
+        scaledValueRealPart[scaledValueRealPart < negativeminVal] = negativeminVal # For signed integers, clip/saturate values below negativeminVal to negativeminVal to avoid underflow
+        scaledValueImagPart[scaledValueImagPart < negativeminVal] = negativeminVal # For signed integers, clip/saturate values below negativeminVal to negativeminVal to avoid underflow
+    else:
+        scaledValueRealPart[scaledValueRealPart < 0] = 0 # For unsigned integers, clip/saturate values below 0 to 0 to avoid underflow
+        scaledValueImagPart[scaledValueImagPart < 0] = 0 # For unsigned integers, clip/saturate values below 0 to 0 to avoid underflow
+
+    scaledcomplexArr = (scaledValueRealPart + 1j*scaledValueImagPart).astype('complex64') # can also be type cast as float 32. In that case, it will be an integer but with a .0
+
+    return scaledcomplexArr
+
 def dropFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, outputArrFracBits):
 
     """
@@ -304,34 +335,3 @@ def matrixMultiplicationFixedPointComplexInput_nonOptimalButPrecise(A, B, inputA
 
 
 
-
-# def convert_Complexfloat_to_fixedPointInt(complexArr, numIntBits, numFracBits, numSignBits):
-
-#     """
-#     complexArr: must be a complex valued array
-#     """
-
-#     effectiveNumBits = numIntBits + numFracBits - numSignBits # Number of integer bits also includes the signed bit
-
-#     posmaxVal = 2**effectiveNumBits - 1
-#     negativeminVal = -(2**effectiveNumBits)
-
-#     realPart = np.real(complexArr)
-#     imagPart = np.imag(complexArr)
-
-#     scaledValueRealPart = np.floor(realPart*(2**numFracBits) + 0.5)
-#     scaledValueImagPart = np.floor(imagPart*(2**numFracBits) + 0.5)
-
-#     scaledValueRealPart[scaledValueRealPart>posmaxVal] = posmaxVal # clip/saturate values above posmaxVal to posmaxVal to avoid overflow
-#     scaledValueImagPart[scaledValueImagPart>posmaxVal] = posmaxVal # clip/saturate values above posmaxVal to posmaxVal to avoid overflow
-
-#     if numSignBits:
-#         scaledValueRealPart[scaledValueRealPart < negativeminVal] = negativeminVal # For signed integers, clip/saturate values below negativeminVal to negativeminVal to avoid underflow
-#         scaledValueImagPart[scaledValueImagPart < negativeminVal] = negativeminVal # For signed integers, clip/saturate values below negativeminVal to negativeminVal to avoid underflow
-#     else:
-#         scaledValueRealPart[scaledValueRealPart < 0] = 0 # For unsigned integers, clip/saturate values below 0 to 0 to avoid underflow
-#         scaledValueImagPart[scaledValueImagPart < 0] = 0 # For unsigned integers, clip/saturate values below 0 to 0 to avoid underflow
-
-#     scaledcomplexArr = (scaledValueRealPart + 1j*scaledValueImagPart).astype('complex64') # can also be type cast as float 32. In that case, it will be an integer but with a .0
-
-#     return scaledcomplexArr
