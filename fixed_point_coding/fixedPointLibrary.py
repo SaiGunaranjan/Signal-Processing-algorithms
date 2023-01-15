@@ -332,6 +332,23 @@ def matrixMultiplicationFixedPointComplexInput_nonOptimalButPrecise(A, B, inputA
     return C
 
 
+def fixedPointDFT(signalFixedPoint, numFFT, inputFracBits, outputFracBits):
+
+    numTimeSamples = len(signalFixedPoint)
+    if (numFFT > numTimeSamples):
+        numZerosToPad = numFFT - numTimeSamples
+        signalFixedPoint = np.pad(signalFixedPoint, (0,numZerosToPad))
+
+    numFFTBins = numFFT
+    freqInd = timeInd = np.arange(numFFTBins)
+    DFTMatrix = np.exp(-1j*2*np.pi*freqInd[:,None]*timeInd[None,:]/numFFTBins)
+    numIntBits = 1
+    numFracBits = inputFracBits
+    numSignBits = 1
+    DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBits, numFracBits, numSignBits)
+    rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalFixedPoint[:,None], numFracBits, outputFracBits)
+
+    return rfft_dftFixedPoint
 
 
 

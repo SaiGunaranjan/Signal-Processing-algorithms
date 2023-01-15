@@ -9,7 +9,7 @@ Created on Thu Dec 29 21:13:23 2022
 import numpy as np
 import matplotlib.pyplot as plt
 from fixedPointLibrary import convert_float_to_fixedPointInt, dropFractionalBits_fixedPointInt,\
-    convert_Complexfloat_to_fixedPointInt, matrixMultiplicationFixedPointComplexInput
+    convert_Complexfloat_to_fixedPointInt, matrixMultiplicationFixedPointComplexInput, fixedPointDFT
 import time as time
 
 
@@ -44,7 +44,7 @@ signalphasor = signalAmplitude*signalPhase
 
 targetRangeBins = 612 + np.random.uniform(-0.5,0.5,1)[0]
 signal = signalphasor*np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
-# signal = np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
+signal = np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
 noise = (totalNoiseSigma/np.sqrt(2))*np.random.randn(numTimeSamples) + 1j*(totalNoiseSigma/np.sqrt(2))*np.random.randn(numTimeSamples)
 noisySignal = signal + noise
 
@@ -83,9 +83,39 @@ signalWindowedImagBitsDropped = dropFractionalBits_fixedPointInt(np.imag(signalW
 the signal is 32 bit, window is also 32 bit and hence the product will be 64 bits. So, if we type cast it as int32, there will be clipping/saturation
 to the max 32 bit signed value i.e. -2**31, 2**31-1
 """
-
 signalWindowedBitsDropped = signalWindowedRealBitsDropped + 1j*signalWindowedImagBitsDropped
 signalWindowedCovertFloat = signalWindowedBitsDropped/(2**outputArrFracBits)
+
+""" Fourier transform using matrix based DFT """
+timeInd = np.arange(numTimeSamples)
+numFFTBins = numTimeSamples # For now assume same number of FFT bins as number of samples.
+freqInd = np.arange(numFFTBins)
+#Also, assume for now that the signal length is always a power of 2. This is because, for fixed point integer operations, it is easy to work with scale factors which are powers of 2
+DFTMatrix = np.exp(-1j*2*np.pi*freqInd[:,None]*timeInd[None,:]/numFFTBins)
+
+rfft_dftMethod = (DFTMatrix @ signalWindowedFloat)/numTimeSamples
+rfft_dftMethod = rfft_dftMethod[0:numRangeSamples]
+
+inputArrFracBits = 31
+outputArrFracBits = 31#31
+t1 = time.time()
+rfft_dftFixedPoint = fixedPointDFT(signalWindowedBitsDropped, numFFTBins, inputArrFracBits, outputArrFracBits)
+t2 = time.time()
+rfft_dftFixedPoint = (rfft_dftFixedPoint[0:numRangeSamples].squeeze())/numTimeSamples
+rfft_dftFixedPointConvertToFloat = rfft_dftFixedPoint/(2**outputArrFracBits)
+
+timeForFixedPointDFT = t2-t1
+print('Total time for Fixed point DFT = {0:.2f} sec'.format(timeForFixedPointDFT))
+
+rfftSpec = 20*np.log10(np.abs(rfft))
+rfftSpec -= np.amax(rfftSpec)
+
+rfft_dftMethodSpec = 20*np.log10(np.abs(rfft_dftMethod))
+rfft_dftMethodSpec -= np.amax(rfft_dftMethodSpec)
+
+rfft_dftFixedPointConvertToFloatSpec = 20*np.log10(np.abs(rfft_dftFixedPointConvertToFloat))
+rfft_dftFixedPointConvertToFloatSpec -= np.amax(rfft_dftFixedPointConvertToFloatSpec)
+
 
 plt.figure(1,figsize=(20,10))
 plt.suptitle('Windowed Signal: Floating vs Fixed')
@@ -114,46 +144,6 @@ plt.subplot(2,2,4)
 plt.title('Imag part error')
 plt.plot(np.imag(signalWindowedFloat) - np.imag(signalWindowedCovertFloat))
 plt.grid(True)
-
-
-"""
-Fourier transform using matrix based DFT
-
-"""
-timeInd = np.arange(numTimeSamples)
-numFFTBins = numTimeSamples # For now assume same number of FFT bins as number of samples.
-freqInd = np.arange(numFFTBins)
-#Also, assume for now that the signal length is always a power of 2. This is because, for fixed point integer operations, it is easy to work with scale factors which are powers of 2
-DFTMatrix = np.exp(-1j*2*np.pi*freqInd[:,None]*timeInd[None,:]/numFFTBins)
-
-rfft_dftMethod = (DFTMatrix @ signalWindowedFloat)/numTimeSamples
-rfft_dftMethod = rfft_dftMethod[0:numRangeSamples]
-
-
-numIntBits = 1
-numFracBits = 31
-numSignBits = 1
-DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBits, numFracBits, numSignBits)
-
-inputArrFracBits = 31
-outputArrFracBits = 31
-t1 = time.time()
-rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalWindowedBitsDropped[:,None], inputArrFracBits, outputArrFracBits)
-t2 = time.time()
-rfft_dftFixedPoint = (rfft_dftFixedPoint[0:numRangeSamples].squeeze())/numTimeSamples
-rfft_dftFixedPointConvertToFloat = rfft_dftFixedPoint/(2**outputArrFracBits)
-
-timeForFixedPointDFT = t2-t1
-print('Total time for Fixed point DFT = {0:.2f} sec'.format(timeForFixedPointDFT))
-
-rfftSpec = 20*np.log10(np.abs(rfft))
-rfftSpec -= np.amax(rfftSpec)
-
-rfft_dftMethodSpec = 20*np.log10(np.abs(rfft_dftMethod))
-rfft_dftMethodSpec -= np.amax(rfft_dftMethodSpec)
-
-rfft_dftFixedPointConvertToFloatSpec = 20*np.log10(np.abs(rfft_dftFixedPointConvertToFloat))
-rfft_dftFixedPointConvertToFloatSpec -= np.amax(rfft_dftFixedPointConvertToFloatSpec)
 
 plt.figure(2,figsize=(20,10))
 plt.title('Range spectrum')
