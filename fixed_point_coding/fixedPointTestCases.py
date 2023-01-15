@@ -44,6 +44,7 @@ signalphasor = signalAmplitude*signalPhase
 
 targetRangeBins = 612 + np.random.uniform(-0.5,0.5,1)[0]
 signal = signalphasor*np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
+# signal = np.exp(1j*2*np.pi*targetRangeBins*np.arange(numTimeSamples)/numTimeSamples)
 noise = (totalNoiseSigma/np.sqrt(2))*np.random.randn(numTimeSamples) + 1j*(totalNoiseSigma/np.sqrt(2))*np.random.randn(numTimeSamples)
 noisySignal = signal + noise
 
