@@ -334,6 +334,28 @@ def matrixMultiplicationFixedPointComplexInput_nonOptimalButPrecise(A, B, inputA
 
 def fixedPointDFT(signalFixedPoint, numFFT, inputFracBits, outputFracBits):
 
+    """
+    This function performs a fixed point DFT of a signal.
+    Input:
+        signalFixedPoint: The signal(in fixed point format) on which DFT is to be performed.
+        The signal should be in 1QinputFracBits format.
+
+        numFFT: Number of points of DFT. It should be greater than or equal to the length of the
+        input signal. If greater, then zero padding is done to the input signal.
+
+        inputFracBits: Fractional bits for the input signal.
+        The DFT matrix will also be generated with the same number of fractional bits as the signal.
+        1 integer bit which is also the signed bit. So the format of the DFT matrix will be 1QinputFracBits
+
+        outputFracBits: Fractional bits for the output DFT signal
+
+    Output:
+        rfft_dftFixedPoint: The resultant fixed point DFT of the signal.
+        It will be in 1QoutputFracBits format
+
+
+    """
+
     numTimeSamples = len(signalFixedPoint)
     if (numFFT > numTimeSamples):
         numZerosToPad = numFFT - numTimeSamples
