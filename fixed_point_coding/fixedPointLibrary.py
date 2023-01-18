@@ -356,7 +356,7 @@ def fixedPointDFT(signalFixedPoint, numFFT, inputFracBits, outputFracBits):
         The DFT matrix will also be generated with the same number of fractional bits as the signal.
         1 integer bit which is also the signed bit. So the format of the DFT matrix will be 1QinputFracBits
 
-        outputFracBits: Fractional bits for the output DFT signal
+        outputFracBits: Fractional bits for the output DFT signal and the twiddle factor
 
     Output:
         rfft_dftFixedPoint: The resultant fixed point DFT of the signal.
@@ -374,10 +374,11 @@ def fixedPointDFT(signalFixedPoint, numFFT, inputFracBits, outputFracBits):
     freqInd = timeInd = np.arange(numFFTBins)
     DFTMatrix = np.exp(-1j*2*np.pi*freqInd[:,None]*timeInd[None,:]/numFFTBins)
     numIntBits = 1
-    numFracBits = inputFracBits
+    numFracBitsTwiddleFactor = outputFracBits
+    # numFracBits = inputFracBits
     numSignBits = 1
-    DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBits, numFracBits, numSignBits)
-    rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalFixedPoint, numFracBits, outputFracBits)
+    DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBits, numFracBitsTwiddleFactor, numSignBits)
+    rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalFixedPoint, inputFracBits, outputFracBits)
 
     return rfft_dftFixedPoint
 
