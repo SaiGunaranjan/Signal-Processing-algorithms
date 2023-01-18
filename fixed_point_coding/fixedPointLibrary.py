@@ -216,7 +216,12 @@ def matrixMultiplicationFixedPointComplexInput(A, B, inputArrFracBits, outputArr
     """
 
     numRowsC = A.shape[0]
-    numColsC = B.shape[1]
+    try:
+        numColsC = B.shape[1]
+    except IndexError:
+        B = B[:,None]
+        numColsC = B.shape[1]
+
     # C = np.zeros((numRowsC, numColsC),dtype = A.dtype)
     """ I have initialized the output matrix as int64 but it will contain int32 elements.
     If I initialize as int32, I was getting over flow errors"""
@@ -289,7 +294,11 @@ def matrixMultiplicationFixedPointComplexInput_nonOptimalButPrecise(A, B, inputA
     """
 
     numRowsC = A.shape[0]
-    numColsC = B.shape[1]
+    try:
+        numColsC = B.shape[1]
+    except IndexError:
+        B = B[:,None]
+        numColsC = B.shape[1]
     # C = np.zeros((numRowsC, numColsC),dtype = A.dtype)
     """ I have initialized the output matrix as int64 but it will contain int32 elements.
     If I initialize as int32, I was getting over flow errors"""
@@ -368,7 +377,7 @@ def fixedPointDFT(signalFixedPoint, numFFT, inputFracBits, outputFracBits):
     numFracBits = inputFracBits
     numSignBits = 1
     DFTMatrixFixedPoint = convert_Complexfloat_to_fixedPointInt(DFTMatrix, numIntBits, numFracBits, numSignBits)
-    rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalFixedPoint[:,None], numFracBits, outputFracBits)
+    rfft_dftFixedPoint = matrixMultiplicationFixedPointComplexInput(DFTMatrixFixedPoint, signalFixedPoint, numFracBits, outputFracBits)
 
     return rfft_dftFixedPoint
 
