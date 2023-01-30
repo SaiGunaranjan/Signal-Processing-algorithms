@@ -36,7 +36,9 @@ def fft_as_successive_dft(signal):
 
 def fft_as_successive_dft_scaled(signal):
 
-    if (len(signal) == 1):
+    N = len(signal)
+
+    if (N == 1):
         return signal
     else:
         evenIndexSignal = signal[0::2]
@@ -44,7 +46,7 @@ def fft_as_successive_dft_scaled(signal):
         evenIndexSignalFFT = fft_as_successive_dft_scaled(evenIndexSignal)
         oddIndexSignalFFT = fft_as_successive_dft_scaled(oddIndexSignal)
 
-        N = 2*len(evenIndexSignalFFT)
+        # N = 2*len(evenIndexSignalFFT)
         k = np.arange(0,N/2)
 
         twiddleFactor = np.exp(-1j*2*np.pi*k/N)
