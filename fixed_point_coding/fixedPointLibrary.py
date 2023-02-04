@@ -69,6 +69,9 @@ def dropFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, outpu
     """
     inputFixedPointArr : should be an array of integers in int32 format
     """
+    # inputArrActualBitwidth = np.ceil(np.log2(np.amax(np.abs(inputFixedPointArr)))).astype('int32')
+    # if (inputArrActualBitwidth<inputArrFracBits):
+    #     inputArrFracBits = inputArrActualBitwidth
 
     numFracBitsToBeDropped = inputArrFracBits - outputArrFracBits # Works only when inputArrFracBits >= outputArrFracBits
 
@@ -89,6 +92,32 @@ def addFractionalBits_fixedPointInt(inputFixedPointArr, inputArrFracBits, output
     outputFixedPointArr = inputFixedPointArr << numFracBitsToBeAdded
 
     return outputFixedPointArr
+
+def complexMult(a, b, inputFracBits, outputFracBits):
+
+    """ For now assuming a, b have same number of fractional bits = inputFracBits"""
+
+    FracBitsPostMult = inputFracBits + inputFracBits
+
+    realPart1 = ((a.real).astype('int64'))*((b.real).astype('int64'))
+    realPart1BitsDropped = dropFractionalBits_fixedPointInt(realPart1, FracBitsPostMult, outputFracBits)
+
+    realPart2 = ((a.imag).astype('int64'))*((b.imag).astype('int64'))
+    realPart2BitsDropped = dropFractionalBits_fixedPointInt(realPart2, FracBitsPostMult, outputFracBits)
+
+    realPart = (realPart1BitsDropped - realPart2BitsDropped)
+
+    imagPart1 = ((a.imag).astype('int64'))*((b.real).astype('int64'))
+    imagPart1BitsDropped = dropFractionalBits_fixedPointInt(imagPart1, FracBitsPostMult, outputFracBits)
+
+    imagPart2 = ((a.real).astype('int64'))*((b.imag).astype('int64'))
+    imagPart2BitsDropped = dropFractionalBits_fixedPointInt(imagPart2, FracBitsPostMult, outputFracBits)
+
+    imagPart = (imagPart1BitsDropped + imagPart2BitsDropped)
+
+    c = realPart + 1j*imagPart
+
+    return c
 
 
 def matrixMultiplicationFixedPoint_nonOptimalButPrecise(A, B, inputArrFracBits, outputArrFracBits):
@@ -383,4 +412,74 @@ def fixedPointDFT(signalFixedPoint, numFFT, inputFracBits, outputFracBits):
     return rfft_dftFixedPoint
 
 
+def fixedPointfft_as_successive_dft(signal, intBits, fracBits, signBits):
+    """ signal should be a fixed point signal of the format intBits, fracBits, signBits"""
 
+    N = len(signal)
+
+    if (N == 1):
+        return signal
+    else:
+        evenIndexSignal = signal[0::2]
+        oddIndexSignal = signal[1::2]
+        evenIndexSignalFFT = fixedPointfft_as_successive_dft(evenIndexSignal,intBits, fracBits, signBits)
+        oddIndexSignalFFT = fixedPointfft_as_successive_dft(oddIndexSignal,intBits, fracBits, signBits)
+
+        k = np.arange(0,N/2)
+
+        twiddleFactor = np.exp(-1j*2*np.pi*k/N)
+        twiddleFactorFixedPoint = convert_Complexfloat_to_fixedPointInt(twiddleFactor,intBits,fracBits,signBits)
+
+        inputFracBits = fracBits
+        outputFracBits = fracBits
+        oddIndexSignalFFTTwiddleScalingFixed = complexMult(oddIndexSignalFFT, twiddleFactorFixedPoint, inputFracBits, outputFracBits)
+
+        fftTopHalf = evenIndexSignalFFT + oddIndexSignalFFTTwiddleScalingFixed
+        fftBottomHalf = evenIndexSignalFFT - oddIndexSignalFFTTwiddleScalingFixed
+
+        signalFFT = np.hstack((fftTopHalf,fftBottomHalf))
+
+        return signalFFT
+
+def fixedPointfft_as_successive_dft_scaled(signal, intBits, fracBits, signBits):
+
+    """ signal should be a fixed point signal of the format intBits, fracBits, signBits"""
+
+    N = len(signal)
+
+    if (N == 1):
+        return signal
+    else:
+        evenIndexSignal = signal[0::2]
+        oddIndexSignal = signal[1::2]
+        evenIndexSignalFFT = fixedPointfft_as_successive_dft_scaled(evenIndexSignal, intBits, fracBits, signBits)
+        oddIndexSignalFFT = fixedPointfft_as_successive_dft_scaled(oddIndexSignal, intBits, fracBits, signBits)
+
+
+        k = np.arange(0,N/2)
+
+        twiddleFactor = np.exp(-1j*2*np.pi*k/N)
+        twiddleFactorFixedPoint = convert_Complexfloat_to_fixedPointInt(twiddleFactor,intBits,fracBits,signBits)
+
+        inputFracBits = fracBits
+        outputFracBits = fracBits
+        oddIndexSignalFFTTwiddleScalingFixed = complexMult(oddIndexSignalFFT, twiddleFactorFixedPoint, inputFracBits, outputFracBits)
+
+        fftTopHalf = evenIndexSignalFFT + oddIndexSignalFFTTwiddleScalingFixed
+        fftBottomHalf = evenIndexSignalFFT - oddIndexSignalFFTTwiddleScalingFixed
+
+        signalFFT = np.hstack((fftTopHalf,fftBottomHalf))
+        # Since there are log2(N) stages, the scaling becomes 2**(log2(N)) = N
+
+        signalFFTRealScaled = (np.real(signalFFT).astype('int64')) >> 1 # Right shift by 1 or divide by 2 to scale the ouput at each stage.
+        signalFFTImagScaled = (np.imag(signalFFT).astype('int64')) >> 1 # Right shift by 1 or divide by 2 to scale the ouput at each stage.
+        # Since there are log2(N) stages, the scaling becomes 2**(log2(N)) = N
+
+        # bitwidthReal = np.ceil(np.log2(np.amax(np.abs(signalFFTRealScaled))))
+        # bitwidthImag = np.ceil(np.log2(np.amax(np.abs(signalFFTImagScaled))))
+        # print('real part bitwidth', bitwidthReal)
+        # print('imag part bitwidth', bitwidthImag)
+
+        signalFFT = signalFFTRealScaled + 1j*signalFFTImagScaled
+
+        return signalFFT
