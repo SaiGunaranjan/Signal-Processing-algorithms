@@ -40,7 +40,7 @@ Dynamic range test post Range FFT
 """
 windowFunction = np.hanning(numTimeSamples)
 # dynamicRangedB = 20 # Eg. -10 dBsm and +10 dBsm RCS targets have an effective dynamic range of 20 dB
-objectSNR_perBin = np.abs(noiseFloorPerBindBFs) - 20 #np.array([120])
+objectSNR_perBin = np.abs(noiseFloorPerBindBFs) - 20 # (-20 dB is to back off the signal power from 0 dBFs)
 signalPowerdBFs = objectSNR_perBin + noiseFloorPerBindBFs
 signalPower = 10**(signalPowerdBFs/10)
 signalAmplitude = np.sqrt(signalPower)
