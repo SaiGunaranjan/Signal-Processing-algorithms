@@ -25,6 +25,15 @@ def mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad):
 
     path = 'antenna_cordinates\\' + platform + '\\antenna\\'
 
+
+    if (platform == 'SRIR16'):
+        numTx = 4 # 4 Txs separated by lambda/2
+        numRx = 4 # 4 Txs separated by 2*lambda
+        txSeq = np.arange(numTx)
+        # ulaInd = np.flipud(((np.arange(numTx*numRx).reshape(-1,numRx)).T).reshape(numTx*numRx))
+        ulaInd = np.array([15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0]) # 16 element Az ULA indices generated as above
+
+
     if (platform == 'SRIR144'):
         numTx = 12
         numRx = 12
@@ -71,4 +80,5 @@ def mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad):
 
     return mimoPhasor, mimoPhasor_txrx, ulaInd
 
-
+# a,b,c = mimoPhasorSynth('SRIR16', 4e-3, -60/180*np.pi, 0)
+# a,b,c = mimoPhasorSynth('SRIR256', 4e-3, 30/180*np.pi, 0)

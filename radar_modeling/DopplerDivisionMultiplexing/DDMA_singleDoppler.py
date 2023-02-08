@@ -51,16 +51,23 @@ from mimoPhasorSynthesis import mimoPhasorSynth
 
 plt.close('all')
 
-platform = 'SRIR256' # 'SRIR256', 'SRIR144'
+platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
-if (platform == 'SRIR144'):
+if (platform == 'SRIR16'):
+    numTx_simult = 4
+    numRx = 4
+    numMIMO = 16 # All MIMO in azimuth only
+    numRamps = 128 # Assuming 128 ramps for both detection and MIMO segments
+elif (platform == 'SRIR144'):
     numTx_simult = 12
     numRx = 12
     numMIMO = 48
+    numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
 elif (platform == 'SRIR256'):
     numTx_simult = 13
     numRx = 16
     numMIMO = 74
+    numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -73,8 +80,7 @@ DNL = 360/(numPhaseCodes) # DNL in degrees
 
 
 """ Chirp Parameters"""
-# Assuming 140 ramps for both detection and MIMO segments
-numRamps = 140
+
 numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
