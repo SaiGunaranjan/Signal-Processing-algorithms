@@ -279,7 +279,8 @@ ULA = np.unwrap(np.angle(mimoCoefficients_flatten[0,:]))
 
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:]*np.hanning(numMIMO),n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
-
+ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
+ULA_spectrumdB -= np.amax(ULA_spectrumdB)
 
 plt.figure(3, figsize=(20,10), dpi=200)
 plt.subplot(1,2,1)
@@ -290,7 +291,7 @@ plt.ylabel('Phase (rad)')
 plt.grid(True)
 plt.subplot(1,2,2)
 plt.title('MIMO ULA spectrum')
-plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum)),label='Angle spectrum')
+plt.plot(angAxis_deg, ULA_spectrumdB,label='Angle spectrum')
 plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
 plt.legend()
 plt.xlabel('Angle (deg)')

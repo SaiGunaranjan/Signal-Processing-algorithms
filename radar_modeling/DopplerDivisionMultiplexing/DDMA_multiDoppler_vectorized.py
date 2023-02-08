@@ -264,6 +264,8 @@ ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
 mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
+ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
+ULA_spectrumdB -= np.amax(ULA_spectrumdB,axis=1)[:,None]
 
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
 signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
@@ -312,8 +314,8 @@ plt.figure(4, figsize=(20,10))
 plt.suptitle('MIMO ULA Angle spectrum')
 for ele in range(numDopUniqRbin):
     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
-    plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
-    plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
+    plt.plot(angAxis_deg, ULA_spectrumdB[ele,:],lw=2)
+    plt.vlines(objectAzAngle_deg[ele], ymin = -70, ymax = 10)
     plt.xlabel('Angle (deg)')
     plt.ylabel('dB')
     plt.grid(True)
