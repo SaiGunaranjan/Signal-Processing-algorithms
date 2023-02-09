@@ -51,16 +51,23 @@ from mimoPhasorSynthesis import mimoPhasorSynth
 
 plt.close('all')
 
-platform = 'SRIR256' # 'SRIR256', 'SRIR144'
+platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
-if (platform == 'SRIR144'):
+if (platform == 'SRIR16'):
+    numTx_simult = 4
+    numRx = 4
+    numMIMO = 16 # All MIMO in azimuth only
+    numRamps = 128 # Assuming 128 ramps for both detection and MIMO segments
+elif (platform == 'SRIR144'):
     numTx_simult = 12
     numRx = 12
     numMIMO = 48
+    numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
 elif (platform == 'SRIR256'):
     numTx_simult = 13
     numRx = 16
     numMIMO = 74
+    numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -73,8 +80,7 @@ DNL = 360/(numPhaseCodes) # DNL in degrees
 
 
 """ Chirp Parameters"""
-# Assuming 140 ramps for both detection and MIMO segments
-numRamps = 140
+
 numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
@@ -279,7 +285,8 @@ ULA = np.unwrap(np.angle(mimoCoefficients_flatten[0,:]))
 
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:]*np.hanning(numMIMO),n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
-
+ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
+ULA_spectrumdB -= np.amax(ULA_spectrumdB)
 
 plt.figure(3, figsize=(20,10), dpi=200)
 plt.subplot(1,2,1)
@@ -290,7 +297,7 @@ plt.ylabel('Phase (rad)')
 plt.grid(True)
 plt.subplot(1,2,2)
 plt.title('MIMO ULA spectrum')
-plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum)),label='Angle spectrum')
+plt.plot(angAxis_deg, ULA_spectrumdB,label='Angle spectrum')
 plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
 plt.legend()
 plt.xlabel('Angle (deg)')

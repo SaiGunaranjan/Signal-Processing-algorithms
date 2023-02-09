@@ -35,6 +35,8 @@ each with its own phase code per ramp and have also been able to estimate MIMO c
 I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
 """
 
+""" In addition to angle accuracy, also check for SLLs in the angle spectrum"""
+
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
 
@@ -54,9 +56,13 @@ if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
 
-platform = 'SRIR256' # 'SRIR256', 'SRIR144'
+platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
-if (platform == 'SRIR144'):
+if (platform == 'SRIR16'):
+    numTx_simult = 4
+    numRx = 4
+    numMIMO = 16 # All MIMO in azimuth only
+elif (platform == 'SRIR144'):
     numTx_simult = 12
     numRx = 12
     numMIMO = 48

@@ -50,16 +50,23 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-platform = 'SRIR256' # 'SRIR256', 'SRIR144'
+platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
-if (platform == 'SRIR144'):
+if (platform == 'SRIR16'):
+    numTx_simult = 4
+    numRx = 4
+    numMIMO = 16 # All MIMO in azimuth only
+    numRamps = 128 # Assuming 128 ramps for both detection and MIMO segments
+elif (platform == 'SRIR144'):
     numTx_simult = 12
     numRx = 12
     numMIMO = 48
+    numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
 elif (platform == 'SRIR256'):
     numTx_simult = 13
     numRx = 16
     numMIMO = 74
+    numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -72,8 +79,6 @@ numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 
 """ Chirp Parameters"""
-# Assuming 140 ramps for both detection and MIMO segments
-numRamps = 140
 numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
@@ -264,6 +269,8 @@ ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
 mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
+ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
+ULA_spectrumdB -= np.amax(ULA_spectrumdB,axis=1)[:,None]
 
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
 signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
@@ -312,8 +319,8 @@ plt.figure(4, figsize=(20,10))
 plt.suptitle('MIMO ULA Angle spectrum')
 for ele in range(numDopUniqRbin):
     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
-    plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
-    plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
+    plt.plot(angAxis_deg, ULA_spectrumdB[ele,:],lw=2)
+    plt.vlines(objectAzAngle_deg[ele], ymin = -70, ymax = 10)
     plt.xlabel('Angle (deg)')
     plt.ylabel('dB')
     plt.grid(True)
