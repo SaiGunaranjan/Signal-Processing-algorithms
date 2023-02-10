@@ -136,12 +136,13 @@ objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) #
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
 objectRangeBin = objectRange/rangeRes
 
-rangeStepSize = 0.125
-rangeOffset = np.arange(-2,2+rangeStepSize,0.125)
-noRangeOffsetInd = np.where(rangeOffset==0)[0][0]
-numRangeOffsets = len(rangeOffset)
-rangeMoved = objectRange + rangeOffset[:,None] + objectVelocity_mps*interRampTime*np.arange(numRamps)[None,:]
-rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
+rangebinStepSize = 0.125
+rangebinOffset = np.arange(-2,2+rangebinStepSize,0.125)
+noRangeOffsetInd = np.where(rangebinOffset==0)[0][0]
+numRangeOffsets = len(rangebinOffset)
+rangeMoved = objectRange + objectVelocity_mps*interRampTime*np.arange(numRamps)[None,:]
+rangeBinsMoved = rangeMoved/rangeRes + rangebinOffset[:,None]
+rangeBinsMoved = np.floor(rangeBinsMoved).astype('int32')
 
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
@@ -246,7 +247,7 @@ for ele in np.arange(numRangeOffsets):
 
 
 binshiftIndicesToPlot = np.arange(noRangeOffsetInd-3,noRangeOffsetInd+4)
-binshiftsToPlot = rangeOffset[binshiftIndicesToPlot]
+binshiftsToPlot = rangebinOffset[binshiftIndicesToPlot]
 legendLabel = ['True Rbin + ' + str(x) for x in binshiftsToPlot]
 
 plt.figure(1, figsize=(20,10),dpi=150)
@@ -302,14 +303,14 @@ plt.figure(5,figsize=(20,10),dpi=150)
 plt.suptitle('DDMA: Angle sensitivity to bin offset')
 plt.subplot(1,2,1)
 plt.title('Angle accuracy vs Range bin offset')
-plt.plot(rangeOffset,angleError,'-o')
+plt.plot(rangebinOffset,angleError,'-o')
 plt.xlabel('Range bin offset')
 plt.ylabel('Angle error (deg)')
 plt.grid(True)
 
 plt.subplot(1,2,2)
 plt.title('Angle SLLs vs Range bin offset')
-plt.plot(rangeOffset,sllValdBc,'-o')
+plt.plot(rangebinOffset,sllValdBc,'-o')
 plt.xlabel('Range bin offset')
 plt.ylabel('dBc')
 plt.grid(True)
