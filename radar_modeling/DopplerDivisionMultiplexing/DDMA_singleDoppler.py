@@ -276,7 +276,7 @@ plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all
 plt.vlines(dopplerBinsToSample,ymin = noiseFloorEstFromSignal-20, ymax = signalPowerDoppSpectrum+5)
 plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
 # plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
-plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum'])
+plt.legend(['Doppler Spectrum', 'Noise floor'])
 plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
