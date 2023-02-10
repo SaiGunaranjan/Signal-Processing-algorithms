@@ -1,39 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec  3 16:36:29 2021
+Created on Fri Feb 10 21:20:41 2023
 
 @author: saiguna
 """
 
-""" In this script, I have modeled how the phase shifter error(from the
-ground truth)for each unique phase shifter manifests as periodic repetetions
-when the phase is swept over several ramps. This periodic component for each
-of the phase shifter manifests as spurs in the Doppler spectrum. These spurs get
-aggravated when the phase delta(in degrees) programmed per ramp divides 360 degress
-exactly. In such case, the same phase shifter code is applied periodically
-at every 360/phase_delta ramp number. For example, if the phase delta per ramp
-is chosen as 30 degrees, then 360/30 = 12 i.e. the starting ramp and the 12th ramp
-will have the same phase shifter applied. Similarly, the 2nd ramp and the 13th ramp
-have the same phase shifter applied and so on. Now since each phase shifter
-has its own "signature"(error in terms of DNL wrt ground truth), there will be
-a periodic pattern every 12th ramp. To break this periodicity, I have chosen
-a phase step which doesn't divide 360 degrees. For example, if the phase step per ramp
-is 29 degress instead of 30 degress, then at the 13th ramp, the phase is 29*13 = 377 = 17 degress.
-But this is not equal to 0 degrees i.e the phase shifter for the 13th ramp
-is not the same as the phase shifter for the 1st ramp. Similarly, the second ramp
-has a phase of 29 degress while the 14th ramp has a phase of 29*14= 406 = 46 degress which
-is not the same as 29 degress. Hence the phase shifter for the 14th ramp
-is not the same as the phase shifter for the 2nd ramp. Hence just by making
-the phase change per ramp not a divisor of 360 degress, we remove the periodicity.
-We also observe that the noise floor increases by 3 dB for each Tx that is added
-to the simultaneous transmission i.e., when we move from 3 Tx to 4 Tx, the noise floor raises by another 3 dB.
-This is not very clear to me and I need to understand this better!!
+"""
+Model impact of inaccurate range update in DDMA scheme
+
+In this script, I have modelled and shown the impact of an inaccurate range update(per ramp)
+on the angle spectrum. I have used the angle error(from ground truth) and the SLL
+as a metric to asses the impact. Towards this modelling, I have swept the range bin offset
+from -2 to +2 in steps of 0.125 bins around the true range bin movement across chirps.
+I then plot the angle accuracy and angle spectrum SLLs as a function of the range bin offset.
+As expected, the DDMA scheme is very sensitive to the range update since
+we potentially update the range bin on a chirp by chirp basis and also
+phase correct per chirp(if there is a bin update).
 """
 
-""" In this commit, I have also modeled the Txs/Rxs with simulataneous transmission from all Txs
-each with its own phase code per ramp and have also been able to estimate MIMO coeficients.
-I have assumed 4 Txs each separated by 2mm (lamda/2) and 8 Rxs each separated by 8mm (2lamda).
-Also added Doppler to the object"""
 
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
@@ -55,8 +39,8 @@ plt.close('all')
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
 if (platform == 'SRIR16'):
-    numTx_simult = 4
-    numRx = 4
+    numTx_simult = 4 # separated by lambda/2
+    numRx = 4 # separated by 2lambda
     numMIMO = 16 # All MIMO in azimuth only
     numRamps = 128 # Assuming 128 ramps for both detection and MIMO segments
 elif (platform == 'SRIR144'):
@@ -100,8 +84,6 @@ phaseStepPerTx_deg = 29#29.3
 
 Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
-
-
 
 
 ## RF parameters
@@ -158,10 +140,8 @@ rangeStepSize = 0.125
 rangeOffset = np.arange(-2,2+rangeStepSize,0.125)
 noRangeOffsetInd = np.where(rangeOffset==0)[0][0]
 numRangeOffsets = len(rangeOffset)
-# rangeMoved = objectRange + objectVelocity_mps*interRampTime*np.arange(numRamps)
 rangeMoved = objectRange + rangeOffset[:,None] + objectVelocity_mps*interRampTime*np.arange(numRamps)[None,:]
 rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
-
 
 phaseStepPerRamp_deg = np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
@@ -173,35 +153,17 @@ phaseShifterCodes_withNoise = phaseShifterCodes + phaseShifterNoise
 """ Ensure that the phase shifter LUT is without any bias and is from 0 to 360 degrees"""
 phaseShifterCodes_withNoise = np.mod(phaseShifterCodes_withNoise,360)
 
-""" NOT USING THE BELOW QUADRATIC PHASE in this DDMA MIMO scheme
-
-A small quadratic term is added to the linear phase term to break the periodicity.
-The strength of the quadratic term is controlled by the alpha parameter. If alpha is large,
-the quadratic term dominates the linear term thus breaking the periodicity of the Phase shifter DNL but
-at the cost of main lobe widening.
-If alpha is very small, the contribution of the quadratic term diminishes and the periodicity of
-the phase shifter DNL is back thus resulting in spurs/harmonics in the spectrum.
-Thus the alpha should be moderate to break the periodicity with help
-of the quadratic term at the same time not degrade the main lobe width.
-I have observed that for phaseStepPerRamp_deg=30 deg, alpha = 1e-4 is best. We will use this
-to scale the alpha for other step sizes"""
-
-alpha = 0#1e-4
-rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:] + (alpha/2)*(np.arange(numRamps)[None,:])**2)
+rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:])
 rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
 phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
 
 rangeTerm = signalphasor*np.exp(1j*((2*np.pi*objectRangeBin)/numSamp)*np.arange(numSamp))
-# rangeTerm = np.exp(1j*2*np.pi*(chirpSlope*2*objectRange/lightSpeed)*adcSamplingTime*np.arange(numSamp)) # numSamp
 dopplerTerm = np.exp(1j*((2*np.pi*objectVelocityBin)/numRamps)*np.arange(numRamps))
 """ Range Bin migration term"""
 rangeBinMigration = \
     np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[:,None]*np.arange(numSamp)[None,:])
-
-# rxSignal = np.exp(1j*(2*np.pi/lamda)*rxSpacing*np.sin(objectAzAngle_rad)*np.arange(numRx))
-# txSignal = np.exp(1j*(2*np.pi/lamda)*txSpacing*np.sin(objectAzAngle_rad)*np.arange(numTx_simult))
 
 rxSignal = mimoPhasor_txrx[0,0,:]
 txSignal = mimoPhasor_txrx[0,:,0]
@@ -222,11 +184,7 @@ signal_rfft = np.fft.fft(signal_rangeWin,axis=2)/numSamp
 signal_rfft = signal_rfft[:,:,0:numSampPostRfft]
 signal_rfft_powermean = np.mean(np.abs(signal_rfft)**2,axis=(0,1))
 
-# rangeBinsToSample = np.round(objectRangeBin).astype('int32')
-# chirpSamp_givenRangeBin = signal_rfft[:,:,rangeBinsToSample]
-
 rangeBinsToSample = rangeBinsMoved
-
 chirpSamp_givenRangeBin = signal_rfft[np.arange(numRamps)[None,:],:,rangeBinsToSample]
 
 """ Correcting for the Pi phase jump caused due to the Range bin Migration"""
@@ -243,12 +201,10 @@ rbmModulationDigitalFreq = (rbmModulationAnalogFreq/rampSamplingRate)*2*np.pi
 rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq*np.arange(numRamps))
 chirpSamp_givenRangeBin = chirpSamp_givenRangeBin*rbmModulationCorrectionTerm[None,:,None]
 
-
 signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
 signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
-signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
+signalFFTShift = signalFFT
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
-# signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=0)[None,:] # Normalize the spectrum for each Rx
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 
 objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
@@ -264,48 +220,12 @@ noiseFloorEstFromSignal = 10*np.log10(np.percentile(powerMeanSpectrum_arossRxs,7
 signalPowerDoppSpectrum = 10*np.log10(np.amax(powerMeanSpectrum_arossRxs,axis=1))
 snrDoppSpectrum = signalPowerDoppSpectrum - noiseFloorEstFromSignal
 
-# print('\nSNR post Doppler FFT: {} dB'.format(np.round(snrDoppSpectrum)))
-# print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
-# print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
-
-
-plt.figure(1, figsize=(20,10),dpi=200)
-plt.title('Range spectrum')
-plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
-plt.xlabel('Range Bins')
-plt.ylabel('Power dBm')
-plt.grid(True)
-
-
-plt.figure(2, figsize=(20,10),dpi=200)
-plt.title('Range bin movement across chirps')
-plt.plot(rangeBinsMoved[noRangeOffsetInd-1:noRangeOffsetInd+4,:].T,'-o')
-plt.axhline(objectRangeBin,color='k',linestyle='dashed')
-plt.xlabel('Chirp number')
-plt.ylabel('Range bin')
-plt.grid(True)
-
-
-plt.figure(3, figsize=(20,10), dpi=200)
-plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
-plt.plot(signalMagSpectrum[noRangeOffsetInd-1:noRangeOffsetInd+4,:,0].T, lw=2) # Plotting only the 0th Rx instead of all 8
-plt.vlines(dopplerBinsToSample,ymin = np.amin(noiseFloorEstFromSignal)-20, ymax = np.amax(signalPowerDoppSpectrum)+5)
-# plt.legend(['Doppler Spectrum'])
-plt.xlabel('Doppler Bins')
-plt.ylabel('Power dBFs')
-plt.grid(True)
-
-
+""" Angle analysis"""
 mimoCoefficients_eachDoppler_givenRange = signalFFT[:,dopplerBinsToSample,:] # numTx*numDopp x numRx
 mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
 mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1).T
 ULA -= ULA[0,:][None,:]
-
-
-# digFreq = (ULA[-1] - ULA[0])/(numMIMO - 1)
-# est_ang = np.arcsin((digFreq/(2*np.pi))*lamda/txSpacing)*180/np.pi
-
 
 mimoCoeffWind = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoeffWind,n=numAngleFFT,axis=1)/(numMIMO)
@@ -325,21 +245,58 @@ for ele in np.arange(numRangeOffsets):
     sllValdBc[ele] = ULA_spectrumdB[localMaxInd[sllInd],ele]
 
 
-plt.figure(4, figsize=(20,10), dpi=200)
+binshiftIndicesToPlot = np.arange(noRangeOffsetInd-3,noRangeOffsetInd+4)
+binshiftsToPlot = rangeOffset[binshiftIndicesToPlot]
+legendLabel = ['True Rbin + ' + str(x) for x in binshiftsToPlot]
+
+plt.figure(1, figsize=(20,10),dpi=150)
+plt.subplot(1,2,1)
+plt.title('Range spectrum')
+plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
+plt.xlabel('Range Bins')
+plt.ylabel('Power dBm')
+plt.grid(True)
+plt.ylim([noiseFloor_perBin-10,0])
+
+plt.subplot(1,2,2)
+plt.title('Range bin movement across chirps. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
+plt.plot(rangeBinsMoved[binshiftIndicesToPlot,:].T,'-o')
+# plt.axhline(objectRangeBin,color='k',linestyle='dashed')
+plt.xlabel('Chirp number')
+plt.ylabel('Range bin')
+plt.grid(True)
+plt.legend(legendLabel)
+
+
+plt.figure(3, figsize=(20,10), dpi=150)
+plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
+plt.plot(signalMagSpectrum[binshiftIndicesToPlot,:,0].T, lw=2) # Plotting only the 0th Rx instead of all 8
+plt.xlabel('Doppler Bins')
+plt.ylabel('Power dBFs')
+plt.grid(True)
+plt.legend(legendLabel)
+plt.vlines(dopplerBinsToSample,ymin = np.amin(noiseFloorEstFromSignal)-20, ymax = np.amax(signalPowerDoppSpectrum)+5)
+
+
+plt.figure(4, figsize=(20,10), dpi=150)
 plt.subplot(1,2,1)
 plt.title('MIMO phase')
-plt.plot(ULA[:,noRangeOffsetInd-1:noRangeOffsetInd+4],'-o')
+plt.plot(ULA[:,binshiftIndicesToPlot],'-o')
 plt.xlabel('Rx')
 plt.ylabel('Phase (rad)')
 plt.grid(True)
+plt.legend(legendLabel)
+
 plt.subplot(1,2,2)
-plt.title('MIMO ULA spectrum')
-plt.plot(angAxis_deg, ULA_spectrumdB[:,noRangeOffsetInd-1:noRangeOffsetInd+4],label='Angle spectrum')
-plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
-# plt.legend()
+plt.title('Angle spectrum')
+plt.plot(angAxis_deg, ULA_spectrumdB[:,binshiftIndicesToPlot],label='Angle spectrum')
 plt.xlabel('Angle (deg)')
 plt.ylabel('dB')
 plt.grid(True)
+plt.legend(legendLabel)
+plt.axvline(objectAzAngle_deg, color = 'k', label='Ground Truth angle (deg)')
+
+
 
 plt.figure(5,figsize=(20,10),dpi=150)
 plt.suptitle('DDMA: Angle sensitivity to bin offset')
