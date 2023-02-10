@@ -246,7 +246,7 @@ for ele in np.arange(numRangeOffsets):
     sllValdBc[ele] = ULA_spectrumdB[localMaxInd[sllInd],ele]
 
 
-binshiftIndicesToPlot = np.arange(noRangeOffsetInd-3,noRangeOffsetInd+4)
+binshiftIndicesToPlot = np.arange(0,numRangeOffsets,4)#np.arange(noRangeOffsetInd-3,noRangeOffsetInd+4)
 binshiftsToPlot = rangebinOffset[binshiftIndicesToPlot]
 legendLabel = ['True Rbin + ' + str(x) for x in binshiftsToPlot]
 
