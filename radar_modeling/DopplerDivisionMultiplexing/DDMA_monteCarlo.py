@@ -77,7 +77,7 @@ numAngleFFT = 2048
 mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
 c = 3e8
-numBitsPhaseShifter = 5
+numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 

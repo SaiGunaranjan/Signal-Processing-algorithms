@@ -74,7 +74,7 @@ numAngleFFT = 2048
 mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
 c = 3e8
-numBitsPhaseShifter = 5
+numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 
@@ -273,13 +273,17 @@ ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
 ULA_spectrumdB -= np.amax(ULA_spectrumdB,axis=1)[:,None]
 
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
-signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
+# signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
-powerMeanSpectrum_arossRxs = np.mean(signalFFTShiftSpectrum,axis=1) # Take mean spectrum across Rxs
-noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_arossRxs),70))
+powerMeanSpectrum_arossRxs = np.mean(signalFFTShiftSpectrum,axis=2) # Take mean spectrum across Rxs
+noiseFloorEstFromSignal = 10*np.log10(np.percentile(powerMeanSpectrum_arossRxs,70,axis=1))
+signalPowerDoppSpectrum = 10*np.log10(np.amax(powerMeanSpectrum_arossRxs,axis=1))
+snrDoppSpectrum = signalPowerDoppSpectrum - noiseFloorEstFromSignal
 
 DNL_rad = (DNL/180) * np.pi
-noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps)
+noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps) + 10*np.log10(numTx_simult) # DNL Noise floor raises as 10log10(numSimulTx)
+
+print('\nSNR post Doppler FFT: {} dB'.format(np.round(snrDoppSpectrum)))
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
@@ -290,14 +294,15 @@ plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
 plt.xlabel('Range Bins')
 plt.ylabel('Power dBm')
 plt.grid(True)
-
+plt.ylim([noiseFloor_perBin-10,0])
 
 plt.figure(2, figsize=(20,10))
 plt.suptitle('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
 for ele in range(numDopUniqRbin):
     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
     plt.plot(signalMagSpectrum[ele,:,0].T, lw=2, label='Target speed = ' + str(np.round(objectVelocity_mps[ele],2)) + ' mps') # Plotting only the 0th Rx instead of all 8
-    plt.vlines(dopplerBinsToSample[ele,:] ,ymin = -70, ymax = 10)
+    # plt.vlines(dopplerBinsToSample[ele,:] ,ymin = -70, ymax = 10)
+    plt.vlines(dopplerBinsToSample[ele,:],ymin = np.amin(noiseFloorEstFromSignal)-20, ymax = np.amax(signalPowerDoppSpectrum)+5)
     plt.xlabel('Doppler Bins')
     plt.ylabel('Power dBFs')
     plt.grid(True)

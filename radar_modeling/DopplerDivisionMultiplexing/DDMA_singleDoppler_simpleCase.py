@@ -70,7 +70,7 @@ numAngleFFT = 2048
 txSpacing = 2e-3
 rxSpacing = 4*txSpacing
 lightSpeed = 3e8
-numBitsPhaseShifter = 5
+numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 
@@ -103,7 +103,7 @@ adcSamplingTime = 1/adcSamplingRate # s
 chirpOnTime = numSamp*adcSamplingTime
 chirpSlope = chirpBW/chirpOnTime
 dBFs_to_dBm = 10
-binSNR = -3#10 # dB
+binSNR = 10#-3 # dB
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
 noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
@@ -222,7 +222,7 @@ signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[:,None]
 signalFFT = np.fft.fft(signalWindowed, axis=0, n = numDoppFFT)/numRamps
 signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
-signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=0)[None,:] # Normalize the spectrum for each Rx
+# signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=0)[None,:] # Normalize the spectrum for each Rx
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 
 objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
@@ -231,38 +231,44 @@ dopplerBinsToSample = np.round(objectVelocityBinNewScale + binOffset_Txphase).as
 dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
 DNL_rad = (DNL/180) * np.pi
-noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps)
+noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(numRamps) + 10*np.log10(numTx_simult) # DNL Noise floor raises as 10log10(numSimulTx)
 
 powerMeanSpectrum_arossRxs = np.mean(signalFFTShiftSpectrum,axis=1) # Take mean spectrum across Rxs
-noiseFloorEstFromSignal = 10*np.log10(np.percentile(np.sort(powerMeanSpectrum_arossRxs),70))
+noiseFloorEstFromSignal = 10*np.log10(np.percentile(powerMeanSpectrum_arossRxs,70))
+signalPowerDoppSpectrum = 10*np.log10(np.amax(powerMeanSpectrum_arossRxs))
+snrDoppSpectrum = signalPowerDoppSpectrum - noiseFloorEstFromSignal
 
+
+print('\nSNR post Doppler FFT: {} dB'.format(np.round(snrDoppSpectrum)))
 print('Noise Floor Estimated from signal: {} dB'.format(np.round(noiseFloorEstFromSignal)))
 print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
 mimoCoefficients_eachDoppler_givenRange = signalFFT[dopplerBinsToSample,:] # numTx*numDopp x numRx
 mimoCoefficients_flatten = (mimoCoefficients_eachDoppler_givenRange.T).reshape(-1,numTx_simult*numRx)
 ULA = np.unwrap(np.angle(mimoCoefficients_flatten[0,:]))
-
-ULA_spectrum = np.fft.fft(mimoCoefficients_flatten[0,:],n=numAngleFFT)/(numMIMO)
+mimoCoeffWindowed = mimoCoefficients_flatten[0,:]*np.hanning(numMIMO)
+ULA_spectrum = np.fft.fft(mimoCoeffWindowed,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum)
 ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
 ULA_spectrumdB -= np.amax(ULA_spectrumdB)
 
 plt.figure(1, figsize=(20,10),dpi=200)
-plt.title('Range spectrum')
+plt.title('Power mean Range spectrum - Single chirp SNR = ' + str(np.round(binSNR)) + 'dB')
 plt.plot(10*np.log10(signal_rfft_powermean) + dBFs_to_dBm)
 plt.xlabel('Range Bins')
 plt.ylabel('Power dBm')
 plt.grid(True)
+plt.ylim([noiseFloor_perBin-10,0])
 
 if 1:
     plt.figure(2, figsize=(20,10), dpi=200)
     plt.title('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM. ' + 'Target Speed = ' + str(round(objectVelocity_mps)) + ' mps')
     plt.plot(signalMagSpectrum[:,0], lw=2) # Plotting only the 0th Rx instead of all 8
-    plt.vlines(dopplerBinsToSample,ymin = -70, ymax = 10)
-    plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'solid')
-    plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
-    plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
+    plt.vlines(dopplerBinsToSample,ymin = noiseFloorEstFromSignal-20, ymax = signalPowerDoppSpectrum+5)
+    plt.axhline(noiseFloorEstFromSignal, color = 'k', linestyle = 'dashed')
+    # plt.axhline(noiseFloorSetByDNL, color = 'k', linestyle = '-.')
+    # plt.legend(['Doppler Spectrum', 'Noise floor Est. from spectrum', 'Theoretical Noise floor set by DNL'])
+    plt.legend(['Doppler Spectrum', 'Noise floor'])
     plt.xlabel('Doppler Bins')
     plt.ylabel('Power dBFs')
     plt.grid(True)
