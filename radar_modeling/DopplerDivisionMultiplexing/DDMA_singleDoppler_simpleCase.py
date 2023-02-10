@@ -74,6 +74,10 @@ numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 
+DoppAmbigNumArr = np.arange(-2,3) # Doppler Ambiguity number/Doppler Integer hypothesis
+""" -1/+1 hypothesis is 3 times as likely as -2/2 hypothesis. 0 hypthesis is 2 times as likely as -1/+1 hypothesis """
+DoppAmbNum = np.random.choice(DoppAmbigNumArr,p=[1/20, 3/20, 12/20, 3/20, 1/20])
+
 
 """ Chirp Parameters"""
 # Assuming 140 ramps for both detection and MIMO segments
@@ -127,7 +131,9 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
 """ Target definition"""
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
-objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, maxVelBaseband_mps+2*FsEquivalentVelocity) # 5 m/s
+# objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, maxVelBaseband_mps+2*FsEquivalentVelocity)
+objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity), \
+                                        -maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity)+FsEquivalentVelocity)
 objectAzAngle_deg = np.random.uniform(-50,50) #0
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
