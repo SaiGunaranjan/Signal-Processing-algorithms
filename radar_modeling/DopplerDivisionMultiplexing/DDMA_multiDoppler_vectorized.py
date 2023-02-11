@@ -30,9 +30,11 @@ to the simultaneous transmission i.e., when we move from 3 Tx to 4 Tx, the noise
 This is not very clear to me and I need to understand this better!!
 """
 
-""" In this commit, I have also modeled the Txs/Rxs with simulataneous transmission from all Txs
-each with its own phase code per ramp and have also been able to estimate MIMO coeficients.
-I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
+""" This script now supports 3 methods of MIMO coefficient estimation for the DDMA scheme:
+    1. FFT of the chirp samples + Tx phase modulated Doppler bin sampling
+    2. DFT of the chirp samples with the Tx phase modulated Doppler frequencies
+    3. Demodulation of the DDMA chirp sample data with the phase code sequence of each TX
+    followed by DFT with the baseband Doppler frequencies
 """
 
 """ The derivation for the DDMA scheme is available in the below location:
