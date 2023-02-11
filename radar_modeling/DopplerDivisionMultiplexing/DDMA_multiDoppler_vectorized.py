@@ -283,7 +283,6 @@ else:
     mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed[:,:,:,None]*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
     mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1))
 
-
     signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
     """ Coefficients estimated using FFT and sampling the required bins"""
     # mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # [numObj, numTx, numRx]
