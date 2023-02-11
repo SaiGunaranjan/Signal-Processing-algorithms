@@ -30,9 +30,11 @@ to the simultaneous transmission i.e., when we move from 3 Tx to 4 Tx, the noise
 This is not very clear to me and I need to understand this better!!
 """
 
-""" In this commit, I have also modeled the Txs/Rxs with simulataneous transmission from all Txs
-each with its own phase code per ramp and have also been able to estimate MIMO coeficients.
-I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
+""" This script now supports 3 methods of MIMO coefficient estimation for the DDMA scheme:
+    1. FFT of the chirp samples + Tx phase modulated Doppler bin sampling
+    2. DFT of the chirp samples with the Tx phase modulated Doppler frequencies
+    3. Demodulation of the DDMA chirp sample data with the phase code sequence of each TX
+    followed by DFT with the baseband Doppler frequencies
 """
 
 """ The derivation for the DDMA scheme is available in the below location:
@@ -49,6 +51,15 @@ numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Do
 flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
+
+phaseDemodMethod = 1
+if (phaseDemodMethod == 1):
+    print('\n\nUsing the Tx demodulation method for DDMA\n\n')
+else:
+    print('\n\nUsing modulated Doppler sampling method for DDMA\n\n')
+
+
+
 
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
@@ -114,8 +125,10 @@ print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 """ Target definition"""
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 # objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
+
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity), \
                                         -maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity)+FsEquivalentVelocity,numDopUniqRbin)
+
 
 print('Velocities (mps):', np.round(objectVelocity_mps,2))
 objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10]) Theta plane angle
@@ -244,29 +257,46 @@ else:
 
 
 objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
-binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
-dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
-dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
+
+if (phaseDemodMethod == 1):
+    dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None]).astype('int32')
+    dopplerBinsToSample = np.repeat(dopplerBinsToSample,numTx_simult,axis=1)
+    demodulatingPhaseCodedSignal = signal_phaseCode.T # Transpose is to just matching the dimensions of the chirp samples signal
+    demodulatedDopplerSignal = chirpSamp_givenRangeBin[:,:,:,None]*np.conj(demodulatingPhaseCodedSignal)[None,:,None,:] # [numDopp, numChirp, numRx, numTx]
+    signalWindowed = demodulatedDopplerSignal*np.hanning(numRamps)[None,:,None,None] # [numDopp, numChirp, numRx, numTx]
+    """DFT based coefficient estimation """
+    DFT_vec = np.exp(1j*2*np.pi*(dopplerBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+    mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
+    mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1))
+
+    signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
+    """ Coefficients estimated using FFT and sampling the required bins"""
+    # mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin),dopplerBinsToSample[:,0],:,:] # [numObj, numRx, numTx] , dopplerBinsToSample[:,0] because the other columns are basically repeats
+    # mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1)) # [numObj, numTx, numRx]
+else:
+    binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
+    dopplerBinsToSample = np.round(objectVelocityBinNewScale[:,None] + dopplerBinOffset_rbm[:,None] + binOffset_Txphase[None,:]).astype('int32')
+    dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
+    signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
+    """DFT based coefficient estimation """
+    DFT_vec = np.exp(1j*2*np.pi*(dopplerBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+    mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed[:,:,:,None]*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
+    mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1))
+
+    signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
+    """ Coefficients estimated using FFT and sampling the required bins"""
+    # mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # [numObj, numTx, numRx]
+
 
 
 """ To obtain the signal coefficients, we could either do an FFT and evaluate at the required bins
 or we could simply perform a single point DFT by correlating the signal with the phasor constructed out of the required bins.
 In this commit, I'm evaluating the coefficients by doing a single point DFT at the known Doppler bins.
 This way, we don't have to perform a huge FFT and then evaluate at the dopplerBinsToSample which is compute heavy.
-Rather, we evaluate a single point DFT at the dopplerBinsToSample. T
+Rather, we evaluate a single point DFT at the dopplerBinsToSample.
 This has a much smaller compute as compared to performing a huge FFT for 16 Rx channels.
 Here, I'm computing the Doppler FFT for plotting purpose only"""
-signalWindowed = chirpSamp_givenRangeBin*np.hanning(numRamps)[None,:,None]
-signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
-signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
 
-""" Coefficients estimated using FFT and sampling the required bins"""
-# mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # [numObj, numTx, numRx]
-
-"""DFT based coefficient estimation """
-DFT_vec = np.exp(1j*2*np.pi*(dopplerBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
-mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed[:,:,:,None]*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
-mimoCoefficients_eachDoppler_givenRange = np.transpose(mimoCoefficients_eachDoppler_givenRange,(0,2,1))
 
 mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
 mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
@@ -277,8 +307,8 @@ ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
 ULA_spectrumdB = 20*np.log10(np.abs(ULA_spectrum))
 ULA_spectrumdB -= np.amax(ULA_spectrumdB,axis=1)[:,None]
 
+signalFFTShift = signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
-# signalFFTShiftSpectrum = signalFFTShiftSpectrum/np.amax(signalFFTShiftSpectrum, axis=1)[:,None,:] # Normalize the spectrum for each Rx
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
 powerMeanSpectrum_arossRxs = np.mean(signalFFTShiftSpectrum,axis=2) # Take mean spectrum across Rxs
 noiseFloorEstFromSignal = 10*np.log10(np.percentile(powerMeanSpectrum_arossRxs,70,axis=1))
@@ -301,16 +331,36 @@ plt.ylabel('Power dBm')
 plt.grid(True)
 plt.ylim([noiseFloor_perBin-10,0])
 
+
 plt.figure(2, figsize=(20,10))
-plt.suptitle('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
-for ele in range(numDopUniqRbin):
-    plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
-    plt.plot(signalMagSpectrum[ele,:,0].T, lw=2, label='Target speed = ' + str(np.round(objectVelocity_mps[ele],2)) + ' mps') # Plotting only the 0th Rx instead of all 8
-    plt.vlines(dopplerBinsToSample[ele,:],ymin = np.amin(noiseFloorEstFromSignal)-20, ymax = np.amax(signalPowerDoppSpectrum)+5)
-    plt.xlabel('Doppler Bins')
-    plt.ylabel('Power dBFs')
-    plt.grid(True)
-    plt.legend()
+if (phaseDemodMethod == 1):
+    plt.suptitle('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
+    subplotCount = 0
+    for ele in range(numDopUniqRbin):
+        for ele_tx in np.arange(numTx_simult):
+            plt.subplot(min(3,numDopUniqRbin),numTx_simult, subplotCount+1)
+            if (ele==0):
+                plt.title('Tx' + str(ele_tx) + ' demodulated spectrum')
+            plt.plot(signalMagSpectrum[ele,:,0,ele_tx].T, lw=2, label='Target speed = ' + str(np.round(objectVelocity_mps[ele],2)) + ' mps') # Plotting only the 0th Rx instead of all 8
+            plt.vlines(dopplerBinsToSample[ele,0],ymin = np.amin(noiseFloorEstFromSignal)-20, ymax = np.amax(signalPowerDoppSpectrum)+5)
+            if (ele == numDopUniqRbin-1):
+                plt.xlabel('Doppler Bins')
+            if (ele_tx==0):
+                plt.ylabel('Power dBFs')
+            plt.grid(True)
+            plt.legend()
+            subplotCount += 1
+
+else:
+    plt.suptitle('Doppler Spectrum with ' + str(numTx_simult) + 'Txs simultaneously ON in CDM')
+    for ele in range(numDopUniqRbin):
+        plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+        plt.plot(signalMagSpectrum[ele,:,0].T, lw=2, label='Target speed = ' + str(np.round(objectVelocity_mps[ele],2)) + ' mps') # Plotting only the 0th Rx instead of all 8
+        plt.vlines(dopplerBinsToSample[ele,:],ymin = np.amin(noiseFloorEstFromSignal)-20, ymax = np.amax(signalPowerDoppSpectrum)+5)
+        plt.xlabel('Doppler Bins')
+        plt.ylabel('Power dBFs')
+        plt.grid(True)
+        plt.legend()
 
 
 plt.figure(3, figsize=(20,10))
@@ -323,7 +373,7 @@ for ele in range(numDopUniqRbin):
     plt.grid(True)
 
 
-# plt.figure(4, figsize=(20,10), dpi=200)
+
 plt.figure(4, figsize=(20,10))
 plt.suptitle('MIMO ULA Angle spectrum')
 for ele in range(numDopUniqRbin):
