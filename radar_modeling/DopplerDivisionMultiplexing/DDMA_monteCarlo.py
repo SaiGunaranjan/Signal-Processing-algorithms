@@ -62,14 +62,17 @@ if (platform == 'SRIR16'):
     numTx_simult = 4
     numRx = 4
     numMIMO = 16 # All MIMO in azimuth only
+    numChirpsDDMA = np.array([64,128,256]) # Montecarlo on number of chirps for DDMA MIMO
 elif (platform == 'SRIR144'):
     numTx_simult = 12
     numRx = 12
     numMIMO = 48
+    numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
 elif (platform == 'SRIR256'):
     numTx_simult = 13
     numRx = 16
     numMIMO = 74
+    numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -82,8 +85,7 @@ numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
 
 DoppAmbigNumArr = np.arange(-2,3) # Doppler Ambiguity number/Doppler Integer hypothesis
-""" -1/+1 hypothesis is 3 times as likely as -2/2 hypothesis. 0 hypthesis is 2 times as likely as -1/+1 hypothesis """
-DoppAmbNum = np.random.choice(DoppAmbigNumArr,p=[1/20, 3/20, 12/20, 3/20, 1/20])
+
 
 """ Chirp Parameters"""
 
@@ -138,7 +140,6 @@ maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
 """ MonteCarlo Parameters"""
-numChirpsDDMA = np.arange(50,190,20) #np.arange(50,190,20) #np.arange(50,170,40) #np.arange(50,170,20) #
 range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 4)#np.arange(-20, 30, 2)  # dB
 numMonteCarloRuns = 100#100#50 # 1
 numChirpsMC = len(numChirpsDDMA)
@@ -172,8 +173,14 @@ for numRamps in numChirpsDDMA:
             # objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, \
             #                                         maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
 
-            objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity), \
-                                        -maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity)+FsEquivalentVelocity,numDopUniqRbin)
+
+            objectVelocity_mps = np.empty([0])
+            for numVels in np.arange(numDopUniqRbin):
+                """ -1/+1 hypothesis is 3 times as likely as -2/2 hypothesis. 0 hypthesis is 2 times as likely as -1/+1 hypothesis """
+                DoppAmbNum = np.random.choice(DoppAmbigNumArr,p=[1/20, 3/20, 12/20, 3/20, 1/20])
+                speedEachTarget = np.random.uniform(-maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity), \
+                                            -maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity)+FsEquivalentVelocity,1)
+                objectVelocity_mps = np.append(objectVelocity_mps,speedEachTarget)
 
             objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10])
             objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
@@ -319,7 +326,7 @@ plt.xlabel('SNR (dB)')
 plt.ylabel('Angle Error std (deg)')
 plt.grid(True)
 plt.legend(legend_list)
-plt.ylim([0,1])
+# plt.ylim([0,1])
 
 
 
