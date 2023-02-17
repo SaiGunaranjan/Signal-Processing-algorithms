@@ -44,7 +44,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mimoPhasorSynthesis import mimoPhasorSynth # loading the antenna corodinates for the steradian RADAR platforms
 
-
+# np.random.seed(10)
 plt.close('all')
 
 numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Dopplers in a given range bin
@@ -58,10 +58,12 @@ if (phaseDemodMethod == 1):
 else:
     print('\n\nUsing modulated Doppler sampling method for DDMA\n\n')
 
-
+flagEnableTxCoupling = 1 # 1 to enable , 0 to disable
 
 
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
+
+print('\n\nPlatform selected is', platform, '\n\n')
 
 if (platform == 'SRIR16'):
     numTx_simult = 4
@@ -78,6 +80,14 @@ elif (platform == 'SRIR256'):
     numRx = 16
     numMIMO = 74
     numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
+
+if ((flagEnableTxCoupling == 1) and (platform == 'SRIR16')):
+    print('\n\nInter Tx coupling enabled\n\n')
+elif ((flagEnableTxCoupling == 0) and (platform == 'SRIR16')):
+    print('\n\nInter Tx coupling disabled\n\n')
+else:
+    print('\n\nInter Tx coupling not supported for this platform currently\n\n')
+
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -113,7 +123,7 @@ angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/n
 snrGainDDMA = 10*np.log10(numTx_simult**2) #dB
 snrGainDopplerFFT = 10*np.log10(numRamps) #dB
 totalsnrGain = snrGainDDMA + snrGainDopplerFFT
-print('Total SNR gain ( {0:.0f} Tx DDMA + {1:.0f} point Doppler FFT) = {2:.2f} dB'.format(numTx_simult, numRamps, totalsnrGain))
+print('\n\nTotal SNR gain ( {0:.0f} Tx DDMA + {1:.0f} point Doppler FFT) = {2:.2f} dB'.format(numTx_simult, numRamps, totalsnrGain))
 
 chirpSamplingRate = 1/interRampTime
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
@@ -129,6 +139,7 @@ objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity), \
                                         -maxVelBaseband_mps+(DoppAmbNum*FsEquivalentVelocity)+FsEquivalentVelocity,numDopUniqRbin)
 
+# objectVelocity_mps = np.array([-10,-15])
 
 print('Velocities (mps):', np.round(objectVelocity_mps,2))
 objectAzAngle_deg = np.random.uniform(-50,50, numDopUniqRbin) #np.array([30,-10]) Theta plane angle
@@ -149,7 +160,7 @@ adcSamplingTime = 1/adcSamplingRate # s
 chirpOnTime = numSamp*adcSamplingTime
 chirpSlope = chirpBW/chirpOnTime
 dBFs_to_dBm = 10
-binSNR = -3 # dB
+binSNR = 10#-3 # dB
 totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
 totalNoisePower_dBFs = totalNoisePower_dBm - 10
 noiseFloor_perBin = totalNoisePower_dBFs - 10*np.log10(numSamp) # dBFs/bin
@@ -171,7 +182,8 @@ if (flagRBM == 1):
 else:
     rangeMoved = objectRange + 0*objectVelocity_mps[:,None]*interRampTime*np.arange(numRamps)[None,:]
 
-rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
+rangeBinsMovedfrac = rangeMoved/rangeRes + 0*np.random.uniform(-0.5,0.5,numDopUniqRbin)[:,None]
+rangeBinsMoved = np.floor(rangeBinsMovedfrac).astype('int32')
 
 
 
@@ -216,12 +228,39 @@ rangeBinMigration = \
 rxSignal = mimoPhasor_txrx[:,0,:]
 txSignal = mimoPhasor_txrx[:,:,0]
 
+## currently enabled only for single IC and hence size is 4x4. Will add for multi IC later ON
+if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
+    isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]])
+    isolationPhase = np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult)
+else:
+    isolationMagnitude = np.eye(numTx_simult)
+    isolationPhase = np.zeros((numTx_simult,numTx_simult))
+
+
+isolationPhasor = np.exp(1j*isolationPhase)
+# isolationPhasor[0,0] = 1
+# isolationPhasor[1,1] = 1
+# isolationPhasor[2,2] = 1
+# isolationPhasor[3,3] = 1
+""" Coupling introduces deterministic magnitude coupling across Txs and random phase contribution from adjacent Txs
+Diagonal elements of the phase coupling matrix are made 0. Since they can be removed through cal
+"""
+isolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+isolationMatrix = isolationMagnitude*isolationPhasor
+
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
+signal_phaseCode_couplingMatrix = isolationMatrix @ signal_phaseCode
+txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
+signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
+
+phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode_couplingMatrix_txWeights[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
 phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,:,None]*rxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
 phaseCodedTxRxSignal_withRangeTerm = rangeTerm[None,None,None,None,:] * phaseCodedTxRxSignal[:,:,:,:,None]
 if (flagRBM == 1):
     phaseCodedTxRxSignal_withRangeTerm = phaseCodedTxRxSignal_withRangeTerm * rangeBinMigration[:,None,:,None,:]
+
+
+
 signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
 
 
@@ -383,3 +422,4 @@ for ele in range(numDopUniqRbin):
     plt.xlabel('Angle (deg)')
     plt.ylabel('dB')
     plt.grid(True)
+    plt.ylim([-70,10])
