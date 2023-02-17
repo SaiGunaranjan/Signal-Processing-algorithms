@@ -63,6 +63,7 @@ This is the Tx coupling model I have introduced. This plays a very important rol
 2. Non-linearity of the magnitude response of the phase LUT
 3. Bin shift
 4. Phase shifter cascaded coupling.
+5. Effective antenna pattern in DDMA scheme with multiple Txs simultaneously ON and sweeping phase
 and so on. I will try to add these models into the DDMA scheme one by one.
 
 """
