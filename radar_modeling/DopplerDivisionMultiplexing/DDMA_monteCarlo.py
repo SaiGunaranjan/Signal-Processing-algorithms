@@ -35,7 +35,38 @@ each with its own phase code per ramp and have also been able to estimate MIMO c
 I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
 """
 
-""" In addition to angle accuracy, also check for SLLs in the angle spectrum"""
+""" In addition to angle accuracy, the script now also checks SLLs in the angle spectrum"""
+
+"""
+Introduced Tx-Tx coupling into the DDMA model
+
+In this script, I have introduced inter-Tx coupling model into the DDMA scheme. When we have nearby Txs
+simutaneously transmitting different signals each, there could be coupling from adjacent (and other nearby) Txs
+thus corrupting the original signal transmitted by a particular Tx. This coupling has both a magnitude component
+and a phase component. Let us consider a simple signgle IC with 4 Txs say, Tx0, Tx1, Tx2, Tx3.
+Based on measurements results, typically, the coupling from adjacent Txs i.e Tx1 onto Tx0
+(and similarly from Tx2 onto Tx1, Tx3 onto Tx2) is about 20 dB and from Tx2 to Tx0 (similarly from Tx3 to Tx1) is
+a further 6 dB lower. In other words, when you have all 4 Txs, i.e. Tx0, Tx1, Tx2, Tx3 all ON simultaneously and
+transmitting different signals each, in addition to the signal transmitted by Tx0, the signal from Tx1 couples onto Tx0
+and is 20 dB lower in power. Similarly, the signal from Tx2 couples onto Tx0(in power) and is 20 + 6 dB lower,
+signal from Tx3 couples onto Tx0 and is 20 + 6 + 6 dB lower and so on. Roughly drops by a further 6 dB (or even lower)
+there onwards.  Hence the coupling from Tx1 to Tx0 on the linear voltage scale is 0.1,
+from Tx2 to Tx0 is 0.05 (on linear voltage scale), from Tx3 to Tx0 is 0.025 and so on.
+This is the magitude/amplitude coupling. On top of this, we could also have a random phase contribution from neighbouring Txs.
+This can be captured as a caliberation in the DDMA mode and can be applied at the receiver end to remove this effect.
+I have observed that the inter Tx coupling affects the SLLs in the angle spectrum. To be more particular,
+with the dB coupling numbers mentioned (20, 26, 32, ..), it is actually the un-compensated coupled random phase that
+plays a bigger role in setting the SLLs than the magnitude coupling. So these random phases need to be calibeated out.
+
+This is the Tx coupling model I have introduced. This plays a very important role in DDMA schemes. There are other factors which play a crucial role in the DDMA scheme like:
+1. Non-linearity of the phase response of the phase LUT
+2. Non-linearity of the magnitude response of the phase LUT
+3. Bin shift
+4. Phase shifter cascaded coupling.
+5. Effective antenna pattern in DDMA scheme with multiple Txs simultaneously ON and sweeping phase
+and so on. I will try to add these models into the DDMA scheme one by one.
+
+"""
 
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
@@ -45,6 +76,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mimoPhasorSynthesis import mimoPhasorSynth
 import time as time
+from scipy.signal import argrelextrema
+
+# np.random.seed(10)
 
 tstart = time.time()
 
@@ -55,14 +89,18 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
+flagEnableTxCoupling = 0 # 1 to enable , 0 to disable
 
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
+
+print('\n\nPlatform selected is', platform, '\n\n')
 
 if (platform == 'SRIR16'):
     numTx_simult = 4
     numRx = 4
     numMIMO = 16 # All MIMO in azimuth only
-    numChirpsDDMA = np.array([64,128,256]) # Montecarlo on number of chirps for DDMA MIMO
+    # numChirpsDDMA = np.array([64,128,256]) # Montecarlo on number of chirps for DDMA MIMO
+    numChirpsDDMA = np.array([128])
 elif (platform == 'SRIR144'):
     numTx_simult = 12
     numRx = 12
@@ -73,6 +111,13 @@ elif (platform == 'SRIR256'):
     numRx = 16
     numMIMO = 74
     numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
+
+if ((flagEnableTxCoupling == 1) and (platform == 'SRIR16')):
+    print('\n\nInter Tx coupling enabled\n\n')
+elif ((flagEnableTxCoupling == 0) and (platform == 'SRIR16')):
+    print('\n\nInter Tx coupling disabled\n\n')
+else:
+    print('\n\nInter Tx coupling not supported for this platform currently\n\n')
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -140,14 +185,19 @@ maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
 """ MonteCarlo Parameters"""
-range_binSNRArray = np.arange(-20, 30, 2)#np.arange(-20, 30, 4)#np.arange(-20, 30, 2)  # dB
-numMonteCarloRuns = 100#100#50 # 1
+range_binSNRArray = np.arange(-20, 30, 4)#np.arange(-20, 30, 2)#np.arange(-20, 30, 4)#np.arange(-20, 30, 2)  # dB
+numMonteCarloRuns = 100#100#100#50 # 1
 numChirpsMC = len(numChirpsDDMA)
 numSnrMC = len(range_binSNRArray)
-angleErrorMatrix = np.zeros((numChirpsMC, numSnrMC))
+angleErrorMatrix_std = np.zeros((numChirpsMC, numSnrMC))
 angleErrorMatrix_percentile = np.zeros((numChirpsMC, numSnrMC))
-count_rampMC = 0
 
+angleSLLMatrix_median = np.zeros((numChirpsMC, numSnrMC))
+angleSLLMatrix_max = np.zeros((numChirpsMC, numSnrMC))
+angleSLLMatrix_percentile = np.zeros((numChirpsMC, numSnrMC))
+
+count_rampMC = 0
+percentile = 80#75
 
 for numRamps in numChirpsDDMA:
     rampPhaseIdeal_deg = phaseStepPerRamp_deg[:,None]*(np.arange(numRamps)[None,:])
@@ -166,6 +216,7 @@ for numRamps in numChirpsDDMA:
         signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
         signalphasor = signalAmplitude*signalPhase
         errorAngArray = np.empty([0])
+        angleSllArray = np.empty([0])
         for iter_num in np.arange(numMonteCarloRuns):
             """ Target definition"""
             numDopUniqRbin = np.random.choice(np.arange(1, 4), p=[3/6, 2/6, 1/6]) # Number of Dopplers in a given range bin with the corresponding pmf
@@ -213,8 +264,28 @@ for numRamps in numChirpsDDMA:
             rxSignal = mimoPhasor_txrx[:,0,:]
             txSignal = mimoPhasor_txrx[:,:,0]
 
+            ## currently enabled only for single IC. Will add for multi IC later ON
+            if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
+                isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+                isolationPhase = np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult)
+            else:
+                isolationMagnitude = np.eye(numTx_simult)
+                isolationPhase = np.zeros((numTx_simult,numTx_simult))
+
+
+            isolationPhasor = np.exp(1j*isolationPhase)
+            """ Coupling introduces deterministic magnitude coupling across Txs and random phase contribution from adjacent Txs
+            Diagonal elements of the phase coupling matrix are made 0. Since they can be removed through cal
+            """
+            isolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+            isolationMatrix = isolationMagnitude*isolationPhasor
+
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-            phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
+            signal_phaseCode_couplingMatrix = isolationMatrix @ signal_phaseCode
+            txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
+            signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
+
+            phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode_couplingMatrix_txWeights[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
             phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,:,None]*rxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
             phaseCodedTxRxSignal_withRangeTerm = rangeTerm[None,None,None,None,:] * phaseCodedTxRxSignal[:,:,:,:,None]
             if (flagRBM == 1):
@@ -275,6 +346,17 @@ for numRamps in numChirpsDDMA:
             errorAng = objectAzAngle_deg - estAngDeg
             errorAngArray = np.hstack((errorAngArray,errorAng))
 
+            """ SLL computation"""
+            ULA_spectrumMagdB = 20*np.log10(ULA_spectrumMag)
+            ULA_spectrumMagdBNorm = ULA_spectrumMagdB - np.amax(ULA_spectrumMagdB,axis=1)[:,None]
+            sllValdBc = np.zeros((numDopUniqRbin),dtype=np.float32)
+            for ele1 in np.arange(numDopUniqRbin):
+                localMaxInd = argrelextrema(ULA_spectrumMagdBNorm[ele1,:],np.greater,axis=0,order=2)[0]
+                sllInd = np.argsort(ULA_spectrumMagdBNorm[ele1,localMaxInd])[-2] # 1st SLL
+                sllValdBc[ele1] = ULA_spectrumMagdBNorm[ele1,localMaxInd[sllInd]]
+
+            angleSllArray = np.hstack((angleSllArray,sllValdBc))
+
             # if any(np.abs(errorAng)>3):
             #     print('Im here')
             #     print('Velocities (mps):', np.round(objectVelocity_mps,2))
@@ -292,10 +374,13 @@ for numRamps in numChirpsDDMA:
             #         plt.grid(True)
 
 
-        angErrorStd = np.std(errorAngArray)
-        angleErrorMatrix[count_rampMC,count_snrMC] = angErrorStd
+        angleErrorMatrix_std[count_rampMC,count_snrMC] = np.std(errorAngArray)
+        angleErrorMatrix_percentile[count_rampMC,count_snrMC] = np.percentile(np.abs(errorAngArray),percentile)
 
-        angleErrorMatrix_percentile[count_rampMC,count_snrMC] = np.percentile(np.abs(errorAngArray),98)
+
+        angleSLLMatrix_max[count_rampMC,count_snrMC] = np.amax(angleSllArray)
+        angleSLLMatrix_median[count_rampMC,count_snrMC] = np.median(angleSllArray)
+        angleSLLMatrix_percentile[count_rampMC,count_snrMC] = np.percentile(angleSllArray,percentile)
 
 
         count_snrMC += 1
@@ -310,23 +395,51 @@ tstop = time.time()
 timeMC = tstop - tstart
 print('Total time for Monte-Carlo run = {0:.2f} min'.format(timeMC/60))
 
+n = 1
 legend_list = [str(x) + ' ramps' for x in numChirpsDDMA]
-plt.figure(1,figsize=(20,10), dpi=200)
+plt.figure(n,figsize=(20,10), dpi=200)
 plt.title('Angle Error(std) vs SNR')
-plt.plot(range_binSNRArray, angleErrorMatrix.T, '-o')
+plt.plot(range_binSNRArray, angleErrorMatrix_std.T, '-o')
 plt.xlabel('SNR (dB)')
 plt.ylabel('Angle Error std (deg)')
 plt.grid(True)
 plt.legend(legend_list)
 
-plt.figure(2,figsize=(20,10), dpi=200)
-plt.title('Abs Angle Error(98 percentile) vs SNR')
+n+=1
+
+plt.figure(n,figsize=(20,10), dpi=200)
+plt.title('Abs Angle Error(' + str(percentile) + ' percentile) vs SNR')
 plt.plot(range_binSNRArray, angleErrorMatrix_percentile.T, '-o')
 plt.xlabel('SNR (dB)')
-plt.ylabel('Angle Error std (deg)')
+plt.ylabel('deg')
 plt.grid(True)
 plt.legend(legend_list)
 # plt.ylim([0,1])
+
+""" Hanning window SLL"""
+WindowFn = np.hanning(numMIMO)
+WindowFnFFT = np.fft.fft(WindowFn,n=numAngleFFT)
+WindowFnFFT = np.fft.fftshift(WindowFnFFT)
+WindowFnFFTSpecMagdB = 20*np.log10(np.abs(WindowFnFFT))
+WindowFnFFTSpecMagdBNorm = WindowFnFFTSpecMagdB - np.amax(WindowFnFFTSpecMagdB)
+
+localMaxInd = argrelextrema(WindowFnFFTSpecMagdBNorm,np.greater,axis=0,order=2)[0]
+sllInd = np.argsort(WindowFnFFTSpecMagdBNorm[localMaxInd])[-2]
+WindSLL = WindowFnFFTSpecMagdBNorm[localMaxInd[sllInd]]
+
+for fig_numramps in np.arange(numChirpsMC):
+    plt.figure(n+1,figsize=(20,10), dpi=200)
+    plt.title('Angle SLLs(dBc) vs SNR. Number of DDMA chirps = ' + str(numChirpsDDMA[fig_numramps]))
+    plt.plot(range_binSNRArray, angleSLLMatrix_max.T, '-o',label='Max SLL')
+    plt.plot(range_binSNRArray, angleSLLMatrix_median.T, '-o',label='Median SLL')
+    plt.plot(range_binSNRArray, angleSLLMatrix_percentile.T, '-o',label= str(percentile) + ' percentile SLL')
+    plt.axhline(WindSLL,color='k',label='Window SLL',linestyle='dashed')
+    plt.xlabel('SNR (dB)')
+    plt.ylabel('SLL (dBc)')
+    plt.grid(True)
+    plt.legend()
+    plt.ylim([-50,10])
+    n+=1
 
 
 
