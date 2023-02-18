@@ -37,6 +37,37 @@ I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
 
 """ In addition to angle accuracy, the script now also checks SLLs in the angle spectrum"""
 
+"""
+Introduced Tx-Tx coupling into the DDMA model
+
+In this script, I have introduced inter-Tx coupling model into the DDMA scheme. When we have nearby Txs
+simutaneously transmitting different signals each, there could be coupling from adjacent (and other nearby) Txs
+thus corrupting the original signal transmitted by a particular Tx. This coupling has both a magnitude component
+and a phase component. Let us consider a simple signgle IC with 4 Txs say, Tx0, Tx1, Tx2, Tx3.
+Based on measurements results, typically, the coupling from adjacent Txs i.e Tx1 onto Tx0
+(and similarly from Tx2 onto Tx1, Tx3 onto Tx2) is about 20 dB and from Tx2 to Tx0 (similarly from Tx3 to Tx1) is
+a further 6 dB lower. In other words, when you have all 4 Txs, i.e. Tx0, Tx1, Tx2, Tx3 all ON simultaneously and
+transmitting different signals each, in addition to the signal transmitted by Tx0, the signal from Tx1 couples onto Tx0
+and is 20 dB lower in power. Similarly, the signal from Tx2 couples onto Tx0(in power) and is 20 + 6 dB lower,
+signal from Tx3 couples onto Tx0 and is 20 + 6 + 6 dB lower and so on. Roughly drops by a further 6 dB (or even lower)
+there onwards.  Hence the coupling from Tx1 to Tx0 on the linear voltage scale is 0.1,
+from Tx2 to Tx0 is 0.05 (on linear voltage scale), from Tx3 to Tx0 is 0.025 and so on.
+This is the magitude/amplitude coupling. On top of this, we could also have a random phase contribution from neighbouring Txs.
+This can be captured as a caliberation in the DDMA mode and can be applied at the receiver end to remove this effect.
+I have observed that the inter Tx coupling affects the SLLs in the angle spectrum. To be more particular,
+with the dB coupling numbers mentioned (20, 26, 32, ..), it is actually the un-compensated coupled random phase that
+plays a bigger role in setting the SLLs than the magnitude coupling. So these random phases need to be calibeated out.
+
+This is the Tx coupling model I have introduced. This plays a very important role in DDMA schemes. There are other factors which play a crucial role in the DDMA scheme like:
+1. Non-linearity of the phase response of the phase LUT
+2. Non-linearity of the magnitude response of the phase LUT
+3. Bin shift
+4. Phase shifter cascaded coupling.
+5. Effective antenna pattern in DDMA scheme with multiple Txs simultaneously ON and sweeping phase
+and so on. I will try to add these models into the DDMA scheme one by one.
+
+"""
+
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
 
@@ -47,6 +78,8 @@ from mimoPhasorSynthesis import mimoPhasorSynth
 import time as time
 from scipy.signal import argrelextrema
 
+# np.random.seed(10)
+
 tstart = time.time()
 
 plt.close('all')
@@ -56,8 +89,11 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
+flagEnableTxCoupling = 0 # 1 to enable , 0 to disable
 
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
+
+print('\n\nPlatform selected is', platform, '\n\n')
 
 if (platform == 'SRIR16'):
     numTx_simult = 4
@@ -75,6 +111,13 @@ elif (platform == 'SRIR256'):
     numRx = 16
     numMIMO = 74
     numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
+
+if ((flagEnableTxCoupling == 1) and (platform == 'SRIR16')):
+    print('\n\nInter Tx coupling enabled\n\n')
+elif ((flagEnableTxCoupling == 0) and (platform == 'SRIR16')):
+    print('\n\nInter Tx coupling disabled\n\n')
+else:
+    print('\n\nInter Tx coupling not supported for this platform currently\n\n')
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -221,8 +264,28 @@ for numRamps in numChirpsDDMA:
             rxSignal = mimoPhasor_txrx[:,0,:]
             txSignal = mimoPhasor_txrx[:,:,0]
 
+            ## currently enabled only for single IC. Will add for multi IC later ON
+            if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
+                isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+                isolationPhase = np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult)
+            else:
+                isolationMagnitude = np.eye(numTx_simult)
+                isolationPhase = np.zeros((numTx_simult,numTx_simult))
+
+
+            isolationPhasor = np.exp(1j*isolationPhase)
+            """ Coupling introduces deterministic magnitude coupling across Txs and random phase contribution from adjacent Txs
+            Diagonal elements of the phase coupling matrix are made 0. Since they can be removed through cal
+            """
+            isolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+            isolationMatrix = isolationMagnitude*isolationPhasor
+
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-            phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
+            signal_phaseCode_couplingMatrix = isolationMatrix @ signal_phaseCode
+            txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
+            signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
+
+            phaseCodedTxSignal = dopplerTerm[:,None,:] * signal_phaseCode_couplingMatrix_txWeights[None,:,:] * txSignal[:,:,None] # [numDopp, numTx, numRamps]
             phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,:,None]*rxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
             phaseCodedTxRxSignal_withRangeTerm = rangeTerm[None,None,None,None,:] * phaseCodedTxRxSignal[:,:,:,:,None]
             if (flagRBM == 1):
