@@ -35,7 +35,7 @@ each with its own phase code per ramp and have also been able to estimate MIMO c
 I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
 """
 
-""" In addition to angle accuracy, also check for SLLs in the angle spectrum"""
+""" In addition to angle accuracy, the script now also checks SLLs in the angle spectrum"""
 
 """ The derivation for the DDMA scheme is available in the below location:
     https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/1966081/Code+Division+Multiple+Access+in+FMCW+RADAR"""
@@ -283,6 +283,7 @@ for numRamps in numChirpsDDMA:
             errorAng = objectAzAngle_deg - estAngDeg
             errorAngArray = np.hstack((errorAngArray,errorAng))
 
+            """ SLL computation"""
             ULA_spectrumMagdB = 20*np.log10(ULA_spectrumMag)
             ULA_spectrumMagdBNorm = ULA_spectrumMagdB - np.amax(ULA_spectrumMagdB,axis=1)[:,None]
             sllValdBc = np.zeros((numDopUniqRbin),dtype=np.float32)
@@ -352,7 +353,7 @@ plt.grid(True)
 plt.legend(legend_list)
 # plt.ylim([0,1])
 
-""" Hannig window SLL"""
+""" Hanning window SLL"""
 WindowFn = np.hanning(numMIMO)
 WindowFnFFT = np.fft.fft(WindowFn,n=numAngleFFT)
 WindowFnFFT = np.fft.fftshift(WindowFnFFT)
