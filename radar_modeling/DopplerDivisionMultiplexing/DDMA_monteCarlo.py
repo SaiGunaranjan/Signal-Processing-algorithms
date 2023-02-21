@@ -267,7 +267,7 @@ for numRamps in numChirpsDDMA:
             ## currently enabled only for single IC. Will add for multi IC later ON
             if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
                 isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
-                isolationPhase = np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult)
+                isolationPhase = 0*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # Assuming no phase coupling from neighbouring Txs
             else:
                 isolationMagnitude = np.eye(numTx_simult)
                 isolationPhase = np.zeros((numTx_simult,numTx_simult))

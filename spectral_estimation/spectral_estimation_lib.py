@@ -118,7 +118,7 @@ def music_forward(received_signal, num_sources, corr_mat_model_order, digital_fr
     '''corr_mat_model_order : must be strictly less than half then signal length'''
     signal_length = len(received_signal)
     auto_corr_matrix = np.zeros((corr_mat_model_order,corr_mat_model_order)).astype('complex64')
-    for ele in np.arange(num_samples-corr_mat_model_order+1): # model order dictates the length of the auto-correlation matrix
+    for ele in np.arange(signal_length-corr_mat_model_order+1): # model order dictates the length of the auto-correlation matrix
         auto_corr_matrix += np.matmul(received_signal[ele:ele+corr_mat_model_order,:],received_signal[ele:ele+corr_mat_model_order,:].T.conj()) # Generate the auto-correlation matrix using the expectation method. here we use the forward filtering i.e. y[0:m], y[1:m+1]...
     auto_corr_matrix = auto_corr_matrix/signal_length # Divide the auto-correlation matrix by the signal length
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
