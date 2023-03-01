@@ -53,6 +53,40 @@ def esprit(received_signal, num_sources, corr_mat_model_order):
     return est_freq
 
 
+def vtoeplitz(toprow):
+
+    Npts= toprow.shape[1]
+    Nrow= toprow.shape[0]
+
+    ACM= np.zeros((Nrow,Npts,Npts)).astype('complex64')
+
+    for i in range(Npts):
+        ACM[:,i,i:]= toprow[:,0:Npts-i].conj()
+        ACM[:,i:,i]= toprow[:,0:Npts-i]
+
+    return ACM
+
+def iaa_recursive(received_signal, digital_freq_grid, iterations):
+    '''corr_mat_model_order : must be strictly less than half the signal length'''
+    signal_length = len(received_signal)
+    num_freq_grid_points = len(digital_freq_grid)
+    spectrum = np.fft.fftshift(np.fft.fft(received_signal.squeeze(),num_freq_grid_points)/(signal_length),axes=(0,))
+#    spectrum = np.ones(num_freq_grid_points)
+    vandermonde_matrix = np.exp(1j*np.outer(np.arange(signal_length),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies. Notice the posititve sign inside the exponential
+    for iter_num in np.arange(iterations):
+        spectrum_without_fftshift = np.fft.fftshift(spectrum,axes=(0,))
+        power_vals = np.abs(spectrum_without_fftshift)**2
+        double_sided_corr_vect = np.fft.fft(power_vals,num_freq_grid_points)/(num_freq_grid_points)
+        single_sided_corr_vec = double_sided_corr_vect[0:signal_length] # r0,r1,..rM-1
+        auto_corr_matrix = vtoeplitz(single_sided_corr_vec[None,:])[0,:,:].T
+        auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
+        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv, received_signal),axis=0)
+        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv,vandermonde_matrix),axis=0)
+        spectrum = Ah_Rinv_y/Ah_Rinv_A
+        # print(iter_num)
+    return spectrum
+
+
 def IAAGSFactorization1D(data, freqGridPts, NumIter):
     # This function implements non-parametric spectral estimation based on IAA
     # In particular, it implements fast algorithm as given in following paper
@@ -352,8 +386,15 @@ est_freq = esprit(received_signal, num_sources, corr_mat_model_order)
 est_freq = -1*est_freq
 print('True Digital Frequencies:', source_freq, 'Estimated Digital Frequncies:', est_freq)
 
-""" IAA"""
+""" IAA-GS"""
 IAA_spec = IAAGSFactorization1D(data=received_signal.squeeze(), freqGridPts=digital_freq_grid, NumIter=5)
+
+""" IAA Recursive """
+iterations = 10
+spectrum_iaa = iaa_recursive(received_signal, digital_freq_grid, iterations) # recursive IAA
+#    spectrum_iaa = spec_est.iaa_recursive_levinson_temp(received_signal, digital_freq_grid, iterations) # under debug
+magnitude_spectrum_iaa = np.abs(spectrum_iaa)**2
+
 
 """ CAPON _BURG"""
 Nfft = len(digital_freq_grid)
@@ -365,6 +406,7 @@ plt.title('Magnitude Spectrum')
 plt.plot(digital_freq_grid, magnitude_spectrum_fft, label = 'FFT')
 plt.plot(digital_freq_grid, 10*np.log10(pseudo_spectrum), label='MUSIC')
 plt.vlines(est_freq,-100,60, color='magenta', lw=6, alpha=0.3, label='Freq Est by ESPRIT')
+plt.plot(digital_freq_grid, 10*np.log10(magnitude_spectrum_iaa), linewidth=2, color='lime', label='IAA')
 plt.plot(digital_freq_grid, 10*np.log10(IAA_spec), linewidth=2, color='k', label='IAA-GS')
 plt.plot(digital_freq_grid, capon_spec, linewidth=2, color='cyan', label='CAPON-BURG')
 plt.vlines(-source_freq,-100,60, label = 'Ground truth')
