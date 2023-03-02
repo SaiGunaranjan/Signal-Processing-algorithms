@@ -27,7 +27,14 @@ def music(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
     noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
     vandermonde_matrix = np.exp(-1j*np.outer(np.arange(corr_mat_model_order),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies
-    GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+    """ GhA can be computed in 2 ways:
+        1. As a correlation with a vandermonde matrix
+        2. Oversampled FFT of each of the noise subspace vectors
+        Both 1 and 2 are essentially one and the same. But 1 is compute heavy in terms of MACS while 2 is more FFT friendly
+
+    """
+    # GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+    GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
     AhG = GhA.conj() # A*G
     AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
     pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
