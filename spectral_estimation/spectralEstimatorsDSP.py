@@ -88,9 +88,28 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
         auto_corr_matrix = vtoeplitz(single_sided_corr_vec[None,:])[0,:,:].T
         auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
         Rinv_y = np.matmul(auto_corr_matrix_inv, received_signal)
-        Rinv_A = np.matmul(auto_corr_matrix_inv,vandermonde_matrix)
-        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*Rinv_y,axis=0)
+        """ Ah_Rinv_y can be computed in 2 ways:
+            1. Using matrix multiplication/point wise multiplication + sum
+            2. Oversampled FFT of Rinv_y followed by fft shift
+        Similarly, Rinv_A can be computed in 2 ways:
+            1. matrix multiplication of R_inv and Vandermonde matrix
+            2. Oversampled FFT of each row of R_inv followed by FFT shift along the column dimension and
+            then a flip from left to right. This flip is required because in method 1, we are simply
+            correlating each row of R_inv with a sinusoid vector whose frequency is going from -pi to +pi
+            from left most column to right most column. This means we are actually obtaining the frequency
+            strengths from +pi to -pi(Since FFT has an implicit conjugate sign in the kernel).
+            Hence to match the output from method 1, we need to do a flip from left to right.
+
+        Ah_Rinv_A HAS to be done as a point wise multiplication and sum. It cannot be cast as FFTs.
+        """
+        # Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*Rinv_y,axis=0) # Method 1 for Ah_Rinv_y
+        # Rinv_A = np.matmul(auto_corr_matrix_inv,vandermonde_matrix) # Method 1 for Rinv_A
+
+        Ah_Rinv_y = np.fft.fftshift((np.fft.fft(Rinv_y,axis=0,n=num_freq_grid_points)),axes=(0,)).squeeze() # Method 2 for Ah_Rinv_y
+        Rinv_A = np.fliplr(np.fft.fftshift(np.fft.fft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,))) # Method 2 for Rinv_A
+
         Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*Rinv_A,axis=0)
+
         spectrum = Ah_Rinv_y/Ah_Rinv_A
         # print(iter_num)
     return spectrum
@@ -376,7 +395,8 @@ random_freq = np.random.uniform(low=-np.pi, high=np.pi, size = 1)
 fft_resol_fact = 2
 resol_fact = 0.65
 source_freq = np.array([random_freq, random_freq + resol_fact*2*np.pi/num_samples])
-digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(100*num_samples))
+spectrumGridOSRFact = 128
+digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(spectrumGridOSRFact*num_samples))
 source_signals = np.matmul(np.exp(-1j*np.outer(np.arange(num_samples),source_freq)),complex_signal_amplitudes[:,None])
 wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape)
 received_signal = source_signals + wgn_noise
@@ -396,7 +416,7 @@ est_freq = -1*est_freq
 print('True Digital Frequencies:', -source_freq, 'Estimated Digital Frequncies:', est_freq)
 
 """ IAA-GS"""
-IAA_spec = IAAGSFactorization1D(data=received_signal.squeeze(), freqGridPts=digital_freq_grid, NumIter=5)
+IAA_spec = IAAGSFactorization1D(data=received_signal.squeeze(), freqGridPts=digital_freq_grid, NumIter=10)
 
 """ IAA Recursive """
 iterations = 10
@@ -418,7 +438,7 @@ plt.vlines(est_freq,-100,60, color='magenta', lw=6, alpha=0.3, label='Freq Est b
 plt.plot(digital_freq_grid, 10*np.log10(magnitude_spectrum_iaa), linewidth=2, color='lime', label='IAA')
 plt.plot(digital_freq_grid, 10*np.log10(IAA_spec), linewidth=2, color='k', label='IAA-GS')
 plt.plot(digital_freq_grid, capon_spec, linewidth=2, color='cyan', label='CAPON-BURG')
-plt.vlines(-source_freq,-100,60, label = 'Ground truth')
+plt.vlines(-source_freq,-100,60, alpha=0.3,label = 'Ground truth')
 plt.xlabel('Digital Frequencies')
 plt.legend()
 plt.grid(True)
