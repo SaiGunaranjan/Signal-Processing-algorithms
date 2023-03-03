@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import scipy.signal
 import scipy.linalg
 
-
+np.random.seed(10)
 ### Predefined functions
 
 
@@ -87,8 +87,10 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
         single_sided_corr_vec = double_sided_corr_vect[0:signal_length] # r0,r1,..rM-1
         auto_corr_matrix = vtoeplitz(single_sided_corr_vec[None,:])[0,:,:].T
         auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
-        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv, received_signal),axis=0)
-        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv,vandermonde_matrix),axis=0)
+        Rinv_y = np.matmul(auto_corr_matrix_inv, received_signal)
+        Rinv_A = np.matmul(auto_corr_matrix_inv,vandermonde_matrix)
+        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*Rinv_y,axis=0)
+        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*Rinv_A,axis=0)
         spectrum = Ah_Rinv_y/Ah_Rinv_A
         # print(iter_num)
     return spectrum
