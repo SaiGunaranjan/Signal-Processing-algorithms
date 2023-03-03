@@ -391,7 +391,7 @@ pseudo_spectrum = music(received_signal, num_sources, corr_mat_model_order, digi
 """ ESPRIT"""
 est_freq = esprit(received_signal, num_sources, corr_mat_model_order)
 est_freq = -1*est_freq
-print('True Digital Frequencies:', source_freq, 'Estimated Digital Frequncies:', est_freq)
+print('True Digital Frequencies:', -source_freq, 'Estimated Digital Frequncies:', est_freq)
 
 """ IAA-GS"""
 IAA_spec = IAAGSFactorization1D(data=received_signal.squeeze(), freqGridPts=digital_freq_grid, NumIter=5)
