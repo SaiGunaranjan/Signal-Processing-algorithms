@@ -143,7 +143,17 @@ def music_backward(received_signal, num_sources, corr_mat_model_order, digital_f
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
     noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
     vandermonde_matrix = np.exp(-1j*np.outer(np.arange(corr_mat_model_order),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies
-    GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+    """ GhA can be computed in 2 ways:
+        1. As a correlation with a vandermonde matrix
+        2. Oversampled FFT of each of the noise subspace vectors
+        Both 1 and 2 are essentially one and the same. But 1 is compute heavy in terms of MACS while 2 is more FFT friendly
+
+    """
+    if 0:
+        GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+    if 1:
+        GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
+
     AhG = GhA.conj() # A*G
     AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
     pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
@@ -329,8 +339,30 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
         single_sided_corr_vec = double_sided_corr_vect[0:signal_length] # r0,r1,..rM-1
         auto_corr_matrix = vtoeplitz(single_sided_corr_vec[None,:])[0,:,:].T
         auto_corr_matrix_inv = np.linalg.inv(auto_corr_matrix)
-        Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv, received_signal),axis=0)
-        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*np.matmul(auto_corr_matrix_inv,vandermonde_matrix),axis=0)
+        Rinv_y = np.matmul(auto_corr_matrix_inv, received_signal)
+        """ Ah_Rinv_y can be computed in 2 ways:
+            1. Using matrix multiplication/point wise multiplication + sum
+            2. Oversampled FFT of Rinv_y followed by fft shift
+        Similarly, Rinv_A can be computed in 2 ways:
+            1. matrix multiplication of R_inv and Vandermonde matrix
+            2. Oversampled FFT of each row of R_inv followed by FFT shift along the column dimension and
+            then a flip from left to right. This flip is required because in method 1, we are simply
+            correlating each row of R_inv with a sinusoid vector whose frequency is going from -pi to +pi
+            from left most column to right most column. This means we are actually obtaining the frequency
+            strengths from +pi to -pi(Since FFT has an implicit conjugate sign in the kernel).
+            Hence to match the output from method 1, we need to do a flip from left to right.
+
+        Ah_Rinv_A HAS to be done as a point wise multiplication and sum. It cannot be cast as FFTs.
+        Method 2 in both the cases is compute efficient since we cast the beam former multiplications as FFTs.
+        """
+        if 0:
+            Ah_Rinv_y = np.sum(vandermonde_matrix.conj()*Rinv_y,axis=0) # Method 1 for Ah_Rinv_y
+            Rinv_A = np.matmul(auto_corr_matrix_inv,vandermonde_matrix) # Method 1 for Rinv_A
+        if 1:
+            Ah_Rinv_y = np.fft.fftshift((np.fft.fft(Rinv_y,axis=0,n=num_freq_grid_points)),axes=(0,)).squeeze() # Method 2 for Ah_Rinv_y
+            Rinv_A = np.fliplr(np.fft.fftshift(np.fft.fft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,))) # Method 2 for Rinv_A
+
+        Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*Rinv_A,axis=0)
         spectrum = Ah_Rinv_y/Ah_Rinv_A
         # print(iter_num)
     return spectrum
