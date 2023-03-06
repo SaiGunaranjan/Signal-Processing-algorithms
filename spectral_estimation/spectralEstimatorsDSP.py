@@ -99,6 +99,8 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
             from left most column to right most column. This means we are actually obtaining the frequency
             strengths from +pi to -pi(Since FFT has an implicit conjugate sign in the kernel).
             Hence to match the output from method 1, we need to do a flip from left to right.
+            3. Since the frequency grid points are from -pi to pi, we can use IFFT instead of FFT+FLIPLR.
+            But the scaling with the IFFT needs to be handled.
 
         Ah_Rinv_A HAS to be done as a point wise multiplication and sum. It cannot be cast as FFTs.
         """
@@ -106,7 +108,8 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
         # Rinv_A = np.matmul(auto_corr_matrix_inv,vandermonde_matrix) # Method 1 for Rinv_A
 
         Ah_Rinv_y = np.fft.fftshift((np.fft.fft(Rinv_y,axis=0,n=num_freq_grid_points)),axes=(0,)).squeeze() # Method 2 for Ah_Rinv_y
-        Rinv_A = np.fliplr(np.fft.fftshift(np.fft.fft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,))) # Method 2 for Rinv_A
+        # Rinv_A = np.fliplr(np.fft.fftshift(np.fft.fft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,))) # Method 2 for Rinv_A - Use FFT,FFTSHIFT,fliplr
+        Rinv_A = np.fft.fftshift(np.fft.ifft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,)) # Method 3 for Rinv_A - Use IFFT, FFTSHIFT
 
         Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*Rinv_A,axis=0)
 
@@ -404,12 +407,12 @@ corr_mat_model_order = num_samples//2-2 # must be strictly less than num_samples
 
 magnitude_spectrum_fft = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal,axis=0, n=len(digital_freq_grid))/received_signal.shape[0],axes=0)))
 phase_spectrum_fft = np.unwrap(np.angle(np.fft.fftshift(np.fft.fft(received_signal,axis=0, n=len(digital_freq_grid))/received_signal.shape[0],axes=0)))
-
+magnitude_spectrum_fft -= np.amax(magnitude_spectrum_fft,axis=0)[None,:]
 
 
 """ MUSIC"""
 pseudo_spectrum = music(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
-
+pseudo_spectrum = pseudo_spectrum/np.amax(pseudo_spectrum)
 """ ESPRIT"""
 est_freq = esprit(received_signal, num_sources, corr_mat_model_order)
 est_freq = -1*est_freq
@@ -417,28 +420,30 @@ print('True Digital Frequencies:', -source_freq, 'Estimated Digital Frequncies:'
 
 """ IAA-GS"""
 IAA_spec = IAAGSFactorization1D(data=received_signal.squeeze(), freqGridPts=digital_freq_grid, NumIter=10)
-
+IAA_spec = IAA_spec/np.amax(IAA_spec)
 """ IAA Recursive """
 iterations = 10
 spectrum_iaa = iaa_recursive(received_signal, digital_freq_grid, iterations) # recursive IAA
 #    spectrum_iaa = spec_est.iaa_recursive_levinson_temp(received_signal, digital_freq_grid, iterations) # under debug
 magnitude_spectrum_iaa = np.abs(spectrum_iaa)**2
+magnitude_spectrum_iaa = magnitude_spectrum_iaa/np.amax(magnitude_spectrum_iaa)
 
 
 """ CAPON _BURG"""
 Nfft = len(digital_freq_grid)
 capon_spec = capon_method_marple_dev(received_signal.T,num_samples,Nfft)
 capon_spec = capon_spec.squeeze()
+capon_spec = capon_spec - np.amax(capon_spec)
 
 plt.figure(1,figsize=(20,10))
 plt.title('Magnitude Spectrum')
 plt.plot(digital_freq_grid, magnitude_spectrum_fft, label = 'FFT')
 plt.plot(digital_freq_grid, 10*np.log10(pseudo_spectrum), label='MUSIC')
-plt.vlines(est_freq,-100,60, color='magenta', lw=6, alpha=0.3, label='Freq Est by ESPRIT')
-plt.plot(digital_freq_grid, 10*np.log10(magnitude_spectrum_iaa), linewidth=2, color='lime', label='IAA')
+plt.vlines(est_freq,-80,20, color='magenta', lw=6, alpha=0.3, label='Freq Est by ESPRIT')
+plt.plot(digital_freq_grid, 10*np.log10(magnitude_spectrum_iaa), linewidth=6, color='lime', label='IAA')
 plt.plot(digital_freq_grid, 10*np.log10(IAA_spec), linewidth=2, color='k', label='IAA-GS')
-plt.plot(digital_freq_grid, capon_spec, linewidth=2, color='cyan', label='CAPON-BURG')
-plt.vlines(-source_freq,-100,60, alpha=0.3,label = 'Ground truth')
+plt.plot(digital_freq_grid, capon_spec, linewidth=2, color='red', alpha=0.8, label='CAPON-BURG')
+plt.vlines(-source_freq,-80,20, alpha=0.3,label = 'Ground truth')
 plt.xlabel('Digital Frequencies')
 plt.legend()
 plt.grid(True)

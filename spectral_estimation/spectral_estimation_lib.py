@@ -351,6 +351,8 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
             from left most column to right most column. This means we are actually obtaining the frequency
             strengths from +pi to -pi(Since FFT has an implicit conjugate sign in the kernel).
             Hence to match the output from method 1, we need to do a flip from left to right.
+            3. Since the frequency grid points are from -pi to pi, we can use IFFT instead of FFT+FLIPLR.
+            But the scaling with the IFFT needs to be handled.
 
         Ah_Rinv_A HAS to be done as a point wise multiplication and sum. It cannot be cast as FFTs.
         Method 2 in both the cases is compute efficient since we cast the beam former multiplications as FFTs.
@@ -360,7 +362,8 @@ def iaa_recursive(received_signal, digital_freq_grid, iterations):
             Rinv_A = np.matmul(auto_corr_matrix_inv,vandermonde_matrix) # Method 1 for Rinv_A
         if 1:
             Ah_Rinv_y = np.fft.fftshift((np.fft.fft(Rinv_y,axis=0,n=num_freq_grid_points)),axes=(0,)).squeeze() # Method 2 for Ah_Rinv_y
-            Rinv_A = np.fliplr(np.fft.fftshift(np.fft.fft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,))) # Method 2 for Rinv_A
+            Rinv_A = np.fliplr(np.fft.fftshift(np.fft.fft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,))) # Method 2 for Rinv_A - Use FFT,FFTSHIFT,fliplr
+            # Rinv_A = np.fft.fftshift(np.fft.ifft(auto_corr_matrix_inv,axis=1,n=num_freq_grid_points),axes=(1,)) # Method 3 for Rinv_A - Use IFFT, FFTSHIFT. Avoids fliplr
 
         Ah_Rinv_A = np.sum(vandermonde_matrix.conj()*Rinv_A,axis=0)
         spectrum = Ah_Rinv_y/Ah_Rinv_A
