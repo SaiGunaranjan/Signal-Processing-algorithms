@@ -35,6 +35,7 @@ def music(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
     """
     # GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
     GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
+    # GhA = GhA[0:2,:]
     AhG = GhA.conj() # A*G
     AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
     pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
@@ -372,7 +373,7 @@ def OMP(dictionary_matrix, y_vec, threshold):
         err = np.linalg.norm(residue)**2
         res_err_cond =  err > threshold # check if the change in residue/error is below a particular threshold. Then stop
         error_iter.append(err)
-        print('OMP iteration: ',count)
+        # print('OMP iteration: ',count)
         count+=1
 #    valid_col_ind = np.sort(np.array(col_index))
 #    z_est_sorted = z_est[np.argsort(np.array(col_index))]
@@ -386,6 +387,13 @@ def OMP(dictionary_matrix, y_vec, threshold):
 
 plt.close('all')
 num_samples = 32
+c = 3e8
+fc = 79e9
+lamda = c/fc
+mimoSpacing = lamda/2
+fsSpatial = lamda/mimoSpacing
+nativeAngResDeg = np.arcsin(fsSpatial/num_samples)*180/np.pi
+print('Native Angular Resolution = {0:.2f} deg'.format(nativeAngResDeg))
 num_sources = 2
 object_snr = np.array([40,35])
 noise_power_db = -40 # Noise Power in dB
@@ -397,9 +405,14 @@ complex_signal_amplitudes = weights*signal_phases
 random_freq = np.random.uniform(low=-np.pi, high=np.pi, size = 1)
 fft_resol_fact = 2
 resol_fact = 0.65
-source_freq = np.array([random_freq, random_freq + resol_fact*2*np.pi/num_samples])
+digFreqRes = resol_fact*2*np.pi/num_samples
+angResDeg = np.arcsin((digFreqRes/(2*np.pi))*fsSpatial)*180/np.pi
+print('Programmed Angular Resolution = {0:.2f} deg'.format(angResDeg))
+source_freq = np.array([random_freq, random_freq + digFreqRes])
+source_angle_deg = np.arcsin((source_freq/(2*np.pi))*fsSpatial)*180/np.pi
 spectrumGridOSRFact = 128
 digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(spectrumGridOSRFact*num_samples))
+angleGrid = np.arcsin(((digital_freq_grid/(2*np.pi))*fsSpatial))*180/np.pi
 source_signals = np.matmul(np.exp(-1j*np.outer(np.arange(num_samples),source_freq)),complex_signal_amplitudes[:,None])
 wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape)
 received_signal = source_signals + wgn_noise
@@ -416,7 +429,9 @@ pseudo_spectrum = pseudo_spectrum/np.amax(pseudo_spectrum)
 """ ESPRIT"""
 est_freq = esprit(received_signal, num_sources, corr_mat_model_order)
 est_freq = -1*est_freq
-print('True Digital Frequencies:', -source_freq, 'Estimated Digital Frequncies:', est_freq)
+est_angleDeg = np.arcsin(((est_freq/(2*np.pi))*fsSpatial))*180/np.pi
+# print('True Digital Frequencies:', -source_freq, 'Estimated Digital Frequencies:', est_freq)
+print('True Angles:', -source_angle_deg.squeeze(), '\nESPRIT Estimated Angles:', est_angleDeg)
 
 """ IAA-GS"""
 IAA_spec = IAAGSFactorization1D(data=received_signal.squeeze(), freqGridPts=digital_freq_grid, NumIter=10)
@@ -436,15 +451,15 @@ capon_spec = capon_spec.squeeze()
 capon_spec = capon_spec - np.amax(capon_spec)
 
 plt.figure(1,figsize=(20,10))
-plt.title('Magnitude Spectrum')
-plt.plot(digital_freq_grid, magnitude_spectrum_fft, label = 'FFT')
-plt.plot(digital_freq_grid, 10*np.log10(pseudo_spectrum), label='MUSIC')
-plt.vlines(est_freq,-80,20, color='magenta', lw=6, alpha=0.3, label='Freq Est by ESPRIT')
-plt.plot(digital_freq_grid, 10*np.log10(magnitude_spectrum_iaa), linewidth=6, color='lime', label='IAA')
-plt.plot(digital_freq_grid, 10*np.log10(IAA_spec), linewidth=2, color='k', label='IAA-GS')
-plt.plot(digital_freq_grid, capon_spec, linewidth=2, color='red', alpha=0.8, label='CAPON-BURG')
-plt.vlines(-source_freq,-80,20, alpha=0.3,label = 'Ground truth')
-plt.xlabel('Digital Frequencies')
+plt.title('Angle Spectrum.' + ' Native Angular Res (deg) = ' + str(np.round(nativeAngResDeg,2)) + '. Programmed Angular Res (deg) = ' + str(np.round(angResDeg,2)))
+plt.plot(angleGrid, magnitude_spectrum_fft, label = 'FFT')
+plt.plot(angleGrid, 10*np.log10(pseudo_spectrum), label='MUSIC')
+plt.vlines(est_angleDeg,-80,20, color='magenta', lw=6, alpha=0.3, label='Freq Est by ESPRIT')
+plt.plot(angleGrid, 10*np.log10(magnitude_spectrum_iaa), linewidth=6, color='lime', label='IAA')
+plt.plot(angleGrid, 10*np.log10(IAA_spec), linewidth=2, color='k', label='IAA-GS')
+plt.plot(angleGrid, capon_spec, linewidth=2, color='blueviolet', alpha=0.8, label='CAPON-BURG')
+plt.vlines(-source_angle_deg,-80,20, alpha=0.3,label = 'Ground truth')
+plt.xlabel('Angle(deg)')
 plt.legend()
 plt.grid(True)
 
@@ -464,7 +479,7 @@ y_vec = np.matmul(dictionary, x_vec)
 threshold = 1e-3
 x_vec_est, error_iter = OMP(dictionary, y_vec, threshold)
 
-print('True Col Ind: ', non_zero_ind,  'Estimated Col Ind: ', np.nonzero(x_vec_est)[0])
+# print('True Col Ind: ', non_zero_ind,  'Estimated Col Ind: ', np.nonzero(x_vec_est)[0])
 
 plt.figure(2,figsize=(20,10))
 plt.title('Orthogonal Matching Pursuit')
