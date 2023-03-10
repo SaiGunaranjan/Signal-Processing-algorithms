@@ -102,6 +102,7 @@ interpFact = (chirpCentreFreq/(chirpCentreFreq + chirpSlope*np.arange(numSamples
 allChirpsDuration = (numChirps-1)*interRampTime
 
 doppPhase = np.unwrap(np.angle(radarSignal),axis=1)
+doppSignal = radarSignal
 chirpSampPoints = np.arange(numChirps)*interRampTime
 interpreceivedSignal = np.zeros((receivedSignal.shape),dtype=np.complex64)
 for ele in range(numSamples):
@@ -113,14 +114,22 @@ for ele in range(numSamples):
     if 1:
         """ Spline interpolation. Valid even when there are multiple Dopplers in the scene"""
         # doppPhaseInterpFunc = interpolate.splrep(chirpSampPoints, doppPhase[ele,:], s=0, k=1)
-        doppPhaseInterpFunc = interpolate.splrep(chirpSampPoints, doppPhase[ele,:], k=3) # cubic spline interpolation
+
+        # doppPhaseInterpFunc = interpolate.splrep(chirpSampPoints, doppPhase[ele,:], k=3) # cubic spline interpolation
+        # xnew = interpFact[ele,:]
+        # doppPhaseInterpVals = interpolate.splev(xnew, doppPhaseInterpFunc, der=0)
+
+        doppSignalRealInterpFunc = interpolate.splrep(chirpSampPoints, np.real(doppSignal[ele,:]), k=5) # cubic spline interpolation
+        doppSignalImagInterpFunc = interpolate.splrep(chirpSampPoints, np.imag(doppSignal[ele,:]), k=5) # cubic spline interpolation
         xnew = interpFact[ele,:]
-        doppPhaseInterpVals = interpolate.splev(xnew, doppPhaseInterpFunc, der=0)
+        doppSignalRealInterpVals = interpolate.splev(xnew, doppSignalRealInterpFunc, der=0)
+        doppSignalImagInterpVals = interpolate.splev(xnew, doppSignalImagInterpFunc, der=0)
 
-    interpreceivedSignal[ele,:] = np.exp(1j*doppPhaseInterpVals)
+    # interpreceivedSignal[ele,:] = np.exp(1j*doppPhaseInterpVals)
+    interpreceivedSignal[ele,:] = doppSignalRealInterpVals + 1j*doppSignalImagInterpVals
 
 
-doppPhaseInterp = np.unwrap(np.angle(interpreceivedSignal),axis=1)
+# doppPhaseInterp = np.unwrap(np.angle(interpreceivedSignal),axis=1)
 interpreceivedSignalWind = interpreceivedSignal*np.hanning(numSamples)[:,None]
 interpreceivedSignalRfft = np.fft.fft(interpreceivedSignalWind,axis=0)/numSamples
 interpreceivedSignalRfft = interpreceivedSignalRfft[0:numSamples//2,:]
@@ -135,8 +144,22 @@ interpreceivedSignalRfftDfftMagSpec = 20*np.log10(np.abs(interpreceivedSignalRff
 binsMovedPreCorr = np.argmax(receivedSignalRfftMagSpec,axis=0)
 binsMovedPostCorr = np.argmax(interpreceivedSignalRfftMagSpec,axis=0)
 
-
 plt.figure(1,figsize=(20,10),dpi=200)
+plt.suptitle('Range spectrum')
+plt.subplot(1,2,1)
+plt.title('Before keystone correction')
+plt.plot(receivedSignalRfftMagSpec)
+plt.xlabel('Range bins')
+plt.grid(True)
+
+plt.subplot(1,2,2)
+plt.title('Post keystone correction')
+plt.plot(interpreceivedSignalRfftMagSpec)
+plt.xlabel('Range bins')
+plt.grid(True)
+
+
+plt.figure(2,figsize=(20,10),dpi=200)
 plt.subplot(2,2,1)
 plt.title('Range bin vs Chirp number')
 plt.imshow(receivedSignalRfftMagSpec,aspect='auto')
