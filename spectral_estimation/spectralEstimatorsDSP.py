@@ -27,6 +27,19 @@ def music(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
     noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
     vandermonde_matrix = np.exp(-1j*np.outer(np.arange(corr_mat_model_order),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies
+
+    """ The below step is to reduce the compute by taking only 1 noise subspace eigen vector and
+    performing FFT on it instead of on all the noise subspace eigen vectors. Theoretically this is correct
+    but with real data, using all the noise subspace eigen vectors and taking FFT and then
+    magnitude square and sum across all the FFTed noise subspace eigen vectors helps
+    give a smoother pseudo spectrum. If we use only 1/2 noise subspace eigen vectors, The true peaks are
+    undisturbed but some smaller flase peaks start to show up. Using all the noise subspace eigen vectors helps smoothen
+    and eliminate the false peaks.
+    Thus I have taken only 2 of the noise subpace eigen vectors instead of all. Enable below line
+    if you want to use only 1/2 noise subspace eigen vectors to reduce compute.
+    """
+    # noise_subspace = noise_subspace[:,0:2]
+
     """ GhA can be computed in 2 ways:
         1. As a correlation with a vandermonde matrix
         2. Oversampled FFT of each of the noise subspace vectors
@@ -35,16 +48,6 @@ def music(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
     """
     # GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
     GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
-    """ The below step is to reduce the compute by taking only 1 noise subspace eigen vector and
-    performing FFT on it instead of on all the noise subspace eigen vectors. Theoretically this is correct
-    but with real data, using all the noise subspace eigen vectors and taking FFT and then
-    magnitude square and sum across all the FFTed noise subspace eigen vectors helps
-    give a smoother pseudo spectrum. If we use only 1/2 noise subspace eigen vectors, The true peaks are
-    undisturbed but some smaller flase peaks start to show up. Using all the noise subspace eigen vectors helps smoothen
-    and eliminate the false peaks.
-    Thus I have taken only 2 of the noise subpace eigen vectors instead of all. Ideally this step should be done before taking FFT as well"""
-    # GhA = GhA[0:2,:] #
-
     AhG = GhA.conj() # A*G
     AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
     pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
@@ -466,7 +469,7 @@ plt.plot(angleGrid, 10*np.log10(pseudo_spectrum), label='MUSIC')
 plt.vlines(est_angleDeg,-80,20, color='magenta', lw=6, alpha=0.3, label='Freq Est by ESPRIT')
 plt.plot(angleGrid, 10*np.log10(magnitude_spectrum_iaa), linewidth=6, color='lime', label='IAA')
 plt.plot(angleGrid, 10*np.log10(IAA_spec), linewidth=2, color='k', label='IAA-GS')
-plt.plot(angleGrid, capon_spec, linewidth=2, color='blueviolet', alpha=0.8, label='CAPON-BURG')
+plt.plot(angleGrid, capon_spec, linewidth=4, color='blueviolet', alpha=0.4, label='CAPON-BURG')
 plt.vlines(-source_angle_deg,-80,20, alpha=0.3,label = 'Ground truth')
 plt.xlabel('Angle(deg)')
 plt.legend()
