@@ -91,6 +91,20 @@ else:
 
 flagEnableTxCoupling = 1 # 1 to enable , 0 to disable
 
+""" Typical Isolation/coupling numbers of Txs in a chip. Adjacent Txs have an isolation/coupling
+of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
+tx0tx1IsolationPowerdB = 20
+tx0tx2IsolationPowerdB = tx0tx1IsolationPowerdB + 6
+tx0tx3IsolationPowerdB = tx0tx2IsolationPowerdB + 6
+
+tx0tx1IsolationAmp = np.sqrt(1/(10**(tx0tx1IsolationPowerdB/10)))
+tx0tx2IsolationAmp = np.sqrt(1/(10**(tx0tx2IsolationPowerdB/10)))
+tx0tx3IsolationAmp = np.sqrt(1/(10**(tx0tx3IsolationPowerdB/10)))
+
+tx0tx0IsolationAmp = 1
+tx0tx1IsolationAmp = np.round(tx0tx1IsolationAmp,3)
+tx0tx2IsolationAmp = np.round(tx0tx2IsolationAmp,3)
+tx0tx3IsolationAmp = np.round(tx0tx3IsolationAmp,3)
 
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
@@ -261,7 +275,12 @@ txSignal = mimoPhasor_txrx[:,:,0]
 
 ## currently enabled only for single IC. Will add for multi IC later ON
 if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
-    isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+    # isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+    isolationMagnitude = np.array([[tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp,tx0tx3IsolationAmp],\
+                                               [tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp],\
+                                                   [tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp],\
+                                                       [tx0tx3IsolationAmp,tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+
     isolationPhase = 0*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult)
 else:
     isolationMagnitude = np.eye(numTx_simult)
