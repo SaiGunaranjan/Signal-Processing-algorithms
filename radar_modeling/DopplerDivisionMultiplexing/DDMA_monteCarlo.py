@@ -78,7 +78,7 @@ from mimoPhasorSynthesis import mimoPhasorSynth
 import time as time
 from scipy.signal import argrelextrema
 
-# np.random.seed(10)
+np.random.seed(10)
 
 tstart = time.time()
 
@@ -464,6 +464,12 @@ for fig_numramps in np.arange(numChirpsMC):
     n+=1
 
 
+""" Saving for plotting and debugging purposes"""
+# isolation = tx0tx1IsolationPowerdB
+# np.save('angleErrorMatrix_std_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_std)
+# np.save('angleErrorMatrix_percentile_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_percentile)
+# np.save('range_binSNRArray_isolation' + str(isolation) + 'dB.npy',range_binSNRArray)
+# np.save('angleSLLMatrix_median_isolation' + str(isolation) + 'dB.npy',angleSLLMatrix_median)
 
 
 
