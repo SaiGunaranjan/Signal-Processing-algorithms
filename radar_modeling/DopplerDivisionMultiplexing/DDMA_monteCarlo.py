@@ -89,11 +89,11 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-flagEnableTxCoupling = 0 # 1 to enable , 0 to disable
+flagEnableTxCoupling = 1 # 1 to enable , 0 to disable
 
 """ Typical Isolation/coupling numbers of Txs in a chip. Adjacent Txs have an isolation/coupling
 of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
-tx0tx1IsolationPowerdB = 20
+tx0tx1IsolationPowerdB = 20 #20
 tx0tx2IsolationPowerdB = tx0tx1IsolationPowerdB + 6
 tx0tx3IsolationPowerdB = tx0tx2IsolationPowerdB + 6
 
@@ -288,18 +288,24 @@ for numRamps in numChirpsDDMA:
                                                [tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp],\
                                                    [tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp],\
                                                        [tx0tx3IsolationAmp,tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
-                isolationPhase = 0*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # Assuming no phase coupling from neighbouring Txs
+                isolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Txs
+                rxisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Rxs
             else:
                 isolationMagnitude = np.eye(numTx_simult)
                 isolationPhase = np.zeros((numTx_simult,numTx_simult))
+                rxisolationPhase = np.zeros((numTx_simult,numTx_simult))
 
 
             isolationPhasor = np.exp(1j*isolationPhase)
+            rxisolationPhasor = np.exp(1j*rxisolationPhase)
             """ Coupling introduces deterministic magnitude coupling across Txs and random phase contribution from adjacent Txs
             Diagonal elements of the phase coupling matrix are made 0. Since they can be removed through cal
             """
             isolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
             isolationMatrix = isolationMagnitude*isolationPhasor
+
+            rxisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+            rxisolationMatrix = isolationMagnitude*rxisolationPhasor
 
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
             signal_phaseCode_couplingMatrix = isolationMatrix @ signal_phaseCode
@@ -312,7 +318,8 @@ for numRamps in numChirpsDDMA:
             if (flagRBM == 1):
                 phaseCodedTxRxSignal_withRangeTerm = phaseCodedTxRxSignal_withRangeTerm * rangeBinMigration[:,None,:,None,:]
             signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
-
+            """ Rx coupling"""
+            signal = np.matmul(rxisolationMatrix[None,:,:],signal)
 
             noise = (sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp) + 1j*(sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp)
             noise = noise.reshape(numRamps, numRx, numSamp)
@@ -373,8 +380,12 @@ for numRamps in numChirpsDDMA:
             sllValdBc = np.zeros((numDopUniqRbin),dtype=np.float32)
             for ele1 in np.arange(numDopUniqRbin):
                 localMaxInd = argrelextrema(ULA_spectrumMagdBNorm[ele1,:],np.greater,axis=0,order=2)[0]
-                sllInd = np.argsort(ULA_spectrumMagdBNorm[ele1,localMaxInd])[-2] # 1st SLL
-                sllValdBc[ele1] = ULA_spectrumMagdBNorm[ele1,localMaxInd[sllInd]]
+                try:
+                    sllInd = np.argsort(ULA_spectrumMagdBNorm[ele1,localMaxInd])[-2] # 1st SLL
+                    sllValdBc[ele1] = ULA_spectrumMagdBNorm[ele1,localMaxInd[sllInd]]
+                except IndexError:
+                    sllValdBc[ele1] = 0
+
 
             angleSllArray = np.hstack((angleSllArray,sllValdBc))
 
@@ -464,12 +475,13 @@ for fig_numramps in np.arange(numChirpsMC):
     n+=1
 
 
-""" Saving for plotting and debugging purposes"""
+# """ Saving for plotting and debugging purposes"""
 # isolation = tx0tx1IsolationPowerdB
-# np.save('angleErrorMatrix_std_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_std)
-# np.save('angleErrorMatrix_percentile_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_percentile)
-# np.save('range_binSNRArray_isolation' + str(isolation) + 'dB.npy',range_binSNRArray)
-# np.save('angleSLLMatrix_median_isolation' + str(isolation) + 'dB.npy',angleSLLMatrix_median)
+# savepath = 'results_isolation\\withTxRxPhaseCoupling\\'
+# np.save(savepath + 'angleErrorMatrix_std_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_std)
+# np.save(savepath + 'angleErrorMatrix_percentile_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_percentile)
+# np.save(savepath + 'range_binSNRArray_isolation' + str(isolation) + 'dB.npy',range_binSNRArray)
+# np.save(savepath + 'angleSLLMatrix_median_isolation' + str(isolation) + 'dB.npy',angleSLLMatrix_median)
 
 
 
