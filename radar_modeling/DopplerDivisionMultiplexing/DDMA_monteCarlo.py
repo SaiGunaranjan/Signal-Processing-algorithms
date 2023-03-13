@@ -89,7 +89,7 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-flagEnableTxCoupling = 1 # 1 to enable , 0 to disable
+flagEnableCoupling = 1 # 1 to enable , 0 to disable
 
 """ Typical Isolation/coupling numbers of Txs in a chip. Adjacent Txs have an isolation/coupling
 of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
@@ -127,9 +127,9 @@ elif (platform == 'SRIR256'):
     numMIMO = 74
     numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
 
-if ((flagEnableTxCoupling == 1) and (platform == 'SRIR16')):
-    print('\n\nInter Tx coupling enabled\n\n')
-elif ((flagEnableTxCoupling == 0) and (platform == 'SRIR16')):
+if ((flagEnableCoupling == 1) and (platform == 'SRIR16')):
+    print('\n\nInter Tx and Inter Rx coupling enabled\n\n')
+elif ((flagEnableCoupling == 0) and (platform == 'SRIR16')):
     print('\n\nInter Tx coupling disabled\n\n')
 else:
     print('\n\nInter Tx coupling not supported for this platform currently\n\n')
@@ -282,33 +282,35 @@ for numRamps in numChirpsDDMA:
             txSignal = mimoPhasor_txrx[:,:,0]
 
             ## currently enabled only for single IC. Will add for multi IC later ON
-            if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
-                # isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
-                isolationMagnitude = np.array([[tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp,tx0tx3IsolationAmp],\
+            if (flagEnableCoupling == 1) and (platform == 'SRIR16'):
+                # txisolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+                txisolationMagnitude = np.array([[tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp,tx0tx3IsolationAmp],\
                                                [tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp],\
                                                    [tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp],\
                                                        [tx0tx3IsolationAmp,tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
-                isolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Txs
-                rxisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Rxs
+                rxisolationMagnitude = txisolationMagnitude.copy()
+                txisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Txs
+                rxisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numRx*numRx).reshape(numRx,numRx) # phase coupling from neighbouring Rxs
             else:
-                isolationMagnitude = np.eye(numTx_simult)
-                isolationPhase = np.zeros((numTx_simult,numTx_simult))
-                rxisolationPhase = np.zeros((numTx_simult,numTx_simult))
+                txisolationMagnitude = np.eye(numTx_simult)
+                rxisolationMagnitude = np.eye(numRx)
+                txisolationPhase = np.zeros((numTx_simult,numTx_simult))
+                rxisolationPhase = np.zeros((numRx,numRx))
 
 
-            isolationPhasor = np.exp(1j*isolationPhase)
+            txisolationPhasor = np.exp(1j*txisolationPhase)
             rxisolationPhasor = np.exp(1j*rxisolationPhase)
             """ Coupling introduces deterministic magnitude coupling across Txs and random phase contribution from adjacent Txs
             Diagonal elements of the phase coupling matrix are made 0. Since they can be removed through cal
             """
-            isolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
-            isolationMatrix = isolationMagnitude*isolationPhasor
+            txisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+            txisolationMatrix = txisolationMagnitude*txisolationPhasor
 
-            rxisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
-            rxisolationMatrix = isolationMagnitude*rxisolationPhasor
+            rxisolationPhasor[np.arange(numRx),np.arange(numRx)] = 1
+            rxisolationMatrix = rxisolationMagnitude*rxisolationPhasor
 
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-            signal_phaseCode_couplingMatrix = isolationMatrix @ signal_phaseCode
+            signal_phaseCode_couplingMatrix = txisolationMatrix @ signal_phaseCode
             txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
             signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
 
