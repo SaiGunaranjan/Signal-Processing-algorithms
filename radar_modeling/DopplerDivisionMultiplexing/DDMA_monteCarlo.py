@@ -479,7 +479,7 @@ for fig_numramps in np.arange(numChirpsMC):
 
 # """ Saving for plotting and debugging purposes"""
 # isolation = tx0tx1IsolationPowerdB
-# savepath = 'results_isolation\\withTxRxPhaseCoupling\\'
+# savepath = 'data_isolation\\withTxRxPhaseCoupling_8eleULA\\'
 # np.save(savepath + 'angleErrorMatrix_std_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_std)
 # np.save(savepath + 'angleErrorMatrix_percentile_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_percentile)
 # np.save(savepath + 'range_binSNRArray_isolation' + str(isolation) + 'dB.npy',range_binSNRArray)

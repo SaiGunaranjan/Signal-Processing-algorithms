@@ -89,7 +89,7 @@ if (phaseDemodMethod == 1):
 else:
     print('\n\nUsing modulated Doppler sampling method for DDMA\n\n')
 
-flagEnableTxCoupling = 1 # 1 to enable , 0 to disable
+flagEnableTxCoupling = 0 # 1 to enable , 0 to disable
 
 """ Typical Isolation/coupling numbers of Txs in a chip. Adjacent Txs have an isolation/coupling
 of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
@@ -158,7 +158,7 @@ rangeRes = c/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
-phaseStepPerTx_deg = 29#29.3
+phaseStepPerTx_deg = 89#29#29.3 This should ideally be 360/numTx_simult + delta, so that the Dopplers are spaced uniformly throughout the Doppler spectrum
 
 Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
