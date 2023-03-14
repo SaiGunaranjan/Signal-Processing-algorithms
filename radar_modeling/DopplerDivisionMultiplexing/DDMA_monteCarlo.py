@@ -38,9 +38,9 @@ I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
 """ In addition to angle accuracy, the script now also checks SLLs in the angle spectrum"""
 
 """
-Introduced Tx-Tx coupling into the DDMA model
+Introduced Tx-Tx Rx-Rx IC level coupling into the DDMA model
 
-In this script, I have introduced inter-Tx coupling model into the DDMA scheme. When we have nearby Txs
+In this script, I have introduced inter-Tx and inter-Rx coupling model into the DDMA scheme. When we have nearby Txs
 simutaneously transmitting different signals each, there could be coupling from adjacent (and other nearby) Txs
 thus corrupting the original signal transmitted by a particular Tx. This coupling has both a magnitude component
 and a phase component. Let us consider a simple signgle IC with 4 Txs say, Tx0, Tx1, Tx2, Tx3.
@@ -56,9 +56,27 @@ This is the magitude/amplitude coupling. On top of this, we could also have a ra
 This can be captured as a caliberation in the DDMA mode and can be applied at the receiver end to remove this effect.
 I have observed that the inter Tx coupling affects the SLLs in the angle spectrum. To be more particular,
 with the dB coupling numbers mentioned (20, 26, 32, ..), it is actually the un-compensated coupled random phase that
-plays a bigger role in setting the SLLs than the magnitude coupling. So these random phases need to be calibeated out.
+plays a bigger role in setting the SLLs than the magnitude coupling. So these random phases need to be caliberated out.
 
-This is the Tx coupling model I have introduced. This plays a very important role in DDMA schemes. There are other factors which play a crucial role in the DDMA scheme like:
+Introduced antenna coupling in addition to the IC coupling
+
+Previously, I had modelled the IC level coupling for the Txs and Rxs. 20 dB between adjacent Txs and Rxs and a 6 dB drop from there on.
+In this commit, I have also added the coupling introduced by the antennas as well. So in essence there are 2 coupling factors:
+1. IC level coupling
+2. Antenna coupling
+The typical antenna level coupling is about 15 dB if the separation is lambda/2 and
+falls to about 24 dB when the separation is 2*lambda. So the Tx antennas separated by lambda/2 and adjacent to each other
+have a coupling of 15 dB. The Rx antennas which are separated by 2*lambda and adjacent to each other have a coupling of 24 dB.
+I have assumed a drop of 6 dB as we move away from the Tx antennas or the Rx antennas. I have assumed a random phase coupling
+for the antenna coupling matrix as well. But instead of varying the phase each Monte Carlo run(like I do for the IC coupling),
+for the antenna coupling, I initialize the magnitude and phase only once at the beginning. I dont vary this frame to frame.
+In terms of modelling, the antenna coupling is also a matrix (for Txs antennas and Rx antennas) which is multipled
+with the IC coupling matrix. So the transmitted signal is TxAntennaCouplingMatrix x TxICCouplingMatrix x Tx phase coded signal.
+Similary, the received signal is RxAntennaCouplingMatrix x RxICCouplingMatrix x Rx signls. For the received signal,
+I have introduced the coupling before adding noise. I might need to introduce the coupling after adding noise.
+
+This is the coupling model I have introduced. This plays a very important role in DDMA schemes.
+There are other factors which play a crucial role in the DDMA scheme like:
 1. Non-linearity of the phase response of the phase LUT
 2. Non-linearity of the magnitude response of the phase LUT
 3. Bin shift
@@ -91,7 +109,7 @@ if (flagRBM == 1):
 
 flagEnableCoupling = 1 # 1 to enable , 0 to disable
 
-""" Typical Isolation/coupling numbers of Txs in a chip. Adjacent Txs have an isolation/coupling
+""" Typical on chip(till the IC ball) isolation/coupling numbers of Txs/Rxs in a chip. Adjacent Txs/Rxs have an isolation/coupling
 of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
 tx0tx1IsolationPowerdB = 20 #20
 tx0tx2IsolationPowerdB = tx0tx1IsolationPowerdB + 6
@@ -133,6 +151,76 @@ elif ((flagEnableCoupling == 0) and (platform == 'SRIR16')):
     print('\n\nInter Tx coupling disabled\n\n')
 else:
     print('\n\nInter Tx coupling not supported for this platform currently\n\n')
+
+""" Typical radiated(at antenna) isolation/coupling numbers of Txs/Rx antennas. Adjacent Txs/Rxs antennas have an isolation/coupling
+of about 15 dB and from there on it drops by about 6 dB as we move away from the Txs.
+The antenna coupling/isolation is about 15 dB for lambda/2 separation and drops by 6 dB further on. Similarly,
+the antenna coupling/isolation is about 24 dB for 2 lambda"""
+if (flagEnableCoupling == 1) and (platform == 'SRIR16'):
+    """ Tx antennas radiated coupling"""
+    tx0tx1AntennaIsolationPowerdB = 15
+    tx0tx2AntennaIsolationPowerdB = tx0tx1AntennaIsolationPowerdB + 6
+    tx0tx3AntennaIsolationPowerdB = tx0tx2AntennaIsolationPowerdB + 6
+
+    tx0tx1AntennaIsolationAmp = np.sqrt(1/(10**(tx0tx1AntennaIsolationPowerdB/10)))
+    tx0tx2AntennaIsolationAmp = np.sqrt(1/(10**(tx0tx2AntennaIsolationPowerdB/10)))
+    tx0tx3AntennaIsolationAmp = np.sqrt(1/(10**(tx0tx3AntennaIsolationPowerdB/10)))
+
+    tx0tx0AntennaIsolationAmp = 1
+    tx0tx1AntennaIsolationAmp = np.round(tx0tx1AntennaIsolationAmp,3)
+    tx0tx2AntennaIsolationAmp = np.round(tx0tx2AntennaIsolationAmp,3)
+    tx0tx3AntennaIsolationAmp = np.round(tx0tx3AntennaIsolationAmp,3)
+
+    txAntennaisolationMagnitude = np.array([[tx0tx0AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx2AntennaIsolationAmp,tx0tx3AntennaIsolationAmp],\
+                                               [tx0tx1AntennaIsolationAmp,tx0tx0AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx2AntennaIsolationAmp],\
+                                                   [tx0tx2AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx0AntennaIsolationAmp,tx0tx1AntennaIsolationAmp],\
+                                                       [tx0tx3AntennaIsolationAmp,tx0tx2AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx0AntennaIsolationAmp]])
+
+
+    txAntennaisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Txs antennas
+    txAntennaisolationPhasor = np.exp(1j*txAntennaisolationPhase)
+
+    txAntennaisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+    txAntennaisolationMatrix = txAntennaisolationMagnitude*txAntennaisolationPhasor
+
+    """ Rx antennas radiated coupling"""
+    rx0rx1AntennaIsolationPowerdB = 24
+    rx0rx2AntennaIsolationPowerdB = rx0rx1AntennaIsolationPowerdB + 6
+    rx0rx3AntennaIsolationPowerdB = rx0rx2AntennaIsolationPowerdB + 6
+
+    rx0rx1AntennaIsolationAmp = np.sqrt(1/(10**(rx0rx1AntennaIsolationPowerdB/10)))
+    rx0rx2AntennaIsolationAmp = np.sqrt(1/(10**(rx0rx2AntennaIsolationPowerdB/10)))
+    rx0rx3AntennaIsolationAmp = np.sqrt(1/(10**(rx0rx3AntennaIsolationPowerdB/10)))
+
+    rx0rx0AntennaIsolationAmp = 1
+    rx0rx1AntennaIsolationAmp = np.round(rx0rx1AntennaIsolationAmp,3)
+    rx0rx2AntennaIsolationAmp = np.round(rx0rx2AntennaIsolationAmp,3)
+    rx0rx3AntennaIsolationAmp = np.round(rx0rx3AntennaIsolationAmp,3)
+
+    rxAntennaisolationMagnitude = np.array([[rx0rx0AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx2AntennaIsolationAmp,rx0rx3AntennaIsolationAmp],\
+                                               [rx0rx1AntennaIsolationAmp,rx0rx0AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx2AntennaIsolationAmp],\
+                                                   [rx0rx2AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx0AntennaIsolationAmp,rx0rx1AntennaIsolationAmp],\
+                                                       [rx0rx3AntennaIsolationAmp,rx0rx2AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx0AntennaIsolationAmp]])
+
+
+    rxAntennaisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numRx*numRx).reshape(numRx,numRx) # phase coupling from neighbouring Rxs
+    rxAntennaisolationPhasor = np.exp(1j*rxAntennaisolationPhase)
+
+    rxAntennaisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+    rxAntennaisolationMatrix = rxAntennaisolationMagnitude*rxAntennaisolationPhasor
+
+else:
+    txAntennaisolationMagnitude = np.eye(numTx_simult)
+    txAntennaisolationPhase = np.zeros((numTx_simult,numTx_simult))
+    txAntennaisolationPhasor = np.exp(1j*txAntennaisolationPhase)
+    txAntennaisolationMatrix = txAntennaisolationMagnitude*txAntennaisolationPhasor
+
+    rxAntennaisolationMagnitude = np.eye(numRx)
+    rxAntennaisolationPhase = np.zeros((numRx,numRx))
+    rxAntennaisolationPhasor = np.exp(1j*rxAntennaisolationPhase)
+    rxAntennaisolationMatrix = rxAntennaisolationMagnitude*rxAntennaisolationPhasor
+
+
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
@@ -310,7 +398,7 @@ for numRamps in numChirpsDDMA:
             rxisolationMatrix = rxisolationMagnitude*rxisolationPhasor
 
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-            signal_phaseCode_couplingMatrix = txisolationMatrix @ signal_phaseCode
+            signal_phaseCode_couplingMatrix = txAntennaisolationMatrix @ txisolationMatrix @ signal_phaseCode # Tx Antenna coupling x Tx IC coupling x Tx signal
             txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
             signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
 
@@ -321,7 +409,8 @@ for numRamps in numChirpsDDMA:
                 phaseCodedTxRxSignal_withRangeTerm = phaseCodedTxRxSignal_withRangeTerm * rangeBinMigration[:,None,:,None,:]
             signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
             """ Rx coupling"""
-            signal = np.matmul(rxisolationMatrix[None,:,:],signal)
+            signal = np.matmul(rxisolationMatrix[None,:,:],signal) # Tx IC coupling x Rx signal
+            signal = np.matmul(rxAntennaisolationMatrix[None,:,:],signal) # Rx Antenna coupling x Rx IC coupling x Rx signal
 
             noise = (sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp) + 1j*(sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp)
             noise = noise.reshape(numRamps, numRx, numSamp)
@@ -479,7 +568,7 @@ for fig_numramps in np.arange(numChirpsMC):
 
 # """ Saving for plotting and debugging purposes"""
 # isolation = tx0tx1IsolationPowerdB
-# savepath = 'data_isolation\\withTxRxPhaseCoupling_8eleULA\\'
+# savepath = 'data_isolation\\withTxRxPhaseCoupling_AntennaCoupling\\'
 # np.save(savepath + 'angleErrorMatrix_std_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_std)
 # np.save(savepath + 'angleErrorMatrix_percentile_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_percentile)
 # np.save(savepath + 'range_binSNRArray_isolation' + str(isolation) + 'dB.npy',range_binSNRArray)
