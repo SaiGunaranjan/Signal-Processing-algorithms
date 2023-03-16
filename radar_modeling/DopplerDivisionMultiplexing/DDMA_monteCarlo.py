@@ -107,8 +107,13 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-flagEnableCoupling = 1 # 1 to enable , 0 to disable
+flagEnableICCoupling = 1 # 1 to enable , 0 to disable
+flagEnableAntennaCoupling = 0 # 1 to enable, 0 to disable
 flagEnableBoreSightCal = 1 # 1 to enable boresight cal, 0 to disable boresight cal
+
+# if (flagEnableICCoupling == 0):
+#     flagEnableAntennaCoupling = 0 # Force Disable antenna coupling if IC coupling itself is disabled
+
 
 """ Typical on chip(till the IC ball) isolation/coupling numbers of Txs/Rxs in a chip. Adjacent Txs/Rxs have an isolation/coupling
 of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
@@ -146,10 +151,14 @@ elif (platform == 'SRIR256'):
     numMIMO = 74
     numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
 
-if ((flagEnableCoupling == 1) and (platform == 'SRIR16')):
-    print('\n\nInter Tx and Inter Rx coupling enabled\n\n')
-elif ((flagEnableCoupling == 0) and (platform == 'SRIR16')):
-    print('\n\nInter Tx and Inter Rx coupling disabled\n\n')
+if ((flagEnableICCoupling == 1) and (flagEnableAntennaCoupling == 1) and (platform == 'SRIR16')):
+    print('\n\nBoth IC and Antenna coupling enabled\n\n')
+elif  ((flagEnableICCoupling == 1) and (flagEnableAntennaCoupling == 0) and (platform == 'SRIR16')):
+     print('\n\nIC coupling enabled but Antenna coupling disabled\n\n')
+elif  ((flagEnableICCoupling == 0) and (flagEnableAntennaCoupling == 1) and (platform == 'SRIR16')):
+     print('\n\nIC coupling disabled but Antenna coupling enabled\n\n')
+elif ((flagEnableICCoupling == 0) and (flagEnableAntennaCoupling == 0) and (platform == 'SRIR16')):
+    print('\n\nBoth IC and Antenna coupling disabled\n\n')
 else:
     print('\n\nInter Tx and Inter Rx coupling not supported for this platform currently\n\n')
 
@@ -164,7 +173,7 @@ else:
 of about 15 dB and from there on it drops by about 6 dB as we move away from the Txs.
 The antenna coupling/isolation is about 15 dB for lambda/2 separation and drops by 6 dB further on. Similarly,
 the antenna coupling/isolation is about 24 dB for 2 lambda"""
-if (flagEnableCoupling == 1) and (platform == 'SRIR16'):
+if (flagEnableAntennaCoupling == 1) and (platform == 'SRIR16'):
     """ Tx antennas radiated coupling"""
     tx0tx1AntennaIsolationPowerdB = 15 # 15 or 20
     tx0tx2AntennaIsolationPowerdB = tx0tx1AntennaIsolationPowerdB + 6 # 20 with +12 or 15 with +6
@@ -384,7 +393,7 @@ for numRamps in numChirpsDDMA:
             txSignal = mimoPhasor_txrx[:,:,0]
 
             ## currently enabled only for single IC. Will add for multi IC later ON
-            if (flagEnableCoupling == 1) and (platform == 'SRIR16'):
+            if (flagEnableICCoupling == 1) and (platform == 'SRIR16'):
                 # txisolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
                 txisolationMagnitude = np.array([[tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp,tx0tx3IsolationAmp],\
                                                [tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp],\
