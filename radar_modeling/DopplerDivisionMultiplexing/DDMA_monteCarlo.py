@@ -560,6 +560,24 @@ for numRamps in numChirpsDDMA:
             #         plt.ylabel('dB')
             #         plt.grid(True)
 
+            # if any(np.abs(sllValdBc)<7):
+            #     print('Im here')
+            #     print('True Velocities (mps):', np.round(objectVelocity_mps,2))
+            #     print('Baseband Velocities (mps):', np.round(objectVelocity_baseBand_mpsBipolar,2))
+            #     print('True Angles (deg):', np.round(objectAzAngle_deg,2))
+            #     print('Estimated Angles (deg):', np.round(estAngDeg,2))
+            #     print('Estimated SLLs (dBc):', np.round(sllValdBc,2))
+
+                # plt.figure(4, figsize=(20,10))
+                # plt.suptitle('MIMO ULA Angle spectrum')
+                # for ele in range(numDopUniqRbin):
+                #     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+                #     plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
+                #     plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
+                #     plt.xlabel('Angle (deg)')
+                #     plt.ylabel('dB')
+                #     plt.grid(True)
+
 
         angleErrorMatrix_std[count_rampMC,count_snrMC] = np.std(errorAngArray)
         angleErrorMatrix_percentile[count_rampMC,count_snrMC] = np.percentile(np.abs(errorAngArray),percentile)
