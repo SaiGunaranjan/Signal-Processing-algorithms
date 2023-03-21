@@ -111,8 +111,6 @@ flagEnableICCoupling = 1 # 1 to enable , 0 to disable
 flagEnableAntennaCoupling = 0 # 1 to enable, 0 to disable
 flagEnableBoreSightCal = 1 # 1 to enable boresight cal, 0 to disable boresight cal
 
-# if (flagEnableICCoupling == 0):
-#     flagEnableAntennaCoupling = 0 # Force Disable antenna coupling if IC coupling itself is disabled
 
 
 """ Typical on chip(till the IC ball) isolation/coupling numbers of Txs/Rxs in a chip. Adjacent Txs/Rxs have an isolation/coupling
@@ -244,7 +242,6 @@ numSampPostRfft = numSamp//2
 numAngleFFT = 2048
 mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
-# c = 3e8
 numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
