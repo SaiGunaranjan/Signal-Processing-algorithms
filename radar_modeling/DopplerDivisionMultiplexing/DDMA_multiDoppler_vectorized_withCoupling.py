@@ -85,9 +85,9 @@ if (flagRBM == 1):
 
 flagEnableICCoupling = 1 # 1 to enable , 0 to disable
 flagEnableAntennaCoupling = 0 # 1 to enable, 0 to disable
-flagEnableBoreSightCal = 0 # 1 to enable boresight cal, 0 to disable boresight cal
+flagEnableBoreSightCal = 1 # 1 to enable boresight cal, 0 to disable boresight cal
 
-phaseDemodMethod = 1
+phaseDemodMethod = 0
 if (phaseDemodMethod == 1):
     print('\n\nUsing the Tx demodulation method for DDMA\n\n')
 else:
@@ -387,6 +387,9 @@ txisolationMatrix = txisolationMagnitude*txisolationPhasor
 rxisolationPhasor[np.arange(numRx),np.arange(numRx)] = 1
 rxisolationMatrix = rxisolationMagnitude*rxisolationPhasor
 
+unCaliberatedTxPhasesRad = np.random.uniform(-np.pi,np.pi, numTx_simult)
+phaseCodesToBeApplied_rad = phaseCodesToBeApplied_rad + unCaliberatedTxPhasesRad[:,None]
+
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
 signal_phaseCode_couplingMatrix = txAntennaisolationMatrix @ txisolationMatrix @ signal_phaseCode
 txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
@@ -499,18 +502,36 @@ Here, I'm computing the Doppler FFT for plotting purpose only"""
 
 
 if (flagEnableBoreSightCal == 1):
-    calTargetrangeBinsToSample = np.repeat(calTargetRangeBin,numRamps)
-    chirpSamp_calTargetRangeBin = signal_rfft[np.arange(numRamps)[None,:],:,calTargetrangeBinsToSample]
-    calTargetsignalWindowed = chirpSamp_calTargetRangeBin#*np.hanning(numRamps)[None,:,None]
-    calTargetVelocityBinsToSample = np.round(calTargetVelocityBin[:,None] + binOffset_Txphase[None,:]).astype('int32')
-    calTargetDFT_vec = np.exp(1j*2*np.pi*(calTargetVelocityBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+    if (phaseDemodMethod == 1):
+        calTargetrangeBinsToSample = np.repeat(calTargetRangeBin,numRamps)
+        calTargetVelocityBinsToSample = np.round(calTargetVelocityBin[:,None] + dopplerBinOffset_rbm[:,None]).astype('int32')
+        calTargetVelocityBinsToSample = np.repeat(calTargetVelocityBinsToSample,numTx_simult,axis=1)
+        demodulatingPhaseCodedSignal = signal_phaseCode.T # Transpose is to just matching the dimensions of the chirp samples signal
+        chirpSamp_calTargetRangeBin = signal_rfft[np.arange(numRamps)[None,:],:,calTargetrangeBinsToSample]
+        demodulatedDopplerSignalCaltarget = chirpSamp_calTargetRangeBin[:,:,:,None]*np.conj(demodulatingPhaseCodedSignal)[None,:,None,:] # [numDopp, numChirp, numRx, numTx]
+        calTargetsignalWindowed = demodulatedDopplerSignalCaltarget#*np.hanning(numRamps)[None,:,None,None] # [numDopp, numChirp, numRx, numTx]
+        """DFT based coefficient estimation """
+        calTargetDFT_vec = np.exp(1j*2*np.pi*(calTargetVelocityBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+        mimoCoefficientsCalTarget = np.sum(calTargetsignalWindowed*np.conj(calTargetDFT_vec[:,:,None,:]),axis=1)/numRamps
+        mimoCoefficientsCalTarget = np.transpose(mimoCoefficientsCalTarget,(0,2,1))
 
-    mimoCoefficientsCalTarget = np.sum(calTargetsignalWindowed[:,:,:,None]*np.conj(calTargetDFT_vec[:,:,None,:]),axis=1)/numRamps
-    mimoCoefficientsCalTarget = np.transpose(mimoCoefficientsCalTarget,(0,2,1))
+        mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget.reshape(-1, numTx_simult*numRx)
+        mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget_flatten[:,ulaInd]
+        calCoeffs = np.conj(mimoCoefficientsCalTarget_flatten/np.abs(mimoCoefficientsCalTarget_flatten))
 
-    mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget.reshape(-1, numTx_simult*numRx)
-    mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget_flatten[:,ulaInd]
-    calCoeffs = np.conj(mimoCoefficientsCalTarget_flatten/np.abs(mimoCoefficientsCalTarget_flatten))
+    else:
+        calTargetrangeBinsToSample = np.repeat(calTargetRangeBin,numRamps)
+        chirpSamp_calTargetRangeBin = signal_rfft[np.arange(numRamps)[None,:],:,calTargetrangeBinsToSample]
+        calTargetsignalWindowed = chirpSamp_calTargetRangeBin#*np.hanning(numRamps)[None,:,None]
+        calTargetVelocityBinsToSample = np.round(calTargetVelocityBin[:,None] + binOffset_Txphase[None,:]).astype('int32')
+        calTargetDFT_vec = np.exp(1j*2*np.pi*(calTargetVelocityBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+
+        mimoCoefficientsCalTarget = np.sum(calTargetsignalWindowed[:,:,:,None]*np.conj(calTargetDFT_vec[:,:,None,:]),axis=1)/numRamps
+        mimoCoefficientsCalTarget = np.transpose(mimoCoefficientsCalTarget,(0,2,1))
+
+        mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget.reshape(-1, numTx_simult*numRx)
+        mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget_flatten[:,ulaInd]
+        calCoeffs = np.conj(mimoCoefficientsCalTarget_flatten/np.abs(mimoCoefficientsCalTarget_flatten))
 
 else:
     calCoeffs = 1
@@ -518,8 +539,8 @@ else:
 
 mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
 mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
-ULA = np.unwrap(np.angle(mimoCoefficients_flatten),axis=1)
 mimoCoefficients_flattenCal = mimoCoefficients_flatten*calCoeffs
+ULA = np.unwrap(np.angle(mimoCoefficients_flattenCal),axis=1)
 mimoCoefficients_flattenCal = mimoCoefficients_flattenCal*np.hanning(numMIMO)[None,:]
 ULA_spectrum = np.fft.fft(mimoCoefficients_flattenCal,axis=1,n=numAngleFFT)/(numMIMO)
 ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
