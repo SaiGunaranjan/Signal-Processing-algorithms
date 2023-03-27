@@ -255,7 +255,7 @@ numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
 interRampTime = 44e-6 # us
-rampSamplingRate = 1/interRampTime
+chirpSamplingRate = 1/interRampTime
 rangeRes = lightSpeed/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
@@ -303,7 +303,7 @@ sigma = np.sqrt(totalNoisePower)
 # totalsnrGain = snrGainDDMA + snrGainDopplerFFT
 # print('Total SNR gain ( {0:.0f} Tx DDMA + {1:.0f} point Doppler FFT) = {2:.2f} dB'.format(numTx_simult, numRamps, totalsnrGain))
 
-chirpSamplingRate = 1/interRampTime
+
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
@@ -476,7 +476,7 @@ for numRamps in numChirpsDDMA:
 
                 """ Correcting for the Doppler modulation caused due to the Range bin Migration"""
                 rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
-                dopplerBinOffset_rbm = (rbmModulationAnalogFreq/rampSamplingRate)*numDoppFFT
+                dopplerBinOffset_rbm = (rbmModulationAnalogFreq/chirpSamplingRate)*numDoppFFT
             else:
                 dopplerBinOffset_rbm = np.zeros((numDopUniqRbin,))
 
