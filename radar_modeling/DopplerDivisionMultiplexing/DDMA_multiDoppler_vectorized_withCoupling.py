@@ -244,6 +244,7 @@ calTargetRange = 5 # in m
 calTargetRangeBin = np.round(calTargetRange/rangeRes).astype('int32')
 calTargetRange = calTargetRangeBin*rangeRes
 calTargetVelocityBin = np.array([0])
+calTargetAzAngle_deg = np.array([0])
 
 Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
@@ -407,7 +408,6 @@ signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numR
 if (flagEnableBoreSightCal == 1):
     calrangeTerm = np.exp(1j*((2*np.pi*calTargetRangeBin)/numSamp)*np.arange(numSamp))
     caldopplerTerm = np.exp(1j*((2*np.pi*calTargetVelocityBin[:,None])/numRamps)*np.arange(numRamps)[None,:]) # [number of Dopplers/range, numRamps]
-    calTargetAzAngle_deg = np.array([0])
     calTargetAzAngle_rad = (calTargetAzAngle_deg/360) * (2*np.pi)
     calTargetElAngle_deg = np.array([0]) # phi=0 plane angle
     calTargetElAngle_rad = (calTargetElAngle_deg/360) * (2*np.pi)
