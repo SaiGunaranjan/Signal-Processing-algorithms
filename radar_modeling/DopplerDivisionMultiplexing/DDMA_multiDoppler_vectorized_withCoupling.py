@@ -390,10 +390,11 @@ rxisolationPhasor[np.arange(numRx),np.arange(numRx)] = 1
 rxisolationMatrix = rxisolationMagnitude*rxisolationPhasor
 
 unCaliberatedTxPhasesRad = np.random.uniform(-np.pi,np.pi, numTx_simult)
-phaseCodesToBeApplied_rad = phaseCodesToBeApplied_rad + unCaliberatedTxPhasesRad[:,None]
+unCaliberatedTxPhasor = np.exp(1j*unCaliberatedTxPhasesRad)
 
 signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-signal_phaseCode_couplingMatrix = txAntennaisolationMatrix @ txisolationMatrix @ signal_phaseCode
+signal_phaseCode_txPhaseDisturbed = signal_phaseCode * unCaliberatedTxPhasor[:,None]
+signal_phaseCode_couplingMatrix = txAntennaisolationMatrix @ txisolationMatrix @ signal_phaseCode_txPhaseDisturbed
 txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
 signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
 
