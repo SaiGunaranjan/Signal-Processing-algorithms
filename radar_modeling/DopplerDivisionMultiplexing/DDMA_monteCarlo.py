@@ -38,9 +38,9 @@ I have modelled the DDMA for the Steradian SRIR144 and SRIR256 platforms.
 """ In addition to angle accuracy, the script now also checks SLLs in the angle spectrum"""
 
 """
-Introduced Tx-Tx coupling into the DDMA model
+Introduced Tx-Tx Rx-Rx IC level coupling into the DDMA model
 
-In this script, I have introduced inter-Tx coupling model into the DDMA scheme. When we have nearby Txs
+In this script, I have introduced inter-Tx and inter-Rx coupling model into the DDMA scheme. When we have nearby Txs
 simutaneously transmitting different signals each, there could be coupling from adjacent (and other nearby) Txs
 thus corrupting the original signal transmitted by a particular Tx. This coupling has both a magnitude component
 and a phase component. Let us consider a simple signgle IC with 4 Txs say, Tx0, Tx1, Tx2, Tx3.
@@ -56,9 +56,27 @@ This is the magitude/amplitude coupling. On top of this, we could also have a ra
 This can be captured as a caliberation in the DDMA mode and can be applied at the receiver end to remove this effect.
 I have observed that the inter Tx coupling affects the SLLs in the angle spectrum. To be more particular,
 with the dB coupling numbers mentioned (20, 26, 32, ..), it is actually the un-compensated coupled random phase that
-plays a bigger role in setting the SLLs than the magnitude coupling. So these random phases need to be calibeated out.
+plays a bigger role in setting the SLLs than the magnitude coupling. So these random phases need to be caliberated out.
 
-This is the Tx coupling model I have introduced. This plays a very important role in DDMA schemes. There are other factors which play a crucial role in the DDMA scheme like:
+Introduced antenna coupling in addition to the IC coupling
+
+Previously, I had modelled the IC level coupling for the Txs and Rxs. 20 dB between adjacent Txs and Rxs and a 6 dB drop from there on.
+In this commit, I have also added the coupling introduced by the antennas as well. So in essence there are 2 coupling factors:
+1. IC level coupling
+2. Antenna coupling
+The typical antenna level coupling is about 15 dB if the separation is lambda/2 and
+falls to about 24 dB when the separation is 2*lambda. So the Tx antennas separated by lambda/2 and adjacent to each other
+have a coupling of 15 dB. The Rx antennas which are separated by 2*lambda and adjacent to each other have a coupling of 24 dB.
+I have assumed a drop of 6 dB as we move away from the Tx antennas or the Rx antennas. I have assumed a random phase coupling
+for the antenna coupling matrix as well. But instead of varying the phase each Monte Carlo run(like I do for the IC coupling),
+for the antenna coupling, I initialize the magnitude and phase only once at the beginning. I dont vary this frame to frame.
+In terms of modelling, the antenna coupling is also a matrix (for Txs antennas and Rx antennas) which is multipled
+with the IC coupling matrix. So the transmitted signal is TxAntennaCouplingMatrix x TxICCouplingMatrix x Tx phase coded signal.
+Similary, the received signal is RxAntennaCouplingMatrix x RxICCouplingMatrix x Rx signls. For the received signal,
+I have introduced the coupling before adding noise. I might need to introduce the coupling after adding noise.
+
+This is the coupling model I have introduced. This plays a very important role in DDMA schemes.
+There are other factors which play a crucial role in the DDMA scheme like:
 1. Non-linearity of the phase response of the phase LUT
 2. Non-linearity of the magnitude response of the phase LUT
 3. Bin shift
@@ -78,7 +96,7 @@ from mimoPhasorSynthesis import mimoPhasorSynth
 import time as time
 from scipy.signal import argrelextrema
 
-# np.random.seed(10)
+np.random.seed(10)
 
 tstart = time.time()
 
@@ -89,7 +107,26 @@ flagRBM = 1
 if (flagRBM == 1):
     print('\n\nRange Bin Migration term has been enabled\n\n')
 
-flagEnableTxCoupling = 0 # 1 to enable , 0 to disable
+flagEnableICCoupling = 1 # 1 to enable , 0 to disable
+flagEnableAntennaCoupling = 0 # 1 to enable, 0 to disable
+flagEnableBoreSightCal = 1 # 1 to enable boresight cal, 0 to disable boresight cal
+
+
+
+""" Typical on chip(till the IC ball) isolation/coupling numbers of Txs/Rxs in a chip. Adjacent Txs/Rxs have an isolation/coupling
+of about 20 dB and from there on it drops by about 6 dB as we move away from the Txs"""
+tx0tx1IsolationPowerdB = 20 #20
+tx0tx2IsolationPowerdB = tx0tx1IsolationPowerdB + 6
+tx0tx3IsolationPowerdB = tx0tx2IsolationPowerdB + 6
+
+tx0tx1IsolationAmp = np.sqrt(1/(10**(tx0tx1IsolationPowerdB/10)))
+tx0tx2IsolationAmp = np.sqrt(1/(10**(tx0tx2IsolationPowerdB/10)))
+tx0tx3IsolationAmp = np.sqrt(1/(10**(tx0tx3IsolationPowerdB/10)))
+
+tx0tx0IsolationAmp = 1
+tx0tx1IsolationAmp = np.round(tx0tx1IsolationAmp,3)
+tx0tx2IsolationAmp = np.round(tx0tx2IsolationAmp,3)
+tx0tx3IsolationAmp = np.round(tx0tx3IsolationAmp,3)
 
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
@@ -112,19 +149,99 @@ elif (platform == 'SRIR256'):
     numMIMO = 74
     numChirpsDDMA = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
 
-if ((flagEnableTxCoupling == 1) and (platform == 'SRIR16')):
-    print('\n\nInter Tx coupling enabled\n\n')
-elif ((flagEnableTxCoupling == 0) and (platform == 'SRIR16')):
-    print('\n\nInter Tx coupling disabled\n\n')
+if ((flagEnableICCoupling == 1) and (flagEnableAntennaCoupling == 1) and (platform == 'SRIR16')):
+    print('\n\nBoth IC and Antenna coupling enabled\n\n')
+elif  ((flagEnableICCoupling == 1) and (flagEnableAntennaCoupling == 0) and (platform == 'SRIR16')):
+     print('\n\nIC coupling enabled but Antenna coupling disabled\n\n')
+elif  ((flagEnableICCoupling == 0) and (flagEnableAntennaCoupling == 1) and (platform == 'SRIR16')):
+     print('\n\nIC coupling disabled but Antenna coupling enabled\n\n')
+elif ((flagEnableICCoupling == 0) and (flagEnableAntennaCoupling == 0) and (platform == 'SRIR16')):
+    print('\n\nBoth IC and Antenna coupling disabled\n\n')
 else:
-    print('\n\nInter Tx coupling not supported for this platform currently\n\n')
+    print('\n\nInter Tx and Inter Rx coupling not supported for this platform currently\n\n')
+
+if (flagEnableBoreSightCal == 1):
+    print('\n\nBoresight cal has been enabled\n\n')
+else:
+    print('\n\nBoresight cal has been disabled\n\n')
+
+
+
+""" Typical radiated(at antenna) isolation/coupling numbers of Txs/Rx antennas. Adjacent Txs/Rxs antennas have an isolation/coupling
+of about 15 dB and from there on it drops by about 6 dB as we move away from the Txs.
+The antenna coupling/isolation is about 15 dB for lambda/2 separation and drops by 6 dB further on. Similarly,
+the antenna coupling/isolation is about 24 dB for 2 lambda"""
+if (flagEnableAntennaCoupling == 1) and (platform == 'SRIR16'):
+    """ Tx antennas radiated coupling"""
+    tx0tx1AntennaIsolationPowerdB = 15 # 15 or 20
+    tx0tx2AntennaIsolationPowerdB = tx0tx1AntennaIsolationPowerdB + 6 # 20 with +12 or 15 with +6
+    tx0tx3AntennaIsolationPowerdB = tx0tx2AntennaIsolationPowerdB + 6 # 20 with +12 or 15 with +6
+
+    tx0tx1AntennaIsolationAmp = np.sqrt(1/(10**(tx0tx1AntennaIsolationPowerdB/10)))
+    tx0tx2AntennaIsolationAmp = np.sqrt(1/(10**(tx0tx2AntennaIsolationPowerdB/10)))
+    tx0tx3AntennaIsolationAmp = np.sqrt(1/(10**(tx0tx3AntennaIsolationPowerdB/10)))
+
+    tx0tx0AntennaIsolationAmp = 1
+    tx0tx1AntennaIsolationAmp = np.round(tx0tx1AntennaIsolationAmp,3)
+    tx0tx2AntennaIsolationAmp = np.round(tx0tx2AntennaIsolationAmp,3)
+    tx0tx3AntennaIsolationAmp = np.round(tx0tx3AntennaIsolationAmp,3)
+
+    txAntennaisolationMagnitude = np.array([[tx0tx0AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx2AntennaIsolationAmp,tx0tx3AntennaIsolationAmp],\
+                                               [tx0tx1AntennaIsolationAmp,tx0tx0AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx2AntennaIsolationAmp],\
+                                                   [tx0tx2AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx0AntennaIsolationAmp,tx0tx1AntennaIsolationAmp],\
+                                                       [tx0tx3AntennaIsolationAmp,tx0tx2AntennaIsolationAmp,tx0tx1AntennaIsolationAmp,tx0tx0AntennaIsolationAmp]])
+
+
+    txAntennaisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Txs antennas
+    txAntennaisolationPhasor = np.exp(1j*txAntennaisolationPhase)
+
+    txAntennaisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+    txAntennaisolationMatrix = txAntennaisolationMagnitude*txAntennaisolationPhasor
+
+    """ Rx antennas radiated coupling"""
+    rx0rx1AntennaIsolationPowerdB = 24 # 20 or 24
+    rx0rx2AntennaIsolationPowerdB = rx0rx1AntennaIsolationPowerdB + 6 # 20 with +12 or 24 with +6
+    rx0rx3AntennaIsolationPowerdB = rx0rx2AntennaIsolationPowerdB + 6 # 20 with +12 or 24 with +6
+
+    rx0rx1AntennaIsolationAmp = np.sqrt(1/(10**(rx0rx1AntennaIsolationPowerdB/10)))
+    rx0rx2AntennaIsolationAmp = np.sqrt(1/(10**(rx0rx2AntennaIsolationPowerdB/10)))
+    rx0rx3AntennaIsolationAmp = np.sqrt(1/(10**(rx0rx3AntennaIsolationPowerdB/10)))
+
+    rx0rx0AntennaIsolationAmp = 1
+    rx0rx1AntennaIsolationAmp = np.round(rx0rx1AntennaIsolationAmp,3)
+    rx0rx2AntennaIsolationAmp = np.round(rx0rx2AntennaIsolationAmp,3)
+    rx0rx3AntennaIsolationAmp = np.round(rx0rx3AntennaIsolationAmp,3)
+
+    rxAntennaisolationMagnitude = np.array([[rx0rx0AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx2AntennaIsolationAmp,rx0rx3AntennaIsolationAmp],\
+                                               [rx0rx1AntennaIsolationAmp,rx0rx0AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx2AntennaIsolationAmp],\
+                                                   [rx0rx2AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx0AntennaIsolationAmp,rx0rx1AntennaIsolationAmp],\
+                                                       [rx0rx3AntennaIsolationAmp,rx0rx2AntennaIsolationAmp,rx0rx1AntennaIsolationAmp,rx0rx0AntennaIsolationAmp]])
+
+
+    rxAntennaisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numRx*numRx).reshape(numRx,numRx) # phase coupling from neighbouring Rxs
+    rxAntennaisolationPhasor = np.exp(1j*rxAntennaisolationPhase)
+
+    rxAntennaisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+    rxAntennaisolationMatrix = rxAntennaisolationMagnitude*rxAntennaisolationPhasor
+
+else:
+    txAntennaisolationMagnitude = np.eye(numTx_simult)
+    txAntennaisolationPhase = np.zeros((numTx_simult,numTx_simult))
+    txAntennaisolationPhasor = np.exp(1j*txAntennaisolationPhase)
+    txAntennaisolationMatrix = txAntennaisolationMagnitude*txAntennaisolationPhasor
+
+    rxAntennaisolationMagnitude = np.eye(numRx)
+    rxAntennaisolationPhase = np.zeros((numRx,numRx))
+    rxAntennaisolationPhasor = np.exp(1j*rxAntennaisolationPhase)
+    rxAntennaisolationMatrix = rxAntennaisolationMagnitude*rxAntennaisolationPhasor
+
+
 
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
 numAngleFFT = 2048
 mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
-c = 3e8
 numBitsPhaseShifter = 7
 numPhaseCodes = 2**numBitsPhaseShifter
 DNL = 360/(numPhaseCodes) # DNL in degrees
@@ -138,12 +255,18 @@ numDoppFFT = 2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
 interRampTime = 44e-6 # us
-rampSamplingRate = 1/interRampTime
-rangeRes = c/(2*chirpBW)
+chirpSamplingRate = 1/interRampTime
+rangeRes = lightSpeed/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
 phaseStepPerTx_deg = 29#29.3
+
+""" Cal target settings"""
+calTargetRange = 5 # in m
+calTargetRangeBin = np.round(calTargetRange/rangeRes).astype('int32')
+calTargetRange = calTargetRangeBin*rangeRes
+calTargetVelocityBin = np.array([0])
 
 Fs_spatial = lamda/mimoArraySpacing
 angAxis_deg = np.arcsin(np.arange(-numAngleFFT//2, numAngleFFT//2)*(Fs_spatial/numAngleFFT))*180/np.pi
@@ -180,7 +303,7 @@ sigma = np.sqrt(totalNoisePower)
 # totalsnrGain = snrGainDDMA + snrGainDopplerFFT
 # print('Total SNR gain ( {0:.0f} Tx DDMA + {1:.0f} point Doppler FFT) = {2:.2f} dB'.format(numTx_simult, numRamps, totalsnrGain))
 
-chirpSamplingRate = 1/interRampTime
+
 maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
 FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 
@@ -243,6 +366,8 @@ for numRamps in numChirpsDDMA:
 
             objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
             objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
+            objectVelocity_baseBand_mpsBipolar = objectVelocity_baseBand_mps
+            objectVelocity_baseBand_mpsBipolar[objectVelocity_baseBand_mpsBipolar>=FsEquivalentVelocity/2] -= FsEquivalentVelocity
             objectRangeBin = objectRange/rangeRes
             if (flagRBM == 1):
                 rangeMoved = objectRange + objectVelocity_mps[:,None]*interRampTime*np.arange(numRamps)[None,:]
@@ -265,23 +390,35 @@ for numRamps in numChirpsDDMA:
             txSignal = mimoPhasor_txrx[:,:,0]
 
             ## currently enabled only for single IC. Will add for multi IC later ON
-            if (flagEnableTxCoupling == 1) and (platform == 'SRIR16'):
-                isolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
-                isolationPhase = 0*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # Assuming no phase coupling from neighbouring Txs
+            if (flagEnableICCoupling == 1) and (platform == 'SRIR16'):
+                # txisolationMagnitude = np.array([[1,0.1,0.05,0.025],[0.1,1,0.1,0.05],[0.05,0.1,1,0.1],[0.025,0.05,0.1,1]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+                txisolationMagnitude = np.array([[tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp,tx0tx3IsolationAmp],\
+                                               [tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp,tx0tx2IsolationAmp],\
+                                                   [tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp,tx0tx1IsolationAmp],\
+                                                       [tx0tx3IsolationAmp,tx0tx2IsolationAmp,tx0tx1IsolationAmp,tx0tx0IsolationAmp]]) # These numbers correspond to power coupling of 20 dB, 20 + 6 dB, 20+6+6 dB and so on. More explanation given in docstring.
+                rxisolationMagnitude = txisolationMagnitude.copy()
+                txisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numTx_simult*numTx_simult).reshape(numTx_simult,numTx_simult) # phase coupling from neighbouring Txs
+                rxisolationPhase = 1*np.random.uniform(-np.pi,np.pi,numRx*numRx).reshape(numRx,numRx) # phase coupling from neighbouring Rxs
             else:
-                isolationMagnitude = np.eye(numTx_simult)
-                isolationPhase = np.zeros((numTx_simult,numTx_simult))
+                txisolationMagnitude = np.eye(numTx_simult)
+                rxisolationMagnitude = np.eye(numRx)
+                txisolationPhase = np.zeros((numTx_simult,numTx_simult))
+                rxisolationPhase = np.zeros((numRx,numRx))
 
 
-            isolationPhasor = np.exp(1j*isolationPhase)
+            txisolationPhasor = np.exp(1j*txisolationPhase)
+            rxisolationPhasor = np.exp(1j*rxisolationPhase)
             """ Coupling introduces deterministic magnitude coupling across Txs and random phase contribution from adjacent Txs
             Diagonal elements of the phase coupling matrix are made 0. Since they can be removed through cal
             """
-            isolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
-            isolationMatrix = isolationMagnitude*isolationPhasor
+            txisolationPhasor[np.arange(numTx_simult),np.arange(numTx_simult)] = 1
+            txisolationMatrix = txisolationMagnitude*txisolationPhasor
+
+            rxisolationPhasor[np.arange(numRx),np.arange(numRx)] = 1
+            rxisolationMatrix = rxisolationMagnitude*rxisolationPhasor
 
             signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
-            signal_phaseCode_couplingMatrix = isolationMatrix @ signal_phaseCode
+            signal_phaseCode_couplingMatrix = txAntennaisolationMatrix @ txisolationMatrix @ signal_phaseCode # Tx Antenna coupling x Tx IC coupling x Tx signal
             txWeights = np.ones((numTx_simult,),dtype=np.float32) #np.array([1,1,1,1])# amplitide varation across Txs. Currently assuming all Txs have same gain
             signal_phaseCode_couplingMatrix_txWeights = txWeights[:,None]*signal_phaseCode_couplingMatrix
 
@@ -292,6 +429,29 @@ for numRamps in numChirpsDDMA:
                 phaseCodedTxRxSignal_withRangeTerm = phaseCodedTxRxSignal_withRangeTerm * rangeBinMigration[:,None,:,None,:]
             signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
 
+            if (flagEnableBoreSightCal == 1):
+                calrangeTerm = np.exp(1j*((2*np.pi*calTargetRangeBin)/numSamp)*np.arange(numSamp))
+                caldopplerTerm = np.exp(1j*((2*np.pi*calTargetVelocityBin[:,None])/numRamps)*np.arange(numRamps)[None,:]) # [number of Dopplers/range, numRamps]
+                calTargetAzAngle_deg = np.array([0])
+                calTargetAzAngle_rad = (calTargetAzAngle_deg/360) * (2*np.pi)
+                calTargetElAngle_deg = np.array([0]) # phi=0 plane angle
+                calTargetElAngle_rad = (calTargetElAngle_deg/360) * (2*np.pi)
+                _, mimoPhasor_txrx_caltarget, _ = mimoPhasorSynth(platform, lamda, calTargetAzAngle_rad, calTargetElAngle_rad)
+                caltargetrxSignal = mimoPhasor_txrx_caltarget[:,0,:]
+                calTargettxSignal = mimoPhasor_txrx_caltarget[:,:,0]
+
+                calTargetphaseCodedTxSignal = caldopplerTerm[:,None,:] * signal_phaseCode_couplingMatrix_txWeights[None,:,:] * calTargettxSignal[:,:,None] # [numDopp, numTx, numRamps]
+                calTargetphaseCodedTxRxSignal = calTargetphaseCodedTxSignal[:,:,:,None]*caltargetrxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
+                calTargetphaseCodedTxRxSignal_withRangeTerm = calrangeTerm[None,None,None,None,:] * calTargetphaseCodedTxRxSignal[:,:,:,:,None]
+                calTargetsignal = np.sum(calTargetphaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
+            else:
+                calTargetsignal = 0
+
+            signal += calTargetsignal # Adding the cal taregt signal to the actual signal
+
+            """ Rx coupling"""
+            signal = np.matmul(rxisolationMatrix[None,:,:],signal) # Tx IC coupling x Rx signal
+            signal = np.matmul(rxAntennaisolationMatrix[None,:,:],signal) # Rx Antenna coupling x Rx IC coupling x Rx signal
 
             noise = (sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp) + 1j*(sigma/np.sqrt(2))*np.random.randn(numRamps*numRx*numSamp)
             noise = noise.reshape(numRamps, numRx, numSamp)
@@ -316,10 +476,9 @@ for numRamps in numChirpsDDMA:
 
                 """ Correcting for the Doppler modulation caused due to the Range bin Migration"""
                 rbmModulationAnalogFreq = (chirpBW/lightSpeed)*objectVelocity_mps
-                dopplerBinOffset_rbm = (rbmModulationAnalogFreq/rampSamplingRate)*numDoppFFT
+                dopplerBinOffset_rbm = (rbmModulationAnalogFreq/chirpSamplingRate)*numDoppFFT
             else:
                 dopplerBinOffset_rbm = np.zeros((numDopUniqRbin,))
-
 
             objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
             binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
@@ -330,6 +489,25 @@ for numRamps in numChirpsDDMA:
             # signalFFT = np.fft.fft(signalWindowed, axis=1, n = numDoppFFT)/numRamps
             # mimoCoefficients_eachDoppler_givenRange = signalFFT[np.arange(numDopUniqRbin)[:,None],dopplerBinsToSample,:] # # [numObj, numTx, numRx]
 
+            if (flagEnableBoreSightCal == 1):
+                calTargetrangeBinsToSample = np.repeat(calTargetRangeBin,numRamps)
+                chirpSamp_calTargetRangeBin = signal_rfft[np.arange(numRamps)[None,:],:,calTargetrangeBinsToSample]
+                calTargetsignalWindowed = chirpSamp_calTargetRangeBin#*np.hanning(numRamps)[None,:,None]
+                calTargetVelocityBinsToSample = np.round(calTargetVelocityBin[:,None] + binOffset_Txphase[None,:]).astype('int32')
+                calTargetDFT_vec = np.exp(1j*2*np.pi*(calTargetVelocityBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
+
+                mimoCoefficientsCalTarget = np.sum(calTargetsignalWindowed[:,:,:,None]*np.conj(calTargetDFT_vec[:,:,None,:]),axis=1)/numRamps
+                mimoCoefficientsCalTarget = np.transpose(mimoCoefficientsCalTarget,(0,2,1))
+
+                mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget.reshape(-1, numTx_simult*numRx)
+                mimoCoefficientsCalTarget_flatten = mimoCoefficientsCalTarget_flatten[:,ulaInd]
+                calCoeffs = np.conj(mimoCoefficientsCalTarget_flatten/np.abs(mimoCoefficientsCalTarget_flatten))
+
+            else:
+                calCoeffs = 1
+
+
+
             """ Replaced large FFT with single point DFT for faster compute"""
             DFT_vec = np.exp(1j*2*np.pi*(dopplerBinsToSample[:,None,:]/numDoppFFT)*np.arange(numRamps)[None,:,None])
             mimoCoefficients_eachDoppler_givenRange = np.sum(signalWindowed[:,:,:,None]*np.conj(DFT_vec[:,:,None,:]),axis=1)/numRamps
@@ -337,8 +515,9 @@ for numRamps in numChirpsDDMA:
 
             mimoCoefficients_flatten = mimoCoefficients_eachDoppler_givenRange.reshape(-1, numTx_simult*numRx)
             mimoCoefficients_flatten = mimoCoefficients_flatten[:,ulaInd]
-            mimoCoefficients_flatten = mimoCoefficients_flatten*np.hanning(numMIMO)[None,:]
-            ULA_spectrum = np.fft.fft(mimoCoefficients_flatten,axis=1,n=numAngleFFT)/(numMIMO)
+            mimoCoefficients_flattenCal = mimoCoefficients_flatten*calCoeffs
+            mimoCoefficients_flattenCal = mimoCoefficients_flattenCal*np.hanning(numMIMO)[None,:]
+            ULA_spectrum = np.fft.fft(mimoCoefficients_flattenCal,axis=1,n=numAngleFFT)/(numMIMO)
             ULA_spectrum = np.fft.fftshift(ULA_spectrum,axes=(1,))
             ULA_spectrumMag = np.abs(ULA_spectrum)
             angInd = np.argmax(ULA_spectrumMag,axis=1)
@@ -352,14 +531,19 @@ for numRamps in numChirpsDDMA:
             sllValdBc = np.zeros((numDopUniqRbin),dtype=np.float32)
             for ele1 in np.arange(numDopUniqRbin):
                 localMaxInd = argrelextrema(ULA_spectrumMagdBNorm[ele1,:],np.greater,axis=0,order=2)[0]
-                sllInd = np.argsort(ULA_spectrumMagdBNorm[ele1,localMaxInd])[-2] # 1st SLL
-                sllValdBc[ele1] = ULA_spectrumMagdBNorm[ele1,localMaxInd[sllInd]]
+                try:
+                    sllInd = np.argsort(ULA_spectrumMagdBNorm[ele1,localMaxInd])[-2] # 1st SLL
+                    sllValdBc[ele1] = ULA_spectrumMagdBNorm[ele1,localMaxInd[sllInd]]
+                except IndexError:
+                    sllValdBc[ele1] = 0
+
 
             angleSllArray = np.hstack((angleSllArray,sllValdBc))
 
             # if any(np.abs(errorAng)>3):
             #     print('Im here')
-            #     print('Velocities (mps):', np.round(objectVelocity_mps,2))
+            #     print('True Velocities (mps):', np.round(objectVelocity_mps,2))
+            #     print('Baseband Velocities (mps):', np.round(objectVelocity_baseBand_mpsBipolar,2))
             #     print('True Angles (deg):', np.round(objectAzAngle_deg,2))
             #     print('Estimated Angles (deg):', np.round(estAngDeg,2))
 
@@ -372,6 +556,24 @@ for numRamps in numChirpsDDMA:
             #         plt.xlabel('Angle (deg)')
             #         plt.ylabel('dB')
             #         plt.grid(True)
+
+            # if any(np.abs(sllValdBc)<7):
+            #     print('Im here')
+            #     print('True Velocities (mps):', np.round(objectVelocity_mps,2))
+            #     print('Baseband Velocities (mps):', np.round(objectVelocity_baseBand_mpsBipolar,2))
+            #     print('True Angles (deg):', np.round(objectAzAngle_deg,2))
+            #     print('Estimated Angles (deg):', np.round(estAngDeg,2))
+            #     print('Estimated SLLs (dBc):', np.round(sllValdBc,2))
+
+                # plt.figure(4, figsize=(20,10))
+                # plt.suptitle('MIMO ULA Angle spectrum')
+                # for ele in range(numDopUniqRbin):
+                #     plt.subplot(np.floor_divide(numDopUniqRbin-1,3)+1,min(3,numDopUniqRbin),ele+1)
+                #     plt.plot(angAxis_deg, 20*np.log10(np.abs(ULA_spectrum[ele,:])),lw=2)
+                #     plt.vlines(objectAzAngle_deg[ele], ymin = -170, ymax = -110)
+                #     plt.xlabel('Angle (deg)')
+                #     plt.ylabel('dB')
+                #     plt.grid(True)
 
 
         angleErrorMatrix_std[count_rampMC,count_snrMC] = np.std(errorAngArray)
@@ -442,6 +644,13 @@ for fig_numramps in np.arange(numChirpsMC):
     n+=1
 
 
+# """ Saving for plotting and debugging purposes"""
+# isolation = tx0tx1IsolationPowerdB
+# savepath = 'data_isolation\\withTxRxPhaseCoupling_AntennaCoupling_20dB_TxRx\\'
+# np.save(savepath + 'angleErrorMatrix_std_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_std)
+# np.save(savepath + 'angleErrorMatrix_percentile_isolation' + str(isolation) + 'dB.npy',angleErrorMatrix_percentile)
+# np.save(savepath + 'range_binSNRArray_isolation' + str(isolation) + 'dB.npy',range_binSNRArray)
+# np.save(savepath + 'angleSLLMatrix_median_isolation' + str(isolation) + 'dB.npy',angleSLLMatrix_median)
 
 
 
