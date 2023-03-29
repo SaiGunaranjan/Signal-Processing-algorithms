@@ -87,7 +87,7 @@ flagEnableICCoupling = 1 # 1 to enable , 0 to disable
 flagEnableAntennaCoupling = 0 # 1 to enable, 0 to disable
 flagEnableBoreSightCal = 1 # 1 to enable boresight cal, 0 to disable boresight cal
 
-phaseDemodMethod = 0
+phaseDemodMethod = 1
 if (phaseDemodMethod == 1):
     print('\n\nUsing the Tx demodulation method for DDMA\n\n')
 else:
