@@ -138,7 +138,7 @@ for binSNR in range_binSNRArray:
         """ Define Phase shifter settings"""
         ddma_radar.define_phaseShifter_settings() # This is also inside the montecarlo loop because, we randomize the phase shifter DNL for each run
         """ Define targets"""
-        ddma_radar.target_definitions_montecarlo()
+        ddma_radar.target_definitions()
         """ Introduce coupling"""
         ddma_radar.introduce_coupling()
         """ Generate DDMA signal"""

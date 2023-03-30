@@ -375,48 +375,17 @@ class DDMA_Radar:
 
     def target_definitions(self):
 
-
-        self.numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Dopplers in a given range bin
-        """ -1/+1 hypothesis is 3 times as likely as -2/2 hypothesis. 0 hypthesis is 2 times as likely as -1/+1 hypothesis """
-        self.DoppAmbNum = np.random.choice(self.DoppAmbigNumArr,p=[1/20, 3/20, 12/20, 3/20, 1/20])
-
         """ Target definition"""
         self.objectRange = np.random.uniform(10,self.maxRange-10) # 60.3 # m
         self.objectRangeBin = self.objectRange/self.rangeRes
+
+        self.numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Dopplers in a given range bin
 
         # objectVelocity_mps = np.random.uniform(-maxVelBaseband_mps-2*FsEquivalentVelocity, maxVelBaseband_mps+2*FsEquivalentVelocity, numDopUniqRbin)  #np.array([-10,-10.1]) #np.array([-10,23])# m/s
-        self.objectVelocity_mps = np.random.uniform(-self.maxVelBaseband_mps+(self.DoppAmbNum*self.FsEquivalentVelocity), \
-                                                -self.maxVelBaseband_mps+(self.DoppAmbNum*self.FsEquivalentVelocity)+self.FsEquivalentVelocity,self.numDopUniqRbin)
-        print('Velocities (mps):', np.round(self.objectVelocity_mps,2))
-        self.objectVelocity_baseBand_mps = np.mod(self.objectVelocity_mps, self.FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
-        self.objectVelocityBin = self.objectVelocity_baseBand_mps/self.velocityRes
 
-        self.objectAzAngle_deg = np.random.uniform(-50,50, self.numDopUniqRbin) #np.array([30,-10]) Theta plane angle
-        objectAzAngle_rad = (self.objectAzAngle_deg/360) * (2*np.pi)
+        # self.objectVelocity_mps = np.random.uniform(-self.maxVelBaseband_mps+(self.DoppAmbNum*self.FsEquivalentVelocity), \
+        #                                         -self.maxVelBaseband_mps+(self.DoppAmbNum*self.FsEquivalentVelocity)+self.FsEquivalentVelocity,self.numDopUniqRbin)
 
-        objectElAngle_deg = np.zeros((self.numDopUniqRbin,)) # phi=0 plane angle
-        objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
-
-        mimoPhasor, self.mimoPhasor_txrx, self.ulaInd = mimoPhasorSynth(self.platform, self.lamda, objectAzAngle_rad, objectElAngle_rad)
-
-        """ Cal target settings"""
-        calTargetRange = 5 # in m
-        self.calTargetRangeBin = np.round(calTargetRange/self.rangeRes).astype('int32')
-        self.calTargetRange = self.calTargetRangeBin*self.rangeRes # To ensure cal target falls exactly on a range bin
-        self.calTargetVelocityBin = np.array([0])
-        self.calTargetAzAngle_deg = np.array([0])
-        self.calTargetElAngle_deg = np.array([0]) # phi=0 plane angle
-
-        return
-
-
-    def target_definitions_montecarlo(self):
-
-        """ Target definition"""
-        self.objectRange = np.random.uniform(10,self.maxRange-10) # 60.3 # m
-        self.objectRangeBin = self.objectRange/self.rangeRes
-
-        self.numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Dopplers in a given range bin
         self.objectVelocity_mps = np.empty([0])
         for numVels in np.arange(self.numDopUniqRbin):
             """ -1/+1 hypothesis is 3 times as likely as -2/2 hypothesis. 0 hypthesis is 2 times as likely as -1/+1 hypothesis """
@@ -425,6 +394,7 @@ class DDMA_Radar:
                                         -self.maxVelBaseband_mps+(DoppAmbNum*self.FsEquivalentVelocity)+self.FsEquivalentVelocity,1)
             self.objectVelocity_mps = np.append(self.objectVelocity_mps,speedEachTarget)
 
+        # print('Velocities (mps):', np.round(self.objectVelocity_mps,2))
         self.objectVelocity_baseBand_mps = np.mod(self.objectVelocity_mps, self.FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
         self.objectVelocityBin = self.objectVelocity_baseBand_mps/self.velocityRes
         self.objectVelocity_baseBand_mpsBipolar = self.objectVelocity_baseBand_mps
@@ -447,7 +417,6 @@ class DDMA_Radar:
         self.calTargetElAngle_deg = np.array([0]) # phi=0 plane angle
 
         return
-
 
 
     def ddma_signal_generation(self, binSNR):
