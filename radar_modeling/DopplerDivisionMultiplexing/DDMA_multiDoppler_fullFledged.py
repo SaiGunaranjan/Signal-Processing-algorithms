@@ -73,7 +73,6 @@ and so on. I will try to add these models into the DDMA scheme one by one.
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mimoPhasorSynthesis import mimoPhasorSynth # loading the antenna corodinates for the steradian RADAR platforms
 from ddma_class import DDMA_Radar
 
 
