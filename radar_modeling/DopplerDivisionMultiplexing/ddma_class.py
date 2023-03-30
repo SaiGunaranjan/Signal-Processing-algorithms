@@ -75,7 +75,7 @@ and so on. I will try to add these models into the DDMA scheme one by one.
 import numpy as np
 from mimoPhasorSynthesis import mimoPhasorSynth # loading the antenna corodinates for the steradian RADAR platforms
 
-
+np.random.seed(10) # This is the true seed and not in the wrapper function
 
 class DDMA_Radar:
 
@@ -400,11 +400,18 @@ class DDMA_Radar:
         self.calTargetAzAngle_deg = np.array([0])
         self.calTargetElAngle_deg = np.array([0]) # phi=0 plane angle
 
+        return
 
 
 
-    def ddma_signal_generation(self, signalphasor):
 
+    def ddma_signal_generation(self, binSNR):
+
+        signalPowerdBFs = self.noiseFloor_perBin + binSNR
+        signalPower = 10**(signalPowerdBFs/10)
+        signalAmplitude = np.sqrt(signalPower)
+        signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
+        signalphasor = signalAmplitude*signalPhase
 
         self.rangeTerm = signalphasor*np.exp(1j*((2*np.pi*self.objectRangeBin)/self.numSamp)*np.arange(self.numSamp))
         self.dopplerTerm = np.exp(1j*((2*np.pi*self.objectVelocityBin[:,None])/self.numRamps)*np.arange(self.numRamps)[None,:]) # [number of Dopplers/range, numRamps]
@@ -433,11 +440,8 @@ class DDMA_Radar:
 
 
         signal = np.sum(phaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
-
-        if (self.flagEnableBoreSightCal == 1):
-            self.calTargetsignal = self.ddma_calsignal_construction()
-        else:
-            self.calTargetsignal = 0
+        """ Construct cal target"""
+        self.ddma_calsignal_construction()
 
         signal += self.calTargetsignal # Adding the cal taregt signal to the actual signal
 
@@ -455,26 +459,31 @@ class DDMA_Radar:
         noise = noise.reshape(self.numRamps, self.numRx, self.numSamp)
         self.signal = signal + noise
 
+        return
 
 
     def ddma_calsignal_construction(self):
 
-        calrangeTerm = np.exp(1j*((2*np.pi*self.calTargetRangeBin)/self.numSamp)*np.arange(self.numSamp))
-        caldopplerTerm = np.exp(1j*((2*np.pi*self.calTargetVelocityBin[:,None])/self.numRamps)*np.arange(self.numRamps)[None,:]) # [number of Dopplers/range, numRamps]
-        calTargetAzAngle_rad = (self.calTargetAzAngle_deg/360) * (2*np.pi)
-        calTargetElAngle_rad = (self.calTargetElAngle_deg/360) * (2*np.pi)
-        _, mimoPhasor_txrx_caltarget, _ = mimoPhasorSynth(self.platform, self.lamda, calTargetAzAngle_rad, calTargetElAngle_rad)
-        caltargetrxSignal = mimoPhasor_txrx_caltarget[:,0,:]
-        calTargettxSignal = mimoPhasor_txrx_caltarget[:,:,0]
+        if (self.flagEnableBoreSightCal == 1):
+            calrangeTerm = 0.125*np.exp(1j*((2*np.pi*self.calTargetRangeBin)/self.numSamp)*np.arange(self.numSamp))
+            caldopplerTerm = np.exp(1j*((2*np.pi*self.calTargetVelocityBin[:,None])/self.numRamps)*np.arange(self.numRamps)[None,:]) # [number of Dopplers/range, numRamps]
+            calTargetAzAngle_rad = (self.calTargetAzAngle_deg/360) * (2*np.pi)
+            calTargetElAngle_rad = (self.calTargetElAngle_deg/360) * (2*np.pi)
+            _, mimoPhasor_txrx_caltarget, _ = mimoPhasorSynth(self.platform, self.lamda, calTargetAzAngle_rad, calTargetElAngle_rad)
+            caltargetrxSignal = mimoPhasor_txrx_caltarget[:,0,:]
+            calTargettxSignal = mimoPhasor_txrx_caltarget[:,:,0]
 
-        calTargetphaseCodedTxSignal = caldopplerTerm[:,None,:] * self.signal_phaseCode_couplingMatrix_txWeights[None,:,:] * calTargettxSignal[:,:,None] # [numDopp, numTx, numRamps]
-        calTargetphaseCodedTxRxSignal = calTargetphaseCodedTxSignal[:,:,:,None]*caltargetrxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
-        calTargetphaseCodedTxRxSignal_withRangeTerm = calrangeTerm[None,None,None,None,:] * calTargetphaseCodedTxRxSignal[:,:,:,:,None]
-        calTargetsignal = np.sum(calTargetphaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
+            calTargetphaseCodedTxSignal = caldopplerTerm[:,None,:] * self.signal_phaseCode_couplingMatrix_txWeights[None,:,:] * calTargettxSignal[:,:,None] # [numDopp, numTx, numRamps]
+            calTargetphaseCodedTxRxSignal = calTargetphaseCodedTxSignal[:,:,:,None]*caltargetrxSignal[:,None,None,:] #[numDopp, numTx, numRamps, numTx, numRx]
+            calTargetphaseCodedTxRxSignal_withRangeTerm = calrangeTerm[None,None,None,None,:] * calTargetphaseCodedTxRxSignal[:,:,:,:,None]
+            self.calTargetsignal = np.sum(calTargetphaseCodedTxRxSignal_withRangeTerm, axis=(0,1)) # [numRamps,numRx, numSamp]
+        else:
+            self.calTargetsignal = 0
 
-        return calTargetsignal
 
-    def ddma_signal_processing(self):
+        return
+
+    def ddma_range_processing(self):
 
 
         signal_rangeWin = self.signal*np.hanning(self.numSamp)[None,None,:]
@@ -487,24 +496,10 @@ class DDMA_Radar:
         else:
             rangeMoved = self.objectRange + 0*self.objectVelocity_mps[:,None]*self.interRampTime*np.arange(self.numRamps)[None,:]
         rangeBinsMovedfrac = rangeMoved/self.rangeRes + 0*np.random.uniform(-0.5,0.5,self.numDopUniqRbin)[:,None]
-        rangeBinsMoved = np.floor(rangeBinsMovedfrac).astype('int32')
-
-
-        self.rangeBinsToSample = rangeBinsMoved
+        self.rangeBinsToSample = np.floor(rangeBinsMovedfrac).astype('int32')
         self.chirpSamp_givenRangeBin = self.signal_rfft[np.arange(self.numRamps)[None,:],:,self.rangeBinsToSample]
 
-        """ Correct for Range bin migration induced phase jump and frequency drift"""
-        self.dopplerBinOffset_rbm = self.rbm_phase_freqbin_correction()
-
-        """ MIMO coefficient estimation """
-        self.mimo_coefficient_estimation()
-
-        """ Bore-sight caliberation"""
-        self.extract_boresight_cal()
-
-        """ Angle estimation"""
-        self.angle_estimation()
-
+        return
 
     def rbm_phase_freqbin_correction(self):
 
@@ -527,15 +522,15 @@ class DDMA_Radar:
                 Currently, I'm using method 2'
             """
             rbmModulationAnalogFreq = (self.chirpBW/self.lightSpeed)*self.objectVelocity_mps
-            dopplerBinOffset_rbm = (rbmModulationAnalogFreq/self.chirpSamplingRate)*self.numDoppFFT
+            self.dopplerBinOffset_rbm = (rbmModulationAnalogFreq/self.chirpSamplingRate)*self.numDoppFFT
 
             # rbmModulationDigitalFreq = (rbmModulationAnalogFreq/chirpSamplingRate)*2*np.pi
             # rbmModulationCorrectionTerm = np.exp(-1j*rbmModulationDigitalFreq[:,None]*np.arange(numRamps)[None,:])
             # self.chirpSamp_givenRangeBin = self.chirpSamp_givenRangeBin*rbmModulationCorrectionTerm[:,:,None]
         else:
-            dopplerBinOffset_rbm = np.zeros((self.numDopUniqRbin,))
+            self.dopplerBinOffset_rbm = np.zeros((self.numDopUniqRbin,))
 
-        return dopplerBinOffset_rbm
+        return
 
 
     def mimo_coefficient_estimation(self):

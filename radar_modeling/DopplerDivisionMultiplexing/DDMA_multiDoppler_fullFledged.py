@@ -76,28 +76,23 @@ import matplotlib.pyplot as plt
 from mimoPhasorSynthesis import mimoPhasorSynth # loading the antenna corodinates for the steradian RADAR platforms
 from ddma_class import DDMA_Radar
 
-np.random.seed(10)
+
 plt.close('all')
 
-
+""" Flags to determine setttings to be used in DDMA scheme"""
 flagRBM = 1 # 1 to enabled range bin migration term and 0 to disable
 flagEnableICCoupling = 1 # 1 to enable , 0 to disable
 flagEnableAntennaCoupling = 0 # 1 to enable, 0 to disable
 flagEnableBoreSightCal = 1 # 1 to enable boresight cal, 0 to disable boresight cal
-phaseDemodMethod = 0 #  1 for Tx demodulation method, 0 for modulated Doppler based sampling,
+phaseDemodMethod = 1 #  1 for Tx demodulation method, 0 for modulated Doppler based sampling,
 platform = 'SRIR16' # 'SRIR16', 'SRIR256', 'SRIR144'
 
-
+""" Initialize DDMA object"""
 ddma_radar = DDMA_Radar(flagEnableICCoupling, flagEnableAntennaCoupling, platform, flagRBM, \
                  phaseDemodMethod, flagEnableBoreSightCal)
 
-
 binSNR = 10 # dB
-signalPowerdBFs = ddma_radar.noiseFloor_perBin + binSNR
-signalPower = 10**(signalPowerdBFs/10)
-signalAmplitude = np.sqrt(signalPower)
-signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
-signalphasor = signalAmplitude*signalPhase
+
 
 """ Define Phase shifter settings"""
 ddma_radar.define_phaseShifter_settings()
@@ -106,12 +101,22 @@ ddma_radar.target_definitions()
 """ Introduce coupling"""
 ddma_radar.introduce_coupling()
 """ Generate DDMA signal"""
-ddma_radar.ddma_signal_generation(signalphasor)
+ddma_radar.ddma_signal_generation(binSNR)
 
 """ DDMA signal processing"""
-ddma_radar.ddma_signal_processing()
+ddma_radar.ddma_range_processing()
+""" Correct for Range bin migration induced phase jump and frequency drift"""
+ddma_radar.rbm_phase_freqbin_correction()
+""" MIMO coefficient estimation """
+ddma_radar.mimo_coefficient_estimation()
+""" Bore-sight caliberation"""
+ddma_radar.extract_boresight_cal()
+""" Angle estimation"""
+ddma_radar.angle_estimation()
 
 
+
+""" Processing for plots"""
 signalFFTShift = ddma_radar.signalFFT #np.fft.fftshift(signalFFT, axes= (0,))
 signalFFTShiftSpectrum = np.abs(signalFFTShift)**2
 signalMagSpectrum = 10*np.log10(np.abs(signalFFTShiftSpectrum))
