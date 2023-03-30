@@ -75,9 +75,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from ddma_class import DDMA_Radar
 
+""" To fix the seed, enable in the ddma class"""
 
 plt.close('all')
-
 """ Flags to determine setttings to be used in DDMA scheme"""
 flagRBM = 1 # 1 to enabled range bin migration term and 0 to disable
 flagEnableICCoupling = 1 # 1 to enable , 0 to disable

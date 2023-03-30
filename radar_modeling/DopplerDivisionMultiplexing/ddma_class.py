@@ -75,7 +75,7 @@ and so on. I will try to add these models into the DDMA scheme one by one.
 import numpy as np
 from mimoPhasorSynthesis import mimoPhasorSynth # loading the antenna corodinates for the steradian RADAR platforms
 
-np.random.seed(10) # This is the true seed and not in the wrapper function
+# np.random.seed(10) # This is the true seed and not in the wrapper script
 
 class DDMA_Radar:
 
@@ -158,19 +158,25 @@ class DDMA_Radar:
             self.numRx = 4
             self.numMIMO = 16 # All MIMO in azimuth only
             self.numRamps = 128 # Assuming 128 ramps for both detection and MIMO segments
-            self.numChirpsMonteCarlo = np.array([128])
+            """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and
+            hence periodicity is significantly reduced"""
+            self.phaseStepPerTx_deg = 89#29#29.3 This should ideally be 360/numTx_simult + delta, so that the Dopplers are spaced uniformly throughout the Doppler spectrum
         elif (self.platform == 'SRIR144'):
             self.numTx_simult = 12
             self.numRx = 12
             self.numMIMO = 48
             self.numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
-            self.numChirpsMonteCarlo = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
+            """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and
+            hence periodicity is significantly reduced"""
+            self.phaseStepPerTx_deg = 29#29#29.3 This should ideally be 360/numTx_simult + delta, so that the Dopplers are spaced uniformly throughout the Doppler spectrum
         elif (self.platform == 'SRIR256'):
             self.numTx_simult = 13
             self.numRx = 16
             self.numMIMO = 74
             self.numRamps = 140 # Assuming 140 ramps for both detection and MIMO segments
-            self.numChirpsMonteCarlo = np.arange(50,190,20) # Montecarlo on number of chirps for DDMA MIMO
+            """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and
+            hence periodicity is significantly reduced"""
+            self.phaseStepPerTx_deg = 29#29#29.3 This should ideally be 360/numTx_simult + delta, so that the Dopplers are spaced uniformly throughout the Doppler spectrum
 
 
         self.maxVelBaseband_mps = (self.chirpSamplingRate/2) * (self.lamda/2) # m/s
@@ -319,6 +325,8 @@ class DDMA_Radar:
 
         print('Velocity resolution = {0:.2f} m/s'.format(self.velocityRes))
 
+        print('Noise Floor set by DNL: {} dB'.format(np.round(self.noiseFloorSetByDNL)))
+
         return
 
 
@@ -328,8 +336,7 @@ class DDMA_Radar:
         self.numBitsPhaseShifter = 7
         self.numPhaseCodes = 2**(self.numBitsPhaseShifter)
         self.DNL = 360/(self.numPhaseCodes) # DNL in degrees
-        """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
-        self.phaseStepPerTx_deg = 89#29#29.3 This should ideally be 360/numTx_simult + delta, so that the Dopplers are spaced uniformly throughout the Doppler spectrum
+
         self.phaseStepPerRamp_deg = np.arange(self.numTx_simult)*self.phaseStepPerTx_deg # Phase step per ramp per Tx
         self.phaseStepPerRamp_rad = (self.phaseStepPerRamp_deg/360)*2*np.pi
         phaseShifterCodes = self.DNL*np.arange(self.numPhaseCodes)
@@ -340,7 +347,7 @@ class DDMA_Radar:
 
         DNL_rad = (self.DNL/180) * np.pi
         self.noiseFloorSetByDNL = 10*np.log10((DNL_rad)**2/12) - 10*np.log10(self.numRamps) + 10*np.log10(self.numTx_simult) # DNL Noise floor raises as 10log10(numSimulTx)
-        # print('Noise Floor set by DNL: {} dB'.format(np.round(noiseFloorSetByDNL)))
+
 
 
         """ NOT USING THE BELOW QUADRATIC PHASE in this DDMA MIMO scheme
@@ -402,6 +409,44 @@ class DDMA_Radar:
 
         return
 
+
+    def target_definitions_montecarlo(self):
+
+        """ Target definition"""
+        self.objectRange = np.random.uniform(10,self.maxRange-10) # 60.3 # m
+        self.objectRangeBin = self.objectRange/self.rangeRes
+
+        self.numDopUniqRbin = int(np.random.randint(low=1, high=4, size=1)) #2 # Number of Dopplers in a given range bin
+        self.objectVelocity_mps = np.empty([0])
+        for numVels in np.arange(self.numDopUniqRbin):
+            """ -1/+1 hypothesis is 3 times as likely as -2/2 hypothesis. 0 hypthesis is 2 times as likely as -1/+1 hypothesis """
+            DoppAmbNum = np.random.choice(self.DoppAmbigNumArr,p=[1/20, 3/20, 12/20, 3/20, 1/20])
+            speedEachTarget = np.random.uniform(-self.maxVelBaseband_mps+(DoppAmbNum*self.FsEquivalentVelocity), \
+                                        -self.maxVelBaseband_mps+(DoppAmbNum*self.FsEquivalentVelocity)+self.FsEquivalentVelocity,1)
+            self.objectVelocity_mps = np.append(self.objectVelocity_mps,speedEachTarget)
+
+        self.objectVelocity_baseBand_mps = np.mod(self.objectVelocity_mps, self.FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
+        self.objectVelocityBin = self.objectVelocity_baseBand_mps/self.velocityRes
+        self.objectVelocity_baseBand_mpsBipolar = self.objectVelocity_baseBand_mps
+        self.objectVelocity_baseBand_mpsBipolar[self.objectVelocity_baseBand_mpsBipolar>=self.FsEquivalentVelocity/2] -= self.FsEquivalentVelocity
+
+        self.objectAzAngle_deg = np.random.uniform(-50,50, self.numDopUniqRbin) #np.array([30,-10]) Theta plane angle
+        objectAzAngle_rad = (self.objectAzAngle_deg/360) * (2*np.pi)
+
+        objectElAngle_deg = np.zeros((self.numDopUniqRbin,)) # phi=0 plane angle
+        objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
+
+        mimoPhasor, self.mimoPhasor_txrx, self.ulaInd = mimoPhasorSynth(self.platform, self.lamda, objectAzAngle_rad, objectElAngle_rad)
+
+        """ Cal target settings"""
+        calTargetRange = 5 # in m
+        self.calTargetRangeBin = np.round(calTargetRange/self.rangeRes).astype('int32')
+        self.calTargetRange = self.calTargetRangeBin*self.rangeRes # To ensure cal target falls exactly on a range bin
+        self.calTargetVelocityBin = np.array([0])
+        self.calTargetAzAngle_deg = np.array([0])
+        self.calTargetElAngle_deg = np.array([0]) # phi=0 plane angle
+
+        return
 
 
 
