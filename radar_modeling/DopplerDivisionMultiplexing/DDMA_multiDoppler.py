@@ -73,9 +73,10 @@ and so on. I will try to add these models into the DDMA scheme one by one.
 
 import numpy as np
 import matplotlib.pyplot as plt
+""" Fixing the seed before calling the DDMA class"""
+np.random.seed(10) # Initializing the seed for the DDMA class here. Defining the seed at this point(before the call to the DDMA class), freezes the settings.
 from ddma_class import DDMA_Radar
 
-""" To fix the seed, enable in the ddma class"""
 
 plt.close('all')
 """ Flags to determine setttings to be used in DDMA scheme"""
