@@ -473,6 +473,28 @@ class DDMA_Radar:
         noise = noise.reshape(self.numRamps, self.numRx, self.numSamp)
         self.signal = signal + noise
 
+        # """ Rx coupling"""
+        # """ Right now introducing Rx IC isolation followed by Rx antenna isolation and then adding noise.
+        # This is ideally not the correct way.
+
+        # First need to introduce Rx antenna coupling followed by noise addition and then Rx IC coupling.
+        # Need to make this change"""
+
+        # """ Also need to introduce arbitrary phases in Rxs and let the bore-sight caliberation handle this."""
+        # """ 1. Rx Antenna coupling to the received signal
+        #     2. Add noise to the received signal at LNA
+        #     3. Rx IC coupling to the LNA signal (post addition of noise)
+        # """
+        # """ 1. Rx antenna coupling"""
+        # signal = np.matmul(self.rxAntennaisolationMatrix[None,:,:],signal) # Rx Antenna coupling x Rx signal
+        # """ 2. Add noise"""
+        # noise = (self.sigma/np.sqrt(2))*np.random.randn(self.numRamps*self.numRx*self.numSamp) + 1j*(self.sigma/np.sqrt(2))*np.random.randn(self.numRamps*self.numRx*self.numSamp)
+        # noise = noise.reshape(self.numRamps, self.numRx, self.numSamp)
+        # signal = signal + noise
+        # """ 3. Rx IC coupling"""
+        # self.signal = np.matmul(self.rxisolationMatrix[None,:,:],signal) # Rx IC coupling x  Rx Antenna coupling x Rx signal
+
+
         return
 
 
