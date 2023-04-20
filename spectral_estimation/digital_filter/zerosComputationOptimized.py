@@ -6,6 +6,32 @@ Created on Wed Apr 19 13:38:47 2023
 """
 
 
+"""
+Compute Zeros of a sinusoid transfer function in an optimized manner
+
+In this script, I have developed a simple method of computing the zeros of a sinusoid transfer function.
+Ideally, in order to find the zeros of an FIR transfer function, we need to compute Z transform of the transfer function/impulse response
+and then solve for the roots of the polynomial in Z inverse to obtain the roots/zeros of the transfer function.
+However, if the signal/impulse response/transfer function is a sinusoid, we don't need to solve for the roots
+of a polynomial(which is a compute heavy operation). Instead, we can find them in a simple manner.
+We know that if we have a sinusoidal signal of digital frequency w and of N samples, if we perform an FFT,
+the zeros are separated by 2*pi/N. These zeros/nulls will be visible with a simple N point FFT only for those sinusoidal signals
+whose digital frequency is an integer multiple of 2*pi/N. For sinusoidal signals whose digital frequency is not an integer multiple
+of 2*pi/N, a simple N point FFT will not reveal the nulls or zeros. To visualize the zeros/nulls, we need to perform an over sampled FFT.
+This is because, if the digital frequency doesn't fall on a bin, then the zeros/nulls which occur at a separation of 2*pi/N from
+the signal peak are also not evaluted when a simple N point FFT is performed. However, when an oversampled FFT is performed,
+we are essentailly evaluating the spectrum on a much finer grid and hence we will inevitably end up evaluating the spectrum at
+a frequency point which is 2*pi/N away from the signal peak as well. Then we will start observing the nulls/zeros.
+Since this is establised, to compute the zeros for the sinusoidal transfer function of N samples, all we need to do is
+to add integer multiples of 2*pi/N to the signal digital frequency in order to obtain the zeros.
+If the signal has a length of N, then there will be N-1 zeros. So, if the sinusoidal signal has a digital frequency w, then,
+ the zeros will be w + 2*pi/N * n, where n goes from (1,N-1). If n is 0 or N, then we land on the signal frequency and hence
+ these points are avoided. Prevously, to compute the zeros of even a sinusoidal transfer function, I was calling the tf2zpk function
+ from the scipy.signal library. This function essentially computes the Z transform of the signal and then solves for the roots of
+ the polynomial. Now, I have understood the structure of a sinusoidal sigal and hence compute the zeros in a trivial manner.
+ This reduces compute significant. This is a new trick I have realized !
+"""
+
 import numpy as np
 import scipy.signal as sig
 import matplotlib.pyplot as plt
@@ -60,7 +86,7 @@ zerosSimpleCompute = (2*np.pi/nDopp)*np.arange(nDopp)[None,:] + 2*np.pi*np.arang
 # zerosSimpleComputePhasor = np.exp(-1j*zerosSimpleCompute)
 zerosSimpleComputePhasor = np.cos(zerosSimpleCompute) - 1j*np.sin(zerosSimpleCompute)
 
-ind = 897
+ind = 897 # Showing the result with one index of the vandermonde matrix. But the result is valid for any sinusoidal signal
 
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.title('LUT zeros vs dynamically computed zeros using simple formula')
@@ -72,12 +98,5 @@ plt.xlabel('Real')
 plt.ylabel('Imag')
 plt.legend()
 
-# plt.figure(1,figsize=(20,10),dpi=200)
-# # plt.title('Zeros of 1st row of pseudo inverse matrix')
-# plt.plot(zerosFilterResponseSuperSet[:,ind].real, zerosFilterResponseSuperSet[:,ind].imag, 'o', fillstyle='none', ms=7, color = 'b', lw=14, alpha=0.5, label='Solved zeros')
-# plt.plot(zerosSimpleComputePhasor[:,ind].real, zerosSimpleComputePhasor[:,ind].imag, 'o', fillstyle='none', ms=7, color='red', label='Computed Zeros')
-# plt.axis('equal')
-# plt.grid(True)
-# plt.xlabel('Real')
-# plt.ylabel('Imag')
-# plt.legend()
+""" I'm not computing the error between the zeros compued by library function and my method, since the order of the zeros might differ
+in the 2 methods"""
