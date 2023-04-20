@@ -30,6 +30,9 @@ If the signal has a length of N, then there will be N-1 zeros. So, if the sinuso
  from the scipy.signal library. This function essentially computes the Z transform of the signal and then solves for the roots of
  the polynomial. Now, I have understood the structure of a sinusoidal sigal and hence compute the zeros in a trivial manner.
  This reduces compute significant. This is a new trick I have realized !
+
+Note: This trick is valid only for sinusoidal transfer functions (single sinusoidal signal of N samples)
+
 """
 
 import numpy as np
