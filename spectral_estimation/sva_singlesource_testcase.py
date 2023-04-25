@@ -50,7 +50,8 @@ main lobe width.
 
 import numpy as np
 import matplotlib.pyplot as plt
-import spectral_estimation_lib as spec_est
+from spectral_estimation_lib import spatially_variant_apodization_bruteforce, spatially_variant_apodization_optimized
+from spectral_estimation_lib import music_backward as music
 
 np.random.seed(30)
 
@@ -99,14 +100,14 @@ osrFact = spectrumGridOSRFact
 numFFTOSR = spectrumGridOSRFact*num_samples
 
 """ SVA brute force"""
-svaSpectralEstimatordB_unoptimal = spec_est.spatially_variant_apodization_bruteforce(received_signal,numFFTOSR)
+svaSpectralEstimatordB_unoptimal = spatially_variant_apodization_bruteforce(received_signal,numFFTOSR)
 
 """ SVA Optimized"""
-svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB = spec_est.spatially_variant_apodization_optimized(received_signal, osrFact)
+svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB = spatially_variant_apodization_optimized(received_signal, osrFact)
 
 
 """ MUSIC"""
-pseudo_spectrum = spec_est.music_backward(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
+pseudo_spectrum = music(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
 pseudo_spectrum = pseudo_spectrum/np.amax(pseudo_spectrum)
 
 
