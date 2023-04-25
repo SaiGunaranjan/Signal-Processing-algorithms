@@ -97,7 +97,7 @@ magnitude_spectrum_fft_hann -= np.amax(magnitude_spectrum_fft_hann,axis=0)[None,
 
 """ SVA"""
 osrFact = spectrumGridOSRFact
-numFFTOSR = spectrumGridOSRFact*num_samples
+numFFTOSR = osrFact*num_samples
 
 """ SVA brute force"""
 svaSpectralEstimatordB_unoptimal = spatially_variant_apodization_bruteforce(received_signal,numFFTOSR)
