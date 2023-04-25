@@ -46,6 +46,14 @@ So there are N complex divisions corresponding to each of the N frequency points
 I have implemented both the brute force method as well as the optimized method of SVA and have generated the results.
 Both thse methods seem to be closely matching. The results are on expected lines with the SVA offering the best SLLS as well as
 main lobe width.
+
+Currently I have tested and observed the magnitude spectrum performance of SVA. Need to check if SVA can also be used to extract
+the phase information from the complex spectrum. In other words, is SVA (optimized version) a spectral estimator like APES or
+a pseudo spectral estimator like MUSIC which gives info about the sinusoids present in the signal but not the phase of the sinusoids.
+One thing is clear, the SVA-brute force is a pseudo spectral estimator since we pick the maximum energy across several windows
+for each frequency point. SInce it operates on the energy to obatin the final spectrum, it is a pseudo spectral estimator. But I need
+to check if SVA-optimized is a spectral estimator which gives the phase of the sinusoid as well.
+
 """
 
 import numpy as np
