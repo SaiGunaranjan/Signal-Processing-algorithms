@@ -94,37 +94,16 @@ magnitude_spectrum_fft -= np.amax(magnitude_spectrum_fft,axis=0)[None,:]
 magnitude_spectrum_fft_hann = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal*np.hanning(num_samples)[:,None],axis=0, n=len(digital_freq_grid))/received_signal.shape[0],axes=0)))
 magnitude_spectrum_fft_hann -= np.amax(magnitude_spectrum_fft_hann,axis=0)[None,:]
 
-
-""" SVA brute force"""
-alpha = np.linspace(0,0.5,100)
-svaWindow = 1 - 2*alpha[None,:]*np.cos(2*np.pi*np.arange(num_samples)[:,None]/num_samples)
-signalWindowed = received_signal * svaWindow
-svaSignalFFT = np.fft.fft(signalWindowed,n=len(digital_freq_grid),axis=0)/num_samples
-svaSignalFFTShift = np.fft.fftshift(svaSignalFFT,axes=(0,))
-svaSignalPsd = np.abs(svaSignalFFTShift)**2
-svaSignalPsdNormalized = svaSignalPsd/np.amax(svaSignalPsd,axis=0)[None,:]
-svaSpectralEstimator = np.amin(svaSignalPsdNormalized,axis=1)
-svaSpectralEstimatordB = 10*np.log10(svaSpectralEstimator)
-
-""" SVA Optimized"""
-received_signal_sva = np.squeeze(received_signal)
+""" SVA"""
 osrFact = spectrumGridOSRFact
 numFFTOSR = spectrumGridOSRFact*num_samples
-signalFFT = np.fft.fft(received_signal_sva,n=len(digital_freq_grid),axis=0)/num_samples # Is normalization required here for sva
-Xk = signalFFT
-kmKInd = np.arange(0,numFFTOSR) - osrFact
-kmKInd[kmKInd<0] += numFFTOSR
-XkmK = Xk[kmKInd]
-kpKInd = np.arange(0,numFFTOSR) + osrFact
-kpKInd[kpKInd>numFFTOSR-1] -= numFFTOSR
-XkpK = Xk[kpKInd]
-alphaK = np.real(Xk/(XkmK+XkpK))
-alphaK[alphaK<0] = 0
-alphaK[alphaK>0.5] = 0.5
-svaspectrum = Xk - alphaK*(XkmK+XkpK)
-svaOptimalSpectrum = np.fft.fftshift(svaspectrum)
-svaOptimalSpectrum = 20*np.log10(np.abs(svaOptimalSpectrum))
-svaOptimalSpectrum -= np.amax(svaOptimalSpectrum)
+
+""" SVA brute force"""
+svaSpectralEstimatordB_unoptimal = spec_est.spatially_variant_apodization_bruteforce(received_signal,numFFTOSR)
+
+""" SVA Optimized"""
+svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB = spec_est.spatially_variant_apodization_optimized(received_signal, osrFact)
+
 
 """ MUSIC"""
 pseudo_spectrum = spec_est.music_backward(received_signal, num_sources, corr_mat_model_order, digital_freq_grid)
@@ -135,8 +114,8 @@ plt.figure(1,figsize=(20,10))
 plt.title('Spatially Variant Apodization')
 plt.plot(angleGrid, magnitude_spectrum_fft, label = 'FFT with rectangular window (raised cosine with alpha=0)')
 plt.plot(angleGrid, magnitude_spectrum_fft_hann, label = 'FFT with hanning window (raised cosine with alpha=0.5)')
-plt.plot(angleGrid, svaSpectralEstimatordB, label = 'Spatially Variant Apodization',lw=6,alpha=0.5)
-plt.plot(angleGrid, svaOptimalSpectrum, label = 'Spatially Variant Apodization - optimized',color='k')
+plt.plot(angleGrid, svaSpectralEstimatordB_unoptimal, label = 'Spatially Variant Apodization',lw=6,alpha=0.5)
+plt.plot(angleGrid, svaOptimalMagSpectrumdB, label = 'Spatially Variant Apodization - optimized',color='k')
 plt.vlines(-source_angle_deg,-80,20, alpha=0.3,label = 'Ground truth')
 plt.xlabel('Angle(deg)')
 plt.legend()
@@ -146,8 +125,8 @@ plt.figure(2,figsize=(20,10))
 plt.title('Spatially Variant Apodization vs MUSIC')
 plt.plot(angleGrid, magnitude_spectrum_fft, label = 'FFT with rectangular window (raised cosine with alpha=0)')
 plt.plot(angleGrid, magnitude_spectrum_fft_hann, label = 'FFT with hanning window (raised cosine with alpha=0.5)')
-plt.plot(angleGrid, svaSpectralEstimatordB, label = 'Spatially Variant Apodization',lw=6,alpha=0.5)
-plt.plot(angleGrid, svaOptimalSpectrum, label = 'Spatially Variant Apodization - optimized',color='k')
+plt.plot(angleGrid, svaSpectralEstimatordB_unoptimal, label = 'Spatially Variant Apodization',lw=6,alpha=0.5)
+plt.plot(angleGrid, svaOptimalMagSpectrumdB, label = 'Spatially Variant Apodization - optimized',color='k')
 plt.plot(angleGrid, 10*np.log10(pseudo_spectrum), label='MUSIC')
 plt.vlines(-source_angle_deg,-80,20, alpha=0.3,label = 'Ground truth')
 plt.xlabel('Angle(deg)')

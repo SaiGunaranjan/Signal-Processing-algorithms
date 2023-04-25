@@ -394,7 +394,49 @@ def iaa_recursive_levinson_temp(received_signal, digital_freq_grid, iterations):
     return spectrum
 
 
+def spatially_variant_apodization_bruteforce(received_signal,numFFTOSR):
 
+    """
+    received_signal should be a column vector e.g: 32 x 1
+
+    """
+    num_samples = received_signal.shape[0]
+    alpha = np.linspace(0,0.5,100)
+    svaWindow = 1 - 2*alpha[None,:]*np.cos(2*np.pi*np.arange(num_samples)[:,None]/num_samples)
+    signalWindowed = received_signal * svaWindow
+    svaSignalFFT = np.fft.fft(signalWindowed,n=numFFTOSR,axis=0)/num_samples
+    svaSignalFFTShift = np.fft.fftshift(svaSignalFFT,axes=(0,))
+    svaSignalPsd = np.abs(svaSignalFFTShift)**2
+    svaSignalPsdNormalized = svaSignalPsd/np.amax(svaSignalPsd,axis=0)[None,:]
+    svaSpectralEstimator = np.amin(svaSignalPsdNormalized,axis=1)
+    svaSpectralEstimatordB_unoptimal = 10*np.log10(svaSpectralEstimator)
+
+    return svaSpectralEstimatordB_unoptimal
+
+
+def spatially_variant_apodization_optimized(received_signal, osrFact):
+
+
+    num_samples = received_signal.shape[0]
+    received_signal_sva = np.squeeze(received_signal)
+    numFFTOSR = osrFact*num_samples
+    signalFFT = np.fft.fft(received_signal_sva,n=numFFTOSR,axis=0)/num_samples # Is normalization required here for sva
+    Xk = signalFFT
+    kmKInd = np.arange(0,numFFTOSR) - osrFact
+    kmKInd[kmKInd<0] += numFFTOSR
+    XkmK = Xk[kmKInd]
+    kpKInd = np.arange(0,numFFTOSR) + osrFact
+    kpKInd[kpKInd>numFFTOSR-1] -= numFFTOSR
+    XkpK = Xk[kpKInd]
+    alphaK = np.real(Xk/(XkmK+XkpK))
+    alphaK[alphaK<0] = 0
+    alphaK[alphaK>0.5] = 0.5
+    svaspectrum = Xk - alphaK*(XkmK+XkpK)
+    svaOptimalComplexSpectrumfftshifted = np.fft.fftshift(svaspectrum)
+    svaOptimalMagSpectrumdB = 20*np.log10(np.abs(svaOptimalComplexSpectrumfftshifted))
+    svaOptimalMagSpectrumdB -= np.amax(svaOptimalMagSpectrumdB)
+
+    return svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB
 
 
 
