@@ -5,6 +5,38 @@ Created on Mon Jan  9 22:22:48 2023
 @author: Sai Gunaranjan
 """
 
+"""
+Fix bug in generation and application of Doppler correction
+
+In this script, I have fixed a bug in the generation and application of the Doppler correction phase term for the MIMO syntesis.
+This debug helped me to thoroughly understand the Doppler phase correction. The point to understand is that a true Doppler bin
+doesn't have to be an integer bin. By doing an FFT and picking a peak, we can only sample integer bins. So, this fractional error
+i.e true Doppler bin (which is a float) - detected Doppler bin (which is necessarily an integer) leads to an uncompensated phase error
+in the MIMO array leading to angle error and SLLs. If the true Doppler bin lies exactly on a integer grid(with no fractional),
+then the Doppler correction phase term becomes 1 and hence no doppler correction phase is required. Eg: If Vtrue/vRes is an integer,
+then the DCM becomes unity (by chance!). But we have no control on the true velcoity of the target and hence it might or might not fall
+on a bin. So we need to get as close to the true Doppler bin (float) as possible. This is achieved through an oversampled FFT evaluation.
+Let us undersatnd this more closely. Consider a case where we have 64 ramps per Tx and 4 Txs. So the velres = Fc/64 * lamda/2.
+The DCM becomes exp (1j*2*pi*k/64*n*64), where n is the Tx number and n varies from 0 to Ntx-1; k is Doppler bin = v/vRes.
+Now, if k is exactly an integer and detection also picks up the same integer when 64 point Doppler FFT is performed on
+the 64 chirp samples, then, k becomes an integer and the DCM becomes unity (64 cancels out in numerator and denominator, k and n take integer values). In this case,
+luckily/coincidentally, no DCM is required while synthesizing the ULA. But consider a case when k is not an integer.
+Now performing a Doppler FFT and picking the peak gives us a qunatized version of the k i.e we get int(k). As seen earlier,
+if k is an integer (on the 64 scale), then the DCM terms becomes unity and this essentially means we are not applying any DCM.
+But because of the error between the true Doppler bin and the quantized Doppler bin(which we call as the Doppler fractional error),
+there is a Doppler residual phase on the MIMO which is un corrected. This leads to the ULA phase have phase jumps leading to
+angle error and poor SLLs in the angle spectrum. To reduce this Doppler fractional error, we need to come as close to the true
+Dopplr frequency as possible. This is achieved by using a oversampled FFT to obatin the Doppler bin (on the oversampled scale).
+Since an oversampled FFT gives a more accurate estimate of the true Doppler frequency, we can get closer to the true Doppler frequency.
+So, in the DCM phase term, the denominator is no longer 64 but may be 512 or 1024 depending on what point Doppler FFT we are performing.
+So now, the numerator (64) and denominator do not cancel out anymore and also the Doppler bin 'k' is no more on the 64 scale but
+it is on the oversampled FFT scale. The greater the oversampling factor (for the FFT computation), the closer we can get to the
+true Doppler frequency and smaller the DCM error. But upto what point do we need to go? In other words what is the
+oversampling FFT factor upto which the DCM error is tolerable. This we can get through a Monte Carlo simulation run.
+
+
+"""
+
 
 import numpy as np
 import matplotlib.pyplot as plt
