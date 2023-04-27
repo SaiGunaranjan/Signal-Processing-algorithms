@@ -58,14 +58,12 @@ wavelength = lightSpeed/chirpCenterFreq
 mimoSpacing = 2e-3 #m
 spatialFs = wavelength/mimoSpacing
 
-
-
-numADCSamp = 512#2048
+numADCSamp = 1024#2048
 numRx = 4
 numTx = 4
 numRangeSamp = numADCSamp//2
 numChirpsPerTx = numChirpsDetSegment//numTx
-dopplerOSR = 16
+dopplerOSR = 16 # Change this OSR factor from 1 to say 16 to see the impact of the DCM on the ULA phase
 numDoppFFT = dopplerOSR*numChirpsPerTx #1024
 
 numMIMOChannels = numTx * numRx
@@ -73,7 +71,7 @@ numMIMOChannels = numTx * numRx
 rangeRes = lightSpeed/(2*chirpBW)
 velRes = (chirpSamplingRate/numChirpsPerTx) * (wavelength/2)
 
-numAngleBins = 256#numMIMOChannels
+numAngleBins = 1024
 angleAxis = np.arcsin((np.arange(-numAngleBins//2, numAngleBins//2))*(spatialFs/numAngleBins))*180/np.pi
 angularRes = np.arcsin(spatialFs/numMIMOChannels)*180/np.pi
 
@@ -86,7 +84,7 @@ totalNoisePowerdBFs = noiseFloorPerBindBFs + 10*np.log10(numADCSamp)
 totalNoisePower = 10**(totalNoisePowerdBFs/10)
 noiseSigma = np.sqrt(totalNoisePower)
 
-targetRange = 35#np.random.uniform(10,maxRange-10)
+targetRange = 35
 rangeBin = targetRange/rangeRes #512
 targetVelocity = np.random.uniform(0,maxBaseBandVelocity)
 targetVelocityBin = targetVelocity/velRes
@@ -99,11 +97,10 @@ targetAnglesRad = (targetAnglesDeg/180) * np.pi
 phaseDelta = (2*np.pi*mimoSpacing*np.sin(targetAnglesRad))/wavelength
 
 
-TargetSNR = 10#15 # dB. Change to -9 dB so that we get  18 dB SNR at detection
+TargetSNR = 10#15 # dB.
 RCSdelta = 60#20 # dB
 antennaPatternInducedPowerDelta = 20 # dB
 strongTargetSNR = TargetSNR + RCSdelta + antennaPatternInducedPowerDelta
-# snrPerBin = np.array([weakTargetSNR, strongTargetSNR])
 snrPerBin = np.array([TargetSNR])
 signalPowerdBFs = noiseFloorPerBindBFs + snrPerBin
 signalPower = 10**(signalPowerdBFs/10)
