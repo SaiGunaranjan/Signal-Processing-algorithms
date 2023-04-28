@@ -106,7 +106,7 @@ snrPerBin = np.array([TargetSNR])
 signalPowerdBFs = noiseFloorPerBindBFs + snrPerBin
 signalPower = 10**(signalPowerdBFs/10)
 signalAmp = np.sqrt(signalPower)
-signalPhase = np.exp(1j*np.random.uniform(-np.pi,np.pi,2))
+signalPhase = np.exp(1j*np.random.uniform(-np.pi,np.pi,1))
 signalPhasor = signalAmp*signalPhase
 
 
