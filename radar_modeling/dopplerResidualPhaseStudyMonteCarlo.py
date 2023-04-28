@@ -64,7 +64,6 @@ numTx = 4
 numRangeSamp = numADCSamp//2
 numChirpsPerTx = numChirpsDetSegment//numTx
 
-
 numMIMOChannels = numTx * numRx
 
 rangeRes = lightSpeed/(2*chirpBW)
@@ -73,7 +72,6 @@ velRes = (chirpSamplingRate/numChirpsPerTx) * (wavelength/2)
 numAngleBins = 1024
 angleAxis = np.arcsin((np.arange(-numAngleBins//2, numAngleBins//2))*(spatialFs/numAngleBins))*180/np.pi
 angularRes = np.arcsin(spatialFs/numMIMOChannels)*180/np.pi
-
 
 maxRange = rangeRes*np.arange(numRangeSamp)
 maxBaseBandVelocity = (chirpSamplingRate/2) * (wavelength/2)
@@ -91,14 +89,12 @@ targetVelocity = np.random.uniform(0,maxBaseBandVelocity,numMonteCarlo)
 targetVelocityBin = targetVelocity/velRes
 doppBin = targetVelocityBin # 1
 
-
 targetAnglesDeg = np.array([10])
 numTargets = len(targetAnglesDeg)
 targetAnglesRad = (targetAnglesDeg/180) * np.pi
 phaseDelta = (2*np.pi*mimoSpacing*np.sin(targetAnglesRad))/wavelength
 
-
-TargetSNR = 20#15 # dB.
+TargetSNR = 40#15 # dB. Set to a high value so that SNR doesnt limit the Doppler phase error
 RCSdelta = 60#20 # dB
 antennaPatternInducedPowerDelta = 20 # dB
 strongTargetSNR = TargetSNR + RCSdelta + antennaPatternInducedPowerDelta
@@ -108,8 +104,6 @@ signalPower = 10**(signalPowerdBFs/10)
 signalAmp = np.sqrt(signalPower)
 signalPhase = np.exp(1j*np.random.uniform(-np.pi,np.pi,1))
 signalPhasor = signalAmp*signalPhase
-
-
 
 rangeSignal = np.exp(1j*2*np.pi*rangeBin*np.arange(numADCSamp)/numADCSamp)
 dopplerSignal = np.exp(1j*2*np.pi*doppBin[None,:]*np.arange(numChirpsPerTx)[:,None]/numChirpsPerTx)
@@ -132,8 +126,6 @@ detectedRangeBin = np.round(rangeBin).astype('int32')
 dopplerSamples = rfft[detectedRangeBin,:,:,:,:]
 angleWindow = np.hanning(numMIMOChannels)#np.kaiser(numMIMOChannels, beta=8)
 
-
-
 dopplerOsrArray = 2**np.arange(0,7,1) ## Change this OSR factor from 1 to say 16 to see the impact of the DCM on the ULA phase
 numOsr = len(dopplerOsrArray)
 minAngleSllArray = np.zeros((numOsr,),dtype=np.float32)
@@ -145,14 +137,11 @@ angleErrorStddBArray = np.zeros((numOsr,),dtype=np.float32)
 count = 0
 for dopplerOSR in dopplerOsrArray:
     numDoppFFT = dopplerOSR*numChirpsPerTx #1024
-
     dfft = np.fft.fft(dopplerSamples,axis=0,n=numDoppFFT)/numChirpsPerTx
     dfftEnergy = np.mean(np.abs(dfft)**2,axis=(1,2))
     detectedDopplerBin = np.argmax(dfftEnergy,axis=0)
     mimoCoeff = dfft[detectedDopplerBin,:,:,np.arange(numMonteCarlo)]
     mimoCoeff = np.transpose(mimoCoeff,(1,2,0)) # Rx, Tx, numMontecarlo
-
-
     doppCorrMimoCoeff = mimoCoeff*np.conj(dopplerPhaseAcrossTxs)[None,:,:]
     doppCorrMimoCoeffFlatten = np.transpose(doppCorrMimoCoeff,(2,1,0)).reshape(numMonteCarlo,numMIMOChannels)
     anglePhaseDeg = np.unwrap(np.angle(doppCorrMimoCoeffFlatten),axis=1)*180/np.pi
