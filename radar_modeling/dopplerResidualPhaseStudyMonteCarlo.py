@@ -83,9 +83,11 @@ totalNoisePowerdBFs = noiseFloorPerBindBFs + 10*np.log10(numADCSamp)
 totalNoisePower = 10**(totalNoisePowerdBFs/10)
 noiseSigma = np.sqrt(totalNoisePower)
 
+numMonteCarlo = 50#50
+
 targetRange = 35
 rangeBin = targetRange/rangeRes #512
-targetVelocity = np.random.uniform(0,maxBaseBandVelocity)
+targetVelocity = np.random.uniform(0,maxBaseBandVelocity,numMonteCarlo)
 targetVelocityBin = targetVelocity/velRes
 doppBin = targetVelocityBin # 1
 
@@ -96,7 +98,7 @@ targetAnglesRad = (targetAnglesDeg/180) * np.pi
 phaseDelta = (2*np.pi*mimoSpacing*np.sin(targetAnglesRad))/wavelength
 
 
-TargetSNR = 10#15 # dB.
+TargetSNR = 20#15 # dB.
 RCSdelta = 60#20 # dB
 antennaPatternInducedPowerDelta = 20 # dB
 strongTargetSNR = TargetSNR + RCSdelta + antennaPatternInducedPowerDelta
@@ -107,23 +109,23 @@ signalAmp = np.sqrt(signalPower)
 signalPhase = np.exp(1j*np.random.uniform(-np.pi,np.pi,2))
 signalPhasor = signalAmp*signalPhase
 
-numMonteCarlo = 50#50
+
 
 rangeSignal = np.exp(1j*2*np.pi*rangeBin*np.arange(numADCSamp)/numADCSamp)
-dopplerSignal = np.exp(1j*2*np.pi*doppBin*np.arange(numChirpsPerTx)/numChirpsPerTx)
+dopplerSignal = np.exp(1j*2*np.pi*doppBin[None,:]*np.arange(numChirpsPerTx)[:,None]/numChirpsPerTx)
 angleSignal = np.exp(1j*phaseDelta[:,None]*np.arange(numMIMOChannels)[None,:])
 
 angleSignal3d = np.transpose((angleSignal.reshape(numTargets,numTx,numRx)), (0,2,1)) # 2, 4,18 # 4 Rxs each separated by lamda/2 and 4Txs each separated by 2lamda
-dopplerPhaseAcrossTxs = np.exp(1j*2*np.pi*doppBin*numChirpsPerTx*np.arange(numTx)/numChirpsPerTx)
+dopplerPhaseAcrossTxs = np.exp(1j*2*np.pi*doppBin[None,:]*numChirpsPerTx*np.arange(numTx)[:,None]/numChirpsPerTx)
 
-signal = signalPhasor[:,None, None, None, None] * rangeSignal[None,:,None,None,None] * dopplerSignal[None,None,:,None,None] * angleSignal3d[:,None,None,:,:] * dopplerPhaseAcrossTxs[None,None,None,None,:]
+signal = signalPhasor[:,None,None,None,None,None] * rangeSignal[None,:,None,None,None,None] * dopplerSignal[None,None,:,None,None,:] * angleSignal3d[:,None,None,:,:,None] * dopplerPhaseAcrossTxs[None,None,None,None,:,:]
 signal = np.sum(signal,axis=0)
 
 noise = (noiseSigma/np.sqrt(2))*np.random.randn(numADCSamp*numChirpsPerTx*numRx*numTx*numMonteCarlo) \
     + 1j*(noiseSigma/np.sqrt(2))*np.random.randn(numADCSamp*numChirpsPerTx*numRx*numTx*numMonteCarlo)
 noise = noise.reshape(numADCSamp,numChirpsPerTx,numRx,numTx,numMonteCarlo)
 
-receivedSignal = signal[:,:,:,:,None] + noise
+receivedSignal = signal + noise
 receivedSignal = receivedSignal*np.blackman(numADCSamp)[:,None,None,None,None]
 rfft = (np.fft.fft(receivedSignal,axis=0)/numADCSamp)[0:numRangeSamp,:,:,:,:]
 detectedRangeBin = np.round(rangeBin).astype('int32')
@@ -134,13 +136,11 @@ angleWindow = np.hanning(numMIMOChannels)#np.kaiser(numMIMOChannels, beta=8)
 
 dopplerOsrArray = 2**np.arange(0,7,1) ## Change this OSR factor from 1 to say 16 to see the impact of the DCM on the ULA phase
 numOsr = len(dopplerOsrArray)
-angleSllArray = np.zeros((numOsr,),dtype=np.float32)
+minAngleSllArray = np.zeros((numOsr,),dtype=np.float32)
+meanAngleSllArray = np.zeros((numOsr,),dtype=np.float32)
+maxAngleSllArray = np.zeros((numOsr,),dtype=np.float32)
 angleErrorStdArray = np.zeros((numOsr,),dtype=np.float32)
 angleErrorStddBArray = np.zeros((numOsr,),dtype=np.float32)
-angleSpectrumMean_inaccurateDoppler_matrix = np.zeros((numOsr,numAngleBins),dtype=np.float32)
-angleSpectrumMean_accurateDoppler_matrix = np.zeros((numOsr,numAngleBins),dtype=np.float32)
-anglePhaseDegInaccDopplerMatrix = np.zeros((numOsr,numMIMOChannels),dtype=np.float32)
-anglePhaseDegAccDopplerMatrix = np.zeros((numOsr,numMIMOChannels),dtype=np.float32)
 
 count = 0
 for dopplerOSR in dopplerOsrArray:
@@ -148,23 +148,16 @@ for dopplerOSR in dopplerOsrArray:
 
     dfft = np.fft.fft(dopplerSamples,axis=0,n=numDoppFFT)/numChirpsPerTx
     dfftEnergy = np.mean(np.abs(dfft)**2,axis=(1,2))
-
-    detectedDopplerBinDetSeg = np.argmax(dfftEnergy,axis=0)
-    detectedDopplerBin = detectedDopplerBinDetSeg
+    detectedDopplerBin = np.argmax(dfftEnergy,axis=0)
     mimoCoeff = dfft[detectedDopplerBin,:,:,np.arange(numMonteCarlo)]
     mimoCoeff = np.transpose(mimoCoeff,(1,2,0)) # Rx, Tx, numMontecarlo
 
 
-    doppCorrMimoCoeff = mimoCoeff*np.conj(dopplerPhaseAcrossTxs)[None,:,None]
+    doppCorrMimoCoeff = mimoCoeff*np.conj(dopplerPhaseAcrossTxs)[None,:,:]
     doppCorrMimoCoeffFlatten = np.transpose(doppCorrMimoCoeff,(2,1,0)).reshape(numMonteCarlo,numMIMOChannels)
     anglePhaseDeg = np.unwrap(np.angle(doppCorrMimoCoeffFlatten),axis=1)*180/np.pi
-    anglePhaseDeg = np.mean(anglePhaseDeg,axis=0)
     doppCorrMimoCoeffFlatten = doppCorrMimoCoeffFlatten*angleWindow[None,:]
     angleFFT = np.fft.fft(doppCorrMimoCoeffFlatten,axis=1,n=numAngleBins)/numMIMOChannels
-    angleSpectrumMean = np.mean(np.abs(angleFFT)**2,axis=0)
-    angleSpectrum = 10*np.log10(np.abs(angleSpectrumMean))
-    angleSpectrum = angleSpectrum - np.amax(angleSpectrum)
-    angleSpectrum = np.fft.fftshift(angleSpectrum)
 
     dopplerCorrection = np.exp(1j*2*np.pi*detectedDopplerBin[None,:]*numChirpsPerTx*np.arange(numTx)[:,None]/numDoppFFT)
     # dopplerCorrection = np.exp(1j*2*np.pi*doppBin*numChirpsPerTx*np.arange(numTx)/numDoppFFT)
@@ -172,7 +165,7 @@ for dopplerOSR in dopplerOsrArray:
     doppCorrMimoCoeff_inaccurateDoppler = mimoCoeff*np.conj(dopplerCorrection)[None,:,:]
     doppCorrMimoCoeffFlatten_inaccurateDoppler = np.transpose(doppCorrMimoCoeff_inaccurateDoppler,(2,1,0)).reshape(numMonteCarlo,numMIMOChannels)
     anglePhaseDegInaccDoppler = np.unwrap(np.angle(doppCorrMimoCoeffFlatten_inaccurateDoppler),axis=1)*180/np.pi
-    anglePhaseDegInaccDoppler = np.mean(anglePhaseDegInaccDoppler,axis=0)
+
     doppCorrMimoCoeffFlatten_inaccurateDoppler = doppCorrMimoCoeffFlatten_inaccurateDoppler*angleWindow[None,:]
     angleFFT_inaccurateDoppler = np.fft.fft(doppCorrMimoCoeffFlatten_inaccurateDoppler,axis=1,n=numAngleBins)/numMIMOChannels
     angleFFT_inaccurateDopplerfftShifted = np.fft.fftshift(angleFFT_inaccurateDoppler,axes=(1,))
@@ -181,7 +174,7 @@ for dopplerOSR in dopplerOsrArray:
     angleSpectrum_inaccurateDopplerfftShifted_dB -= np.amax(angleSpectrum_inaccurateDopplerfftShifted_dB,axis=1)[:,None]
 
     """ Angle Error std"""
-    objAngIndex = np.argmax(angleSpectrum_inaccurateDopplerfftShifted,axis=1)
+    objAngIndex = np.argmax(angleSpectrum_inaccurateDopplerfftShifted_dB,axis=1)
     objAngleDeg = angleAxis[objAngIndex]
     angleErrorDeg = targetAnglesDeg - objAngleDeg
     angleErrorStd = np.std(angleErrorDeg)
@@ -201,71 +194,18 @@ for dopplerOSR in dopplerOsrArray:
         except IndexError:
             sllValdBc[ele1] = 0
 
-    angleSllArray[count] = np.amax(sllValdBc)
-
-
-    angleSpectrumMean_inaccurateDoppler = np.mean(np.abs(angleFFT_inaccurateDoppler)**2,axis=0)
-    angleSpectrumMean_inaccurateDoppler = 10*np.log10(np.abs(angleSpectrumMean_inaccurateDoppler))
-    angleSpectrumMean_inaccurateDoppler = angleSpectrumMean_inaccurateDoppler - np.amax(angleSpectrumMean_inaccurateDoppler)
-    angleSpectrumMean_inaccurateDoppler = np.fft.fftshift(angleSpectrumMean_inaccurateDoppler)
-
-
-    anglePhaseDegInaccDopplerMatrix[count,:] = anglePhaseDegInaccDoppler
-    anglePhaseDegAccDopplerMatrix[count,:] = anglePhaseDeg
-
-    angleSpectrumMean_inaccurateDoppler_matrix[count, :] = angleSpectrumMean_inaccurateDoppler
-    angleSpectrumMean_accurateDoppler_matrix[count, :] = angleSpectrum
-
-
-
-    plt.figure(count+1,figsize=(20,10))
-    plt.suptitle('Doppler OSR = {0}. Num Dopp FFT = {1}'.format(dopplerOSR,numDoppFFT))
-    plt.subplot(1,2,1)
-    plt.title('Angle Phase')
-    plt.plot(anglePhaseDeg,'-o',label='ground truth Phase')
-    plt.plot(anglePhaseDegInaccDoppler,'-o',label='DCM with Doppler OSR = {0}'.format(dopplerOSR))
-    plt.ylabel('angle(deg)')
-    plt.xlabel('MIMO channel number')
-    plt.grid('True')
-    plt.legend()
-
-    plt.subplot(1,2,2)
-    plt.title('Angle Spectrum')
-    plt.plot(angleAxis, angleSpectrum, label='ground truth spectrum')
-    plt.plot(angleAxis, angleSpectrumMean_inaccurateDoppler, label='DCM with Doppler OSR = {0}'.format(dopplerOSR))
-    plt.axvline(targetAnglesDeg[0],color='k')
-    plt.xlabel('angle(deg)')
-    plt.grid('True')
-    plt.legend()
+    meanAngleSllArray[count] = np.mean(sllValdBc)
+    maxAngleSllArray[count] = np.amax(sllValdBc)
+    minAngleSllArray[count] = np.amin(sllValdBc)
 
     count += 1
 
 xAxisLabel = [str(ele) for ele in dopplerOsrArray]
 
-count +=1
-plt.figure(count,figsize=(20,10))
+
+plt.figure(1,figsize=(20,10))
 plt.title('Angle error (1 sigma in deg) vs Doppler OSR factor')
 plt.plot(dopplerOsrArray,angleErrorStdArray,'-o')
-plt.xscale('log');
-plt.xlabel('Doppler OSR')
-plt.ylabel('Deg')
-plt.grid(True)
-plt.xticks(dopplerOsrArray,xAxisLabel)
-
-count +=1
-plt.figure(count,figsize=(20,10))
-plt.title('Angle error (1 sigma in dB) vs Doppler OSR factor')
-plt.plot(dopplerOsrArray,angleErrorStddBArray,'-o')
-plt.xscale('log');
-plt.xlabel('Doppler OSR')
-plt.ylabel('Deg')
-plt.grid(True)
-plt.xticks(dopplerOsrArray,xAxisLabel)
-
-count +=1
-plt.figure(count,figsize=(20,10))
-plt.title('Angle SLL (dBc) vs Doppler OSR factor')
-plt.plot(dopplerOsrArray,angleSllArray,'-o')
 # plt.xscale('log');
 plt.xlabel('Doppler OSR')
 plt.ylabel('Deg')
@@ -273,17 +213,49 @@ plt.grid(True)
 plt.xticks(dopplerOsrArray,xAxisLabel)
 
 
-# rfftFlatten = rfft.reshape(numRangeSamp,numChirpsPerTx*numTx*numRx*numMonteCarlo)
-# rfftPowSpec = np.mean(np.abs(rfftFlatten)**2,axis=1)
-# rfftPowSpecdBm = 10*np.log10(rfftPowSpec) + 10
+plt.figure(2,figsize=(20,10))
+plt.title('Angle error (1 sigma in dB) vs Doppler OSR factor')
+plt.plot(dopplerOsrArray,angleErrorStddBArray,'-o')
+# plt.xscale('log');
+plt.xlabel('Doppler OSR')
+plt.ylabel('Deg')
+plt.grid(True)
+plt.xticks(dopplerOsrArray,xAxisLabel)
 
 
-# plt.figure(1,figsize=(20,10))
-# plt.title('Range spectrum (dBm)')
-# plt.plot(rfftPowSpecdBm)
-# plt.xlabel('range Bins')
-# plt.ylabel('dBm')
-# plt.grid('True')
+plt.figure(3,figsize=(20,10))
+plt.title('Angle SLL (dBc) vs Doppler OSR factor')
+# plt.plot(dopplerOsrArray,minAngleSllArray,'-o',label='Min SLL')
+plt.plot(dopplerOsrArray,meanAngleSllArray,'-o',label='Mean SLL')
+plt.plot(dopplerOsrArray,maxAngleSllArray,'-o',label='Max SLL')
+# plt.xscale('log');
+plt.xlabel('Doppler OSR')
+plt.ylabel('Deg')
+plt.grid(True)
+plt.xticks(dopplerOsrArray,xAxisLabel)
+plt.legend()
+
+
+# # 1. Define data
+# X = [0, 1, 2, 3]
+# Y = [x**2 for x in X]
+
+# # 2. Define figure
+# fig = plt.figure()
+
+# # 3. Configure first x-axis and plot
+# ax1 = fig.add_subplot(111)
+# ax1.plot(X, Y)
+# ax1.set_xlabel("Original x-axis")
+# ax1.set_xticks((0, 1, 2, 3))
+
+# # 4. Configure second x-axis
+# ax2 = ax1.twiny()
+# ax2.set_xticks((0.5, 1.5, 2.5))
+# ax2.set_xlabel("Modified x-axis")
+
+# # 5. Make the plot visible
+# plt.show()
 
 
 
