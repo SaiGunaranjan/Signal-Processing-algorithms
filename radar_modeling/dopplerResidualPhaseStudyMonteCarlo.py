@@ -201,61 +201,65 @@ for dopplerOSR in dopplerOsrArray:
     count += 1
 
 xAxisLabel = [str(ele) for ele in dopplerOsrArray]
+numDoppFFTArray = dopplerOsrArray*numChirpsPerTx
 
 
-plt.figure(1,figsize=(20,10))
+
+fig1 = plt.figure(1,figsize=(20,10))
+ax1 = fig1.add_subplot(111)
 plt.title('Angle error (1 sigma in deg) vs Doppler OSR factor')
-plt.plot(dopplerOsrArray,angleErrorStdArray,'-o')
-# plt.xscale('log');
-plt.xlabel('Doppler OSR')
-plt.ylabel('Deg')
+ax1.plot(dopplerOsrArray,angleErrorStdArray,'-o')
+ax1.set_xlabel('Doppler OSR')
+ax1.set_ylabel('deg')
 plt.grid(True)
-plt.xticks(dopplerOsrArray,xAxisLabel)
+ax1.set_xticks(dopplerOsrArray)
+ax1.set_xlim(dopplerOsrArray[0], dopplerOsrArray[-1])
+ax1.set_ylim(0, 2.5)
+ax2 = ax1.twiny()
+ax2.set_xlim(numDoppFFTArray[0], numDoppFFTArray[-1])
+ax2.set_xticks(numDoppFFTArray)
+ax2.set_xlabel("Doppler FFT size")
+ax2.set_xticklabels(numDoppFFTArray)
 
 
-plt.figure(2,figsize=(20,10))
+
+fig2 = plt.figure(2,figsize=(20,10))
+ax1 = fig2.add_subplot(111)
 plt.title('Angle error (1 sigma in dB) vs Doppler OSR factor')
-plt.plot(dopplerOsrArray,angleErrorStddBArray,'-o')
-# plt.xscale('log');
-plt.xlabel('Doppler OSR')
-plt.ylabel('Deg')
+ax1.plot(dopplerOsrArray,angleErrorStddBArray,'-o')
+ax1.set_xlabel('Doppler OSR')
+ax1.set_ylabel('dB')
 plt.grid(True)
-plt.xticks(dopplerOsrArray,xAxisLabel)
+ax1.set_xticks(dopplerOsrArray)
+ax1.set_xlim(dopplerOsrArray[0], dopplerOsrArray[-1])
+ax2 = ax1.twiny()
+ax2.set_xlim(numDoppFFTArray[0], numDoppFFTArray[-1])
+ax2.set_xticks(numDoppFFTArray)
+ax2.set_xlabel("Doppler FFT size")
+ax2.set_xticklabels(numDoppFFTArray)
 
 
-plt.figure(3,figsize=(20,10))
+
+fig3 = plt.figure(3,figsize=(20,10))
+ax1 = fig3.add_subplot(111)
 plt.title('Angle SLL (dBc) vs Doppler OSR factor')
 # plt.plot(dopplerOsrArray,minAngleSllArray,'-o',label='Min SLL')
-plt.plot(dopplerOsrArray,meanAngleSllArray,'-o',label='Mean SLL')
-plt.plot(dopplerOsrArray,maxAngleSllArray,'-o',label='Max SLL')
-# plt.xscale('log');
-plt.xlabel('Doppler OSR')
-plt.ylabel('Deg')
+ax1.plot(dopplerOsrArray,meanAngleSllArray,'-o',label='Mean SLL')
+ax1.plot(dopplerOsrArray,maxAngleSllArray,'-o',label='Max SLL')
+ax1.set_xlabel('Doppler OSR')
+ax1.set_ylabel('dBc')
 plt.grid(True)
-plt.xticks(dopplerOsrArray,xAxisLabel)
-plt.legend()
+ax1.set_xticks(dopplerOsrArray)
+ax1.legend()
+ax1.set_xlim(dopplerOsrArray[0], dopplerOsrArray[-1])
+ax2 = ax1.twiny()
+ax2.set_xlim(numDoppFFTArray[0], numDoppFFTArray[-1])
+ax2.set_xticks(numDoppFFTArray)
+ax2.set_xlabel("Doppler FFT size")
+ax2.set_xticklabels(numDoppFFTArray)
 
 
-# # 1. Define data
-# X = [0, 1, 2, 3]
-# Y = [x**2 for x in X]
 
-# # 2. Define figure
-# fig = plt.figure()
-
-# # 3. Configure first x-axis and plot
-# ax1 = fig.add_subplot(111)
-# ax1.plot(X, Y)
-# ax1.set_xlabel("Original x-axis")
-# ax1.set_xticks((0, 1, 2, 3))
-
-# # 4. Configure second x-axis
-# ax2 = ax1.twiny()
-# ax2.set_xticks((0.5, 1.5, 2.5))
-# ax2.set_xlabel("Modified x-axis")
-
-# # 5. Make the plot visible
-# plt.show()
 
 
 
