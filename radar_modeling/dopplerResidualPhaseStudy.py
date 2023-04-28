@@ -63,7 +63,7 @@ numRx = 4
 numTx = 4
 numRangeSamp = numADCSamp//2
 numChirpsPerTx = numChirpsDetSegment//numTx
-dopplerOSR = 16 # Change this OSR factor from 1 to say 16 to see the impact of the DCM on the ULA phase
+dopplerOSR = 16#16 # Change this OSR factor from 1 to say 64 in powers of 2 to see the impact of the DCM on the ULA phase
 numDoppFFT = dopplerOSR*numChirpsPerTx #1024
 
 numMIMOChannels = numTx * numRx
@@ -206,32 +206,31 @@ rfftPowSpecdBm = 10*np.log10(rfftPowSpec) + 10
 
 
 
-plt.figure(1,figsize=(20,10))
-plt.title('Range spectrum (dBm)')
-plt.plot(rfftPowSpecdBm)
-plt.xlabel('range Bins')
-plt.ylabel('dBm')
-plt.grid('True')
+# plt.figure(1,figsize=(20,10))
+# plt.title('Range spectrum (dBm)')
+# plt.plot(rfftPowSpecdBm)
+# plt.xlabel('range Bins')
+# plt.ylabel('dBm')
+# plt.grid('True')
 
 
 
 plt.figure(2,figsize=(20,10))
+plt.suptitle('Doppler OSR = {}, numDopp FFT = {}'.format(dopplerOSR,numDoppFFT))
+plt.subplot(1,2,1)
 plt.title('Angle Phase')
-plt.plot(anglePhaseDeg,'-o',label='ground truth Phase')
-plt.plot(anglePhaseDegInaccDoppler,'-o',label='with inaccurate DCM')
+plt.plot(anglePhaseDeg,'-o',label='ground truth ULA phase')
+plt.plot(anglePhaseDegInaccDoppler,'-o',label='DCM corrected ULA phase')
 plt.ylabel('angle(deg)')
 plt.xlabel('MIMO channel number')
 plt.grid('True')
 plt.legend()
 
-
-plt.figure(3,figsize=(20,10))
+plt.subplot(1,2,2)
 plt.title('Angle Spectrum')
 plt.plot(angleAxis, angleSpectrum, label='ground truth spectrum')
-plt.plot(angleAxis, angleSpectrumMean_inaccurateDoppler, label='with inaccurate DCM')
-for ele in np.arange(numTargets):
-    plt.axvline(targetAnglesDeg[ele],color='k')
-
+plt.plot(angleAxis, angleSpectrumMean_inaccurateDoppler, label='DCM corrected spectrum')
+plt.axvline(targetAnglesDeg[0],color='k')
 plt.xlabel('angle(deg)')
 plt.grid('True')
 plt.legend()
