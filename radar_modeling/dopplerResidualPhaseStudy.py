@@ -46,6 +46,17 @@ plt.close('all')
 
 np.random.seed(0)
 
+""" if flag_RxsSeparatedbyLambdaby2 = True, IC config with Rxs separated by lambda/2 and Txs separated by 2 lambda is used.
+Else,  IC config with Rxs separated by 2 lambda and Txs separated by lambda/2 is used."""
+flag_RxsSeparatedbyLambdaby2 = True
+
+
+if flag_RxsSeparatedbyLambdaby2:
+    print("\n\nIC config with Rxs separated by lambda/2 and Txs separated by 2 lambda is used\n\n")
+else:
+    print("\n\nIC config with Rxs separated by 2 lambda and Txs separated by lambda/2 is used\n\n")
+
+
 """Chirp Parameters """
 chirpCenterFreq = 76.5e9 # Hz
 chirpBW = 500e6 # Hz
@@ -93,7 +104,7 @@ numTargets = len(targetAnglesDeg)
 targetAnglesRad = (targetAnglesDeg/180) * np.pi
 phaseDelta = (2*np.pi*mimoSpacing*np.sin(targetAnglesRad))/wavelength
 
-TargetSNR = 40#15 # dB. Set to a high value so that SNR doesnt limit the Doppler phase error
+TargetSNR = 20#15 # dB. Set to a high value so that SNR doesnt limit the Doppler phase error
 RCSdelta = 60#20 # dB
 antennaPatternInducedPowerDelta = 20 # dB
 strongTargetSNR = TargetSNR + RCSdelta + antennaPatternInducedPowerDelta
@@ -113,7 +124,11 @@ angleSignal = np.exp(1j*phaseDelta[:,None]*np.arange(numMIMOChannels)[None,:])
 angleSignal3d = np.transpose((angleSignal.reshape(numTargets,numTx,numRx)), (0,2,1)) # 2, 4,18 # 4 Rxs each separated by lamda/2 and 4Txs each separated by 2lamda
 dopplerPhaseAcrossTxs = np.exp(1j*2*np.pi*doppBin*numChirpsPerTx*np.arange(numTx)/numChirpsPerTx)
 
-signal = signalPhasor[:,None, None, None, None] * rangeSignal[None,:,None,None,None] * dopplerSignal[None,None,:,None,None] * angleSignal3d[:,None,None,:,:] * dopplerPhaseAcrossTxs[None,None,None,None,:]
+if flag_RxsSeparatedbyLambdaby2:
+    signal = signalPhasor[:,None, None, None, None] * rangeSignal[None,:,None,None,None] * dopplerSignal[None,None,:,None,None] * angleSignal3d[:,None,None,:,:] * dopplerPhaseAcrossTxs[None,None,None,None,:]
+else:
+    signal = signalPhasor[:,None, None, None, None] * rangeSignal[None,:,None,None,None] * dopplerSignal[None,None,:,None,None] * angleSignal3d[:,None,None,:,:] * dopplerPhaseAcrossTxs[None,None,None,:,None]
+
 signal = np.sum(signal,axis=0)
 
 noise = (noiseSigma/np.sqrt(2))*np.random.randn(numADCSamp*numChirpsPerTx*numRx*numTx*numMonteCarlo) \
@@ -139,7 +154,12 @@ for dopplerOSR in dopplerOsrArray:
     detectedDopplerBin = detectedDopplerBinDetSeg
     mimoCoeff = dfft[detectedDopplerBin,:,:,np.arange(numMonteCarlo)]
     mimoCoeff = np.transpose(mimoCoeff,(1,2,0)) # Rx, Tx, numMontecarlo
-    doppCorrMimoCoeff = mimoCoeff*np.conj(dopplerPhaseAcrossTxs)[None,:,None]
+
+    if flag_RxsSeparatedbyLambdaby2:
+        doppCorrMimoCoeff = mimoCoeff*np.conj(dopplerPhaseAcrossTxs)[None,:,None]
+    else:
+        doppCorrMimoCoeff = mimoCoeff*np.conj(dopplerPhaseAcrossTxs)[:,None,None]
+
     doppCorrMimoCoeffFlatten = np.transpose(doppCorrMimoCoeff,(2,1,0)).reshape(numMonteCarlo,numMIMOChannels)
     anglePhaseDeg = np.unwrap(np.angle(doppCorrMimoCoeffFlatten),axis=1)*180/np.pi
     anglePhaseDeg = np.mean(anglePhaseDeg,axis=0)
@@ -153,7 +173,11 @@ for dopplerOSR in dopplerOsrArray:
     dopplerCorrection = np.exp(1j*2*np.pi*detectedDopplerBin[None,:]*numChirpsPerTx*np.arange(numTx)[:,None]/numDoppFFT)
     # dopplerCorrection = np.exp(1j*2*np.pi*doppBin*numChirpsPerTx*np.arange(numTx)/numDoppFFT)
 
-    doppCorrMimoCoeff_inaccurateDoppler = mimoCoeff*np.conj(dopplerCorrection)[None,:,:]
+    if flag_RxsSeparatedbyLambdaby2:
+        doppCorrMimoCoeff_inaccurateDoppler = mimoCoeff*np.conj(dopplerCorrection)[None,:,:]
+    else:
+        doppCorrMimoCoeff_inaccurateDoppler = mimoCoeff*np.conj(dopplerCorrection)[:,None,:]
+
     doppCorrMimoCoeffFlatten_inaccurateDoppler = np.transpose(doppCorrMimoCoeff_inaccurateDoppler,(2,1,0)).reshape(numMonteCarlo,numMIMOChannels)
     anglePhaseDegInaccDoppler = np.unwrap(np.angle(doppCorrMimoCoeffFlatten_inaccurateDoppler),axis=1)*180/np.pi
     anglePhaseDegInaccDoppler = np.mean(anglePhaseDegInaccDoppler,axis=0)
