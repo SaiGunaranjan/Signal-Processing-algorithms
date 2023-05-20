@@ -48,7 +48,7 @@ np.random.seed(0)
 
 """ if flag_RxsSeparatedbyLambdaby2 = True, IC config with Rxs separated by lambda/2 and Txs separated by 2 lambda is used.
 Else,  IC config with Rxs separated by 2 lambda and Txs separated by lambda/2 is used."""
-flag_RxsSeparatedbyLambdaby2 = True
+flag_RxsSeparatedbyLambdaby2 = False
 
 
 if flag_RxsSeparatedbyLambdaby2:
