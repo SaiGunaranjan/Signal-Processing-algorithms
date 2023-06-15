@@ -5,6 +5,13 @@ Created on Tue Feb 21 18:30:18 2023
 @author: Sai Gunaranjan
 """
 
+"""
+This script was made to cater to the DSP compute requirements with different High Res Spectral Estimators.
+So, I have made custom functions for the spectral estimators. Basically, I just copied some of the functions from
+the spectral estimation library. This script compares the performance of a few spectral estimators.
+
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal
