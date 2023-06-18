@@ -139,6 +139,14 @@ def music_backward(received_signal, num_sources, corr_mat_model_order, digital_f
             auto_corr_matrix += np.matmul(received_signal[ele::-1,:],received_signal[ele::-1,:].T.conj())
         else:
             auto_corr_matrix += np.matmul(received_signal[ele:ele-corr_mat_model_order:-1,:],received_signal[ele:ele-corr_mat_model_order:-1,:].T.conj())
+
+    """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
+    The proof for this is available in a technical report by MIT Lincoln laboratory by Evans, Johnson, Sun.
+    The report was published in 1982. The proof is available in page 2-30. The link to the pdf is available in the below link:
+        https://archive.ll.mit.edu/mission/aviation/publications/publication-files/technical_reports/Evans_1982_TR-582_WW-18359.pdf
+    """
+    # auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5
+
     auto_corr_matrix = auto_corr_matrix/signal_length # Divide the auto-correlation matrix by the signal length
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
     noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
