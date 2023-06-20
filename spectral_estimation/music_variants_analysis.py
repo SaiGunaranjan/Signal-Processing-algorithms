@@ -9,7 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from spectral_estimation_lib import music_backward as music
-from spectral_estimation_lib import music_snapshots
+from spectral_estimation_lib import music_snapshots#, music_denso
 
 np.random.seed(5)
 
@@ -49,24 +49,31 @@ source_signals = signalPhase @ complex_signal_amplitudes
 
 wgn_noise = (noise_sigma/np.sqrt(2))*np.random.randn(source_signals.shape[0] * numSnapshots) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(source_signals.shape[0] * numSnapshots)
 received_signal = source_signals + wgn_noise.reshape(-1,numSnapshots)
-corr_mat_model_order = num_samples//2-2 # must be strictly less than num_samples/2
+corr_mat_model_order = num_samples//2-1 # must be strictly less than num_samples/2. Should ideally be num_samples/2 - 2
 
 magnitude_spectrum_fft = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal*np.hanning(num_samples)[:,None],axis=0, n=len(digital_freq_grid))/received_signal.shape[0],axes=0)))
 magnitude_spectrum_fft -= np.amax(magnitude_spectrum_fft,axis=0)[None,:]
 
-""" MUSIC"""
+""" MUSIC snaphsots"""
 pseudo_spectrum = music_snapshots(received_signal, num_sources, num_samples, digital_freq_grid)
 pseudo_spectrum = pseudo_spectrum/np.amax(pseudo_spectrum)
 
-pseudo_spectrum_avg = music(received_signal[:,0][:,None], num_sources, num_samples, digital_freq_grid)
+""" MUSIC sliding window"""
+pseudo_spectrum_avg = music(received_signal[:,0][:,None], num_sources, corr_mat_model_order, digital_freq_grid)
 pseudo_spectrum_avg = pseudo_spectrum_avg/np.amax(pseudo_spectrum_avg)
+
+# """ MUSIC denso - spatial smoothing"""
+# pseudo_spectrum_denso = music_denso(received_signal, num_sources, num_samples, digital_freq_grid)
+# pseudo_spectrum_denso = pseudo_spectrum_denso/np.amax(pseudo_spectrum_denso)
+
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.title('Num MIMO samples = ' + str(num_samples) + '. Native Angular Res (deg) = ' + str(np.round(nativeAngResDeg,2)) + '. Programmed Angular Res (deg) = ' + str(np.round(angResDeg,2)))
 plt.plot(angleGrid, magnitude_spectrum_fft[:,0], label = 'FFT')
 plt.plot(angleGrid, 20*np.log10(pseudo_spectrum_avg), label='MUSIC sliding window')
-plt.plot(angleGrid, 20*np.log10(pseudo_spectrum), label='MUSIC snapshots')
+plt.plot(angleGrid, 20*np.log10(pseudo_spectrum), label='MUSIC snapshots = {}'.format(numSnapshots))
+# plt.plot(angleGrid, 20*np.log10(pseudo_spectrum_denso), label='MUSIC denso')
 plt.vlines(source_angle_deg,-100,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
 plt.xlabel('Angle(deg)')
 plt.legend()
