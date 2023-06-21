@@ -5,6 +5,10 @@ Created on Thu Jul 21 17:53:54 2022
 @author: saiguna
 """
 
+""" Borrowed most of the script from angle_estimation//accuracy_analysis.py script
+and commented out the FFT part of the analysis"""
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 import sys
@@ -44,6 +48,8 @@ numSnapshots = 15#50
 num_sources = 1
 binSNRdBArray = np.arange(-10,44,2)
 binSNRlinArray = 10**(binSNRdBArray/10)
+
+dBCLevelBeamWidth = 10
 
 """ The below formula is the Cramer Rao Lower bound limit for accuracy of an estimator.
 It is given by resolution/sqrt(2*binSNRLinearScale)"""
@@ -87,7 +93,7 @@ for binSNR in binSNRdBArray:
         angDegError = objectAngle_deg[monteCarloIter] - estAngDeg
         angErrorArray[count,monteCarloIter] = angDegError
 
-        binWidthArr = np.argsort(np.abs(pseudo_spectrumdB + 10))[0:2]
+        binWidthArr = np.argsort(np.abs(pseudo_spectrumdB + dBCLevelBeamWidth))[0:2]
         binWidth = np.abs(np.diff(binWidthArr))
         beamWidth = np.arcsin(binWidth*(Fs_spatial/numPointsAngleFFT))*180/np.pi
         beamWidthArray[count,monteCarloIter] = beamWidth
@@ -150,7 +156,7 @@ plt.legend()
 
 
 plt.figure(3,figsize=(20,10),dpi=200)
-plt.title('10 dB BW (deg)  vs SNR (dB)')
+plt.title('{} dB BW (deg)  vs SNR (dB)'.format(dBCLevelBeamWidth))
 plt.plot(binSNRdBArray,meanbeamWidth, '-o')
 plt.xlabel('SNR (dB)')
 plt.ylabel('BW (deg)')
