@@ -56,8 +56,9 @@ It is given by resolution/sqrt(2*binSNRLinearScale)"""
 crlb = 1.2/(np.sqrt(2*binSNRlinArray))
 
 numSNRPoints = len(binSNRdBArray)
-angErrorArray = np.zeros((numSNRPoints,numMonteCarloRuns))
-beamWidthArray = np.zeros((numSNRPoints,numMonteCarloRuns))
+angErrorArray = np.zeros((numSNRPoints,numMonteCarloRuns),dtype=np.float32)
+beamWidthArray = np.zeros((numSNRPoints,numMonteCarloRuns),dtype=np.float32)
+musicSpectrumArray = np.zeros((numSNRPoints,numPointsAngleFFT[0]),dtype=np.float32)
 count = 0
 
 for binSNR in binSNRdBArray:
@@ -77,11 +78,6 @@ for binSNR in binSNRdBArray:
     noise = noise.reshape(numMonteCarloRuns,numRx,numSnapshots) # [numMonteCarlo, numRx, numSnapshots]
     signal = rxSignal + noise
 
-    # signalFFT = np.fft.fft(signal,axis=1,n=numPointsAngleFFT[0])/numRx
-    # signalFFTshift = np.fft.fftshift(signalFFT,axes=(1,))
-    # magSpec = np.abs(signalFFTshift)**2
-    # magSpec = magSpec[:,:,0] # Sampling the zero snapshot for FFT
-
     for monteCarloIter in range(numMonteCarloRuns):
         received_signal = signal[monteCarloIter,:,:]
         pseudo_spectrum = music_snapshots(received_signal, num_sources, numRx, digital_freq_grid)
@@ -98,13 +94,8 @@ for binSNR in binSNRdBArray:
         beamWidth = np.arcsin(binWidth*(Fs_spatial/numPointsAngleFFT))*180/np.pi
         beamWidthArray[count,monteCarloIter] = beamWidth
 
-
-
-    # angInd = np.argmax(magSpec,axis=1)
-    # angAxis_deg = np.arcsin(np.arange(-numPointsAngleFFT//2, numPointsAngleFFT//2)*(Fs_spatial/numPointsAngleFFT))*180/np.pi
-    # estAngDeg = angAxis_deg[angInd]
-    # angDegError = objectAngle_deg - estAngDeg
-    # angErrorArray[count,:] = angDegError
+        if (monteCarloIter == numMonteCarloRuns-1):
+            musicSpectrumArray[count,:] = pseudo_spectrumdB
 
 
     count += 1
