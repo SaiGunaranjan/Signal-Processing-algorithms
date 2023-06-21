@@ -7,6 +7,8 @@ Created on Thu Jun 15 13:08:31 2023
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 
 from spectral_estimation_lib import music_backward as music
 from spectral_estimation_lib import music_snapshots#, music_denso
