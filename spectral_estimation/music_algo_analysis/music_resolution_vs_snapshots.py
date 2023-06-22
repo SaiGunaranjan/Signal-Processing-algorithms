@@ -113,18 +113,40 @@ angResDegQunatized = np.round(angResDeg*10)/10
 snrString = ['SNR = {} dB'.format(ele) for ele in snrArray]
 numPointMUSICEff = 2**(np.floor(np.log2(numPointMUSIC)).astype('int32'))
 
+if 0:
+    plt.figure(1,figsize=(20,10),dpi=200)
+    plt.title('Snapshots vs Angular resolution with {} ULA and {} point MUSIC'.format(num_samples,numPointMUSICEff))
+    plt.plot(angResDeg,minSnapshotsArray.T,'-o')
+    plt.xlabel('Programmed Angular separation (deg)')
+    plt.ylabel('Minimum snapshots required')
+    plt.yticks(np.arange(-2,15,2))
+    plt.xticks(angResDegQunatized)
+    plt.ylim([-1,15])
+    plt.grid(True)
+    plt.legend(snrString)
 
-plt.figure(1,figsize=(20,10),dpi=200)
-plt.title('Snapshots vs Angular resolution with {} ULA and {} point MUSIC'.format(num_samples,numPointMUSICEff))
-plt.plot(angResDeg,minSnapshotsArray.T,'-o')
-plt.xlabel('Programmed Angular resolution (deg)')
-plt.ylabel('Minimum snapshots required')
-plt.yticks(np.arange(-2,15,2))
-plt.xticks(angResDegQunatized)
-plt.ylim([-1,15])
+
+
+fig1 = plt.figure(1,figsize=(20,10),dpi=150)
+ax1 = fig1.add_subplot(111)
+plt.title('Snapshots vs Angular resolution with {} element ULA and {} point MUSIC'.format(num_samples,numPointMUSICEff))
+ax1.plot(resol_fact,minSnapshotsArray.T,'-o')
+ax1.set_xlabel('Programmed bin separation')
+ax1.set_ylabel('Minimum snapshots required')
 plt.grid(True)
-plt.legend(snrString)
+ax1.set_xlim(resol_fact[0], resol_fact[-1])
+# ax1.set_xlim(0, 1.1)
+ax1.set_xticks(resol_fact)
+# ax1.set_xticklabels(resol_fact)
+ax1.legend(snrString)
 
+ax2 = ax1.twiny()
+ax2.set_xlim(angResDegQunatized[0], angResDegQunatized[-1])
+# ax2.set_xlim(0, 20)
+ax2.set_xticks(angResDegQunatized)
+ax2.set_xlabel('Programmed Angular separation (deg)')
+ax2.set_xticklabels(angResDegQunatized)
+plt.ylim([-1,15])
 
 
 
