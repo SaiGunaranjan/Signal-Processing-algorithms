@@ -105,7 +105,7 @@ for ele5 in range(numSNR):
             snapShotInd = np.array([np.where(errorAngResDeg[ele5,ele6,:] < deltaMarginDeg)]).min()
             numMinSnapshots = snapshotsArray[snapShotInd]
         except ValueError:
-            numMinSnapshots = 200
+            numMinSnapshots = 100
         minSnapshotsArray[ele5,ele6] = numMinSnapshots
 
 
