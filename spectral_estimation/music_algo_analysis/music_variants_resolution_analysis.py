@@ -16,7 +16,7 @@ from spectral_estimation_lib import music_snapshots#, music_denso
 np.random.seed(5)
 
 plt.close('all')
-num_samples = 8#32
+num_samples = 6#8#32
 c = 3e8
 fc = 79e9
 lamda = c/fc
@@ -73,7 +73,7 @@ pseudo_spectrum_avg = pseudo_spectrum_avg/np.amax(pseudo_spectrum_avg)
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.title('Num MIMO samples = ' + str(num_samples) + '. Native Angular Res (deg) = ' + str(np.round(nativeAngResDeg,2)) + '. Programmed Angular Res (deg) = ' + str(np.round(angResDeg,2)))
 plt.plot(angleGrid, magnitude_spectrum_fft[:,0], label = 'FFT')
-plt.plot(angleGrid, 20*np.log10(pseudo_spectrum_avg), label='MUSIC sliding window')
+# plt.plot(angleGrid, 20*np.log10(pseudo_spectrum_avg), label='MUSIC sliding window')
 plt.plot(angleGrid, 20*np.log10(pseudo_spectrum), label='MUSIC snapshots = {}'.format(numSnapshots))
 # plt.plot(angleGrid, 20*np.log10(pseudo_spectrum_denso), label='MUSIC denso')
 plt.vlines(source_angle_deg,-100,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
