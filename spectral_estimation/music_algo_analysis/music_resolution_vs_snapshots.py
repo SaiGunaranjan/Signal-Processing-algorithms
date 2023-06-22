@@ -43,18 +43,19 @@ numResol = len(resol_fact)
 digFreqRes = resol_fact*((2*np.pi)/num_samples)
 angResDeg = np.arcsin((digFreqRes/(2*np.pi))*fsSpatial)*180/np.pi
 
-snapshotsArray = np.arange(2,52,2)
+snapshotsArray = np.arange(1,16,1)
 lenSnapShotArray = len(snapshotsArray)
 
 snrArray = np.arange(10,60,10) # np.array([40])
 numSNR = len(snrArray)
+snrdelta = 3 # This indicates by how much dB is the second target below the 1st target
 
-numMonteCarlo = 100
+numMonteCarlo = 200
 
 estAngSepDegArray = np.zeros((numSNR,numResol,lenSnapShotArray,numMonteCarlo),dtype=np.float32)
 for ele3 in range(numSNR):
     snr = snrArray[ele3]
-    object_snr = np.array([snr,snr-5])
+    object_snr = np.array([snr,snr-snrdelta])
     weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
 
     for ele1 in range(numResol):
@@ -101,14 +102,18 @@ minSnapshotsArray = np.zeros((numSNR,numResol),dtype=np.int32)
 for ele5 in range(numSNR):
     for ele6 in range(numResol):
         try:
-            numMinSnapshots = np.array([np.where(errorAngResDeg[ele5,ele6,:] < deltaMarginDeg)]).min()
+            snapShotInd = np.array([np.where(errorAngResDeg[ele5,ele6,:] < deltaMarginDeg)]).min()
+            numMinSnapshots = snapshotsArray[snapShotInd]
         except ValueError:
-            numMinSnapshots = 1000
+            numMinSnapshots = 200
         minSnapshotsArray[ele5,ele6] = numMinSnapshots
 
-angResDegQunatized = np.round(angResDeg*100)/100
+
+angResDegQunatized = np.round(angResDeg*10)/10
 snrString = ['SNR = {} dB'.format(ele) for ele in snrArray]
 numPointMUSICEff = 2**(np.floor(np.log2(numPointMUSIC)).astype('int32'))
+
+
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.title('Snapshots vs Angular resolution with {} ULA and {} point MUSIC'.format(num_samples,numPointMUSICEff))
 plt.plot(angResDeg,minSnapshotsArray.T,'-o')
