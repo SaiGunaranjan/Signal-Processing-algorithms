@@ -105,7 +105,7 @@ def music_on_autocorrMat(auto_corr_matrix, num_sources, num_samples, digital_fre
 
     signal_length = auto_corr_matrix.shape[0]
 
-    # auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5
+    auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5
 
     auto_corr_matrix = auto_corr_matrix/signal_length # Divide the auto-correlation matrix by the signal length
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
