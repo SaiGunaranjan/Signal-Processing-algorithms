@@ -47,21 +47,33 @@ def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
     # numTx = 6
     # numRx = 6
     txSeq = np.arange(numTx)
-    ulaInd = np.arange(numRx) # 6 element Az ULA
+    ulaInd = np.arange(numRx)
 
-    physicalTxCordinates = np.array([[0.000000,  0.030000,  0.000000],
-                                     [0.000000,  0.026000,  0.000000],
-                                     [0.000000,  0.022000,  0.000000],
-                                     [0.000000,  0.018000,  0.000000],
-                                     [0.000000,  0.014000,  0.000000],
-                                     [0.000000,  0.010000,  0.000000]])
+    tx_Yoffset = 10e-3
+    tx_ycordinates = tx_Yoffset + txSpacing*np.arange(numTx)
 
-    physicalRxCordinates = np.array([[0.030000, 0.000000,  0.000000],
-                                    [0.028000, 0.000000,  0.000000],
-                                    [0.026000, 0.000000,  0.000000],
-                                    [0.024000, 0.000000,  0.000000],
-                                    [0.022000, 0.000000,  0.000000],
-                                    [0.020000, 0.000000,  0.000000]])
+    rx_Xoffset = 20e-3
+    rx_xcordinates = rx_Xoffset + rxSpacing*np.arange(numRx)
+
+    physicalTxCordinates = np.zeros((numTx,3),dtype=np.float32) # [x,y,z]
+    physicalTxCordinates[:,1] = np.flipud(tx_ycordinates)
+
+    physicalRxCordinates = np.zeros((numRx,3),dtype=np.float32)
+    physicalRxCordinates[:,0] = np.flipud(rx_xcordinates)
+
+    # physicalTxCordinates = np.array([[0.000000,  0.030000,  0.000000],
+    #                                  [0.000000,  0.026000,  0.000000],
+    #                                  [0.000000,  0.022000,  0.000000],
+    #                                  [0.000000,  0.018000,  0.000000],
+    #                                  [0.000000,  0.014000,  0.000000],
+    #                                  [0.000000,  0.010000,  0.000000]])
+
+    # physicalRxCordinates = np.array([[0.030000, 0.000000,  0.000000],
+    #                                 [0.028000, 0.000000,  0.000000],
+    #                                 [0.026000, 0.000000,  0.000000],
+    #                                 [0.024000, 0.000000,  0.000000],
+    #                                 [0.022000, 0.000000,  0.000000],
+    #                                 [0.020000, 0.000000,  0.000000]])
 
     SeqBasedTxCordinates = physicalTxCordinates[txSeq,:]
     SeqBasedRxCordinates = np.copy(physicalRxCordinates)
