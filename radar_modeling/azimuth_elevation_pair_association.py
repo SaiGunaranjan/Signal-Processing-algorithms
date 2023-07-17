@@ -40,20 +40,28 @@ def missingNumber(arr1, arr2):
     return mnum
 
 
-def mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad):
+def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
 
-    path = 'DopplerDivisionMultiplexing\\antenna_cordinates\\' + platform + '\\antenna\\' #For association debug
+    """ L_shaped_array """
+    # numTx and numRx available as global variables
+    # numTx = 6
+    # numRx = 6
+    txSeq = np.arange(numTx)
+    ulaInd = np.arange(numRx) # 6 element Az ULA
 
-    if (platform == 'L_shaped_array'):
+    physicalTxCordinates = np.array([[0.000000,  0.030000,  0.000000],
+                                     [0.000000,  0.026000,  0.000000],
+                                     [0.000000,  0.022000,  0.000000],
+                                     [0.000000,  0.018000,  0.000000],
+                                     [0.000000,  0.014000,  0.000000],
+                                     [0.000000,  0.010000,  0.000000]])
 
-        numTx = 6
-        numRx = 6
-        txSeq = np.array([0,1,2,3,4,5])
-        ulaInd = np.array([0,1,2,3,4,5]) # 6 element Az ULA
-
-
-    physicalTxCordinates = np.loadtxt(path+'LTXMA.txt')
-    physicalRxCordinates = np.loadtxt(path+'LRXMA.txt')
+    physicalRxCordinates = np.array([[0.030000, 0.000000,  0.000000],
+                                    [0.028000, 0.000000,  0.000000],
+                                    [0.026000, 0.000000,  0.000000],
+                                    [0.024000, 0.000000,  0.000000],
+                                    [0.022000, 0.000000,  0.000000],
+                                    [0.020000, 0.000000,  0.000000]])
 
     SeqBasedTxCordinates = physicalTxCordinates[txSeq,:]
     SeqBasedRxCordinates = np.copy(physicalRxCordinates)
@@ -158,7 +166,7 @@ objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
 actualAzElAnglePairs = np.hstack((objectAzAngle_deg[:,None],objectElAngle_deg[:,None]))
 
-_, mimoPhasor_txrx, _ = mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad)
+_, mimoPhasor_txrx, _ = mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad)
 
 ver_ula_signal = np.conj(mimoPhasor_txrx[:,:,0].T)
 hor_ula_signal = np.conj(mimoPhasor_txrx[:,0,:].T)
