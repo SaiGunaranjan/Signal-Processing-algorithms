@@ -151,8 +151,8 @@ AngbinResTx = np.arcsin(fsTx/numPointMUSIC)*180/np.pi
 # objectElAngle_deg = np.array([-np.round(txMaxAng) + offsetel,-np.round(txMaxAng) + np.round(txAngRes) + offsetel ,\
 #                               -np.round(txMaxAng) + 2*np.round(txAngRes) + offsetel])
 
-objectAzAngle_deg = np.array([-25,10,35])
-objectElAngle_deg = np.array([-25,-10, 15])
+objectAzAngle_deg = np.array([-5,5,10])
+objectElAngle_deg = np.array([-10,-5, 2])
 
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
@@ -165,7 +165,7 @@ hor_ula_signal = np.conj(mimoPhasor_txrx[:,0,:].T)
 
 numSnapshots = 100
 snr = 50
-snrdelta = 3 # This indicates by how much dB is the second target below the 1st target
+snrdelta = 0#3 # This indicates by how much dB is the second target below the 1st target and so on
 object_snr = np.array([snr,snr-snrdelta,snr-2*snrdelta])
 """ Noise parameters"""
 noiseFloordB = -100
