@@ -44,8 +44,7 @@ def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
 
     """ L_shaped_array """
     # numTx and numRx available as global variables
-    # numTx = 6
-    # numRx = 6
+
     txSeq = np.arange(numTx)
     ulaInd = np.arange(numRx)
 
@@ -250,6 +249,9 @@ for ele in range(f_ijk.shape[2]):
     azelIndPairs[ele,:] = np.array(indexPairs)
     estAzElAnglePairs[ele,0] = estAzAngles[indexPairs[0]]
     estAzElAnglePairs[ele,1] = estElAngles[indexPairs[1]]
+
+"""If 2 targets get the same azimuth index/elevation index
+while pairing up, then it is considered a failure. Need to handle this failure case."""
 
 missAzInd = missingNumber(np.arange(num_sources),azelIndPairs[0:num_sources-1,0])
 missElInd = missingNumber(np.arange(num_sources),azelIndPairs[0:num_sources-1,1])
