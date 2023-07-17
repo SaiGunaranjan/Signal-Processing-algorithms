@@ -43,7 +43,6 @@ def missingNumber(arr1, arr2):
 def mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad):
 
     path = 'DopplerDivisionMultiplexing\\antenna_cordinates\\' + platform + '\\antenna\\' #For association debug
-    # path = 'antenna_cordinates\\' + platform + '\\antenna\\'
 
     if (platform == 'L_shaped_array'):
 
@@ -123,8 +122,9 @@ numTx = 6
 numRx = 6
 rxSpacing = lamda/2
 fsRx = lamda/rxSpacing
-txSpacing = lamda/2
+txSpacing = lamda #lamda/2
 fsTx = lamda/txSpacing
+num_sources = 3
 
 rxAngRes = np.arcsin(fsRx/numRx)*180/np.pi
 txAngRes = np.arcsin(fsTx/numTx)*180/np.pi
@@ -144,9 +144,17 @@ AngbinResRx = np.arcsin(fsRx/numPointMUSIC)*180/np.pi
 angleGridTx = np.arcsin(((digital_freq_grid/(2*np.pi))*fsTx))*180/np.pi
 AngbinResTx = np.arcsin(fsTx/numPointMUSIC)*180/np.pi
 
-objectAzAngle_deg = np.array([-25,10,35]) #np.array([30,-10]) Theta plane angle
+# offsetaz = 10
+# objectAzAngle_deg = np.array([-np.round(rxMaxAng) + offsetaz,-np.round(rxMaxAng) + np.round(rxAngRes) + offsetaz ,\
+#                               -np.round(rxMaxAng) + 2*np.round(rxAngRes) + offsetaz])
+# offsetel = 5
+# objectElAngle_deg = np.array([-np.round(txMaxAng) + offsetel,-np.round(txMaxAng) + np.round(txAngRes) + offsetel ,\
+#                               -np.round(txMaxAng) + 2*np.round(txAngRes) + offsetel])
+
+objectAzAngle_deg = np.array([-25,10,35])
+objectElAngle_deg = np.array([-25,-10, 15])
+
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
-objectElAngle_deg = np.array([-35,-10, 15]) # phi=0 plane angle np.array([10,-10])
 objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
 actualAzElAnglePairs = np.hstack((objectAzAngle_deg[:,None],objectElAngle_deg[:,None]))
 
@@ -156,7 +164,6 @@ ver_ula_signal = np.conj(mimoPhasor_txrx[:,:,0].T)
 hor_ula_signal = np.conj(mimoPhasor_txrx[:,0,:].T)
 
 numSnapshots = 100
-num_sources = 3
 snr = 50
 snrdelta = 3 # This indicates by how much dB is the second target below the 1st target
 object_snr = np.array([snr,snr-snrdelta,snr-2*snrdelta])
@@ -216,22 +223,24 @@ crossDigFreq = digital_freq_grid[localMaxPeaks]
 
 f_ijk = np.abs(azelMat[:,:,None] - crossDigFreq[None,None,:])
 azelIndPairs = np.zeros((num_sources,2),dtype=np.int32)
-azelAngPairs = np.zeros((num_sources,2),dtype=np.float32)
+estAzElAnglePairs = np.zeros((num_sources,2),dtype=np.float32)
 for ele in range(f_ijk.shape[2]):
     linIndex = np.argmin(f_ijk[:,:,ele])
     indexPairs = np.unravel_index(linIndex,azelMat.shape)
     azelIndPairs[ele,:] = np.array(indexPairs)
-    azelAngPairs[ele,0] = estAzAngles[indexPairs[0]]
-    azelAngPairs[ele,1] = estElAngles[indexPairs[1]]
+    estAzElAnglePairs[ele,0] = estAzAngles[indexPairs[0]]
+    estAzElAnglePairs[ele,1] = estElAngles[indexPairs[1]]
 
 missAzInd = missingNumber(np.arange(num_sources),azelIndPairs[0:num_sources-1,0])
 missElInd = missingNumber(np.arange(num_sources),azelIndPairs[0:num_sources-1,1])
 azelIndPairs[-1,:] = np.array([missAzInd,missElInd])
-azelAngPairs[-1,0] = estAzAngles[missAzInd]
-azelAngPairs[-1,1] = estElAngles[missElInd]
+estAzElAnglePairs[-1,0] = estAzAngles[missAzInd]
+estAzElAnglePairs[-1,1] = estElAngles[missElInd]
 
+actualAzElAnglePairs = actualAzElAnglePairs[np.argsort(actualAzElAnglePairs[:,0]),:]
+estAzElAnglePairs = estAzElAnglePairs[np.argsort(estAzElAnglePairs[:,0]),:]
 print('\n True Az/El angle pairs = \n', actualAzElAnglePairs)
-print('\n Estimated Az/El angle pairs = \n', azelAngPairs)
+print('\n Estimated Az/El angle pairs = \n', estAzElAnglePairs)
 
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.subplot(1,2,1)
