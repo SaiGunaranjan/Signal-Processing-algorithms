@@ -121,7 +121,6 @@ def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
 
 
 
-
 platform = 'L_shaped_array'
 lightSpeed = 3e8
 centerFreq = 76.5e9
@@ -132,7 +131,8 @@ rxSpacing = lamda/2
 fsRx = lamda/rxSpacing
 txSpacing = lamda #lamda/2
 fsTx = lamda/txSpacing
-num_sources = 3
+num_sources = 2
+numPointAngle = 256
 
 rxAngRes = np.arcsin(fsRx/numRx)*180/np.pi
 txAngRes = np.arcsin(fsTx/numTx)*180/np.pi
@@ -143,8 +143,7 @@ txMaxAng = np.arcsin(fsTx/2)*180/np.pi
 print('Rx Ang Res = {0:.2f} deg, Tx Ang Res = {1:.2f} deg'.format(rxAngRes,txAngRes))
 print('Rx Ang Max = {0:.2f} deg, Tx Ang Max = {1:.2f} deg'.format(rxMaxAng,txMaxAng))
 
-spectrumGridOSRFact = 43#To obtain about 256 sample MUSIC
-digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(spectrumGridOSRFact*numTx))
+digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(numPointAngle))
 numPointMUSIC = len(digital_freq_grid)
 
 angleGridRx = np.arcsin(((digital_freq_grid/(2*np.pi))*fsRx))*180/np.pi
@@ -152,79 +151,144 @@ AngbinResRx = np.arcsin(fsRx/numPointMUSIC)*180/np.pi
 angleGridTx = np.arcsin(((digital_freq_grid/(2*np.pi))*fsTx))*180/np.pi
 AngbinResTx = np.arcsin(fsTx/numPointMUSIC)*180/np.pi
 
-objectAzAngle_deg = np.array([-5,5,10])
-objectElAngle_deg = np.array([-10,-5, 2])
-
-objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
-objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
-actualAzElAnglePairs = np.hstack((objectAzAngle_deg[:,None],objectElAngle_deg[:,None]))
-
-_, mimoPhasor_txrx, _ = mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad)
-
-ver_ula_signal = np.conj(mimoPhasor_txrx[:,:,0].T)
-hor_ula_signal = np.conj(mimoPhasor_txrx[:,0,:].T)
-
-numSnapshots = 100
-snr = 50
-snrdelta = 0#3 # This indicates by how much dB is the second target below the 1st target and so on
-object_snr = np.array([snr,snr-snrdelta,snr-2*snrdelta])
+# numSnapshots = numTx
+numMonteCarlo = 200
+num_sources = 2
+resol_fact = np.arange(0.1,1.1,0.1)
+numResol = len(resol_fact)
+snrArray = np.array([40])#np.arange(10,60,10) # np.array([40])
+numSNR = len(snrArray)
+snrdelta = 0#3 # This indicates by how much dB is the second target below the 1st target
 """ Noise parameters"""
 noiseFloordB = -100
-noise_power_db = noiseFloordB + 10*np.log10(numTx)
+noise_power_db = noiseFloordB + 10*np.log10(numTx) # change this from numTx
 noise_variance = 10**(noise_power_db/10)
 noise_sigma = np.sqrt(noise_variance)
-weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
 
-signal_phases = np.exp(1j*np.random.uniform(low=-np.pi, high = np.pi, size = numSnapshots*num_sources))
-signal_phases = signal_phases.reshape(num_sources,numSnapshots)
-complex_signal_amplitudes = weights[:,None]*signal_phases
-ver_signal = ver_ula_signal @ complex_signal_amplitudes
-hor_signal = hor_ula_signal @ complex_signal_amplitudes
+digFreqResAz = resol_fact*((2*np.pi)/numRx)
+azAngResDeg = np.arcsin((digFreqResAz/(2*np.pi))*fsRx)*180/np.pi
 
-wgn_noise_tx = (noise_sigma/np.sqrt(2))*np.random.randn(numTx * numSnapshots) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(numTx * numSnapshots)
-ver_signal = ver_signal + wgn_noise_tx.reshape(-1,numSnapshots)
+digFreqResEl = resol_fact*((2*np.pi)/numTx)
+elAngResDeg = np.arcsin((digFreqResEl/(2*np.pi))*fsTx)*180/np.pi
 
-wgn_noise_rx = (noise_sigma/np.sqrt(2))*np.random.randn(numRx * numSnapshots) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(numRx * numSnapshots)
-hor_signal = hor_signal + wgn_noise_rx.reshape(-1,numSnapshots)
 
-pseudo_spectrum_rx = music_snapshots(hor_signal, num_sources, numRx, digital_freq_grid)
-pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
-pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
+estAzAngleSepDegArr = np.zeros((numSNR,numResol,numMonteCarlo))
+estElAngleSepDegArr = np.zeros((numSNR,numResol,numMonteCarlo))
+for ele_snr in range(numSNR):
+    snr = snrArray[ele_snr]
+    object_snr = np.array([snr,snr-snrdelta])
+    weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
+    signal_phases = np.exp(1j*np.random.uniform(low=-np.pi, high = np.pi, size = num_sources))
+    complex_signal_amplitudes = weights * signal_phases
 
-pseudo_spectrum_tx = music_snapshots(ver_signal, num_sources, numTx, digital_freq_grid)
-pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
-pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
+    for ele_res in range(numResol):
+        objectAzAngle_deg = np.array([0,0+azAngResDeg[ele_res]])
+        objectElAngle_deg = np.array([0,0+elAngResDeg[ele_res]])
+        objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
+        objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
 
-localMaxInd = argrelextrema(pseudo_spectrum_rxdB,np.greater,axis=0,order=1)[0]
-peakInd = np.argsort(pseudo_spectrum_rxdB[localMaxInd])[-num_sources::]
-localMaxPeaks = localMaxInd[peakInd]
-azDigFreq = digital_freq_grid[localMaxPeaks]
-estAzAngles = angleGridRx[localMaxPeaks]
+        _, mimoPhasor_txrx, _ = mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad) # numObj, numTx, numRx
+        mimoPhasor = np.conj(mimoPhasor_txrx) # Remove this conj by removing flipud in music snapshots function
+        angleSignal = np.sum(mimoPhasor * complex_signal_amplitudes[:,None,None],axis=0)
 
-localMaxInd = argrelextrema(pseudo_spectrum_txdB,np.greater,axis=0,order=1)[0]
-peakInd = np.argsort(pseudo_spectrum_txdB[localMaxInd])[-num_sources::]
-localMaxPeaks = localMaxInd[peakInd]
-elDigFreq = digital_freq_grid[localMaxPeaks]
-estElAngles = angleGridTx[localMaxPeaks]
+        for ele_mc in range(numMonteCarlo):
+            wgn_noise = (noise_sigma/np.sqrt(2))*np.random.randn(numTx * numRx) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(numTx * numRx)
+            angleSignalwithNoise = angleSignal + wgn_noise.reshape(numTx,numRx)
 
-actualAzElAnglePairs = actualAzElAnglePairs[np.argsort(actualAzElAnglePairs[:,0]),:]
+            pseudo_spectrum_rx = music_snapshots(angleSignalwithNoise.T, num_sources, numRx, digital_freq_grid)
+            pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
+            pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
 
-print('\n True Az/El angle pairs = \n', actualAzElAnglePairs)
+            pseudo_spectrum_tx = music_snapshots(angleSignalwithNoise, num_sources, numTx, digital_freq_grid)
+            pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
+            pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
+
+            # localMaxInd = argrelextrema(pseudo_spectrum_rxdB,np.greater,axis=0,order=1)[0]
+            # peakInd = np.argsort(pseudo_spectrum_rxdB[localMaxInd])[-num_sources::]
+            # localMaxPeaks = localMaxInd[peakInd]
+            # estAzAngles = angleGridRx[localMaxPeaks]
+
+            """  Estimated Azimuth resolution computation"""
+            localMaxInd = argrelextrema(pseudo_spectrum_rxdB,np.greater,axis=0,order=1)[0]
+            try:
+                peakInd = np.argsort(pseudo_spectrum_rxdB[localMaxInd])[-num_sources::]
+                localMaxPeaks = localMaxInd[peakInd]
+                estAzAngleSepDeg = np.abs(np.diff(angleGridRx[localMaxPeaks]))
+                if (np.isnan(estAzAngleSepDeg)):
+                    estAzAngleSepDeg = 250
+            except IndexError:
+                estAzAngleSepDeg = 250
+
+            estAzAngleSepDegArr[ele_snr,ele_res,ele_mc] = estAzAngleSepDeg
+
+            # localMaxInd = argrelextrema(pseudo_spectrum_txdB,np.greater,axis=0,order=1)[0]
+            # peakInd = np.argsort(pseudo_spectrum_txdB[localMaxInd])[-num_sources::]
+            # localMaxPeaks = localMaxInd[peakInd]
+            # estElAngles = angleGridTx[localMaxPeaks]
+
+            """  Estimated elevation resolution computation"""
+            localMaxInd = argrelextrema(pseudo_spectrum_txdB,np.greater,axis=0,order=1)[0]
+            try:
+                peakInd = np.argsort(pseudo_spectrum_txdB[localMaxInd])[-num_sources::]
+                localMaxPeaks = localMaxInd[peakInd]
+                estElAngleSepDeg = np.abs(np.diff(angleGridTx[localMaxPeaks]))
+                if (np.isnan(estElAngleSepDeg)):
+                    estElAngleSepDeg = 250
+            except IndexError:
+                estElAngleSepDeg = 250
+
+            estElAngleSepDegArr[ele_snr,ele_res,ele_mc] = estElAngleSepDeg
+
+
+percent90estAzAngSepArrMusic = np.percentile(estAzAngleSepDegArr,90,axis=2)
+# percent90estAngSepArrCapon = np.percentile(estAngSepArrCapon,90,axis=2)
+
+percent50estAzAngSepArrMusic = np.percentile(estAzAngleSepDegArr,50,axis=2)
+# percent50estAngSepArrCapon = np.percentile(estAngSepArrCapon,50,axis=2)
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
+# plt.suptitle('Target SNR = ' + str(binSNRdBArray[0]) + ' dB')
 plt.subplot(1,2,1)
-plt.title('Num Rx samples = ' + str(numRx))
-plt.plot(angleGridRx, pseudo_spectrum_rxdB, label='MUSIC snapshots = {}'.format(numSnapshots))
-plt.vlines(objectAzAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
-plt.xlabel('Angle(deg)')
-plt.legend()
+plt.title('90 percentile separation')
+plt.plot(azAngResDeg,percent90estAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
+# plt.plot(azAngResDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
+plt.plot(azAngResDeg, azAngResDeg, color='k', label='Expectation')
+plt.xlabel('GT angular separation (deg)')
+plt.ylabel('estimated angular separation (deg)')
+plt.ylim([0,np.ceil(azAngResDeg[-1])])
 plt.grid(True)
+plt.legend()
+
 
 plt.subplot(1,2,2)
-plt.title('Num Tx samples = ' + str(numTx))
-plt.plot(angleGridTx, pseudo_spectrum_txdB, label='MUSIC snapshots = {}'.format(numSnapshots))
-plt.vlines(objectElAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
-plt.xlabel('Angle(deg)')
-plt.legend()
+plt.title('50 percentile separation')
+plt.plot(azAngResDeg,percent50estAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
+# plt.plot(azAngResDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
+plt.plot(azAngResDeg, azAngResDeg, color='k', label='Expectation')
+plt.xlabel('GT angular separation (deg)')
+plt.ylabel('estimated angular separation (deg)')
+# plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+plt.ylim([0,np.ceil(azAngResDeg[-1])])
 plt.grid(True)
+plt.legend()
+
+
+
+
+# plt.figure(1,figsize=(20,10),dpi=200)
+# plt.subplot(1,2,1)
+# plt.title('Num Rx samples = ' + str(numRx))
+# plt.plot(angleGridRx, pseudo_spectrum_rxdB)
+# plt.vlines(objectAzAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
+# plt.xlabel('Angle(deg)')
+# plt.legend()
+# plt.grid(True)
+
+# plt.subplot(1,2,2)
+# plt.title('Num Tx samples = ' + str(numTx))
+# plt.plot(angleGridTx, pseudo_spectrum_txdB)
+# plt.vlines(objectElAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
+# plt.xlabel('Angle(deg)')
+# plt.legend()
+# plt.grid(True)
