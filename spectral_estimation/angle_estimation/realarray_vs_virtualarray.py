@@ -62,15 +62,138 @@ import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
 
 
-np.random.seed(5)
-plt.close('all')
+def capon_method_marple_dev(datain,Nsen,Nfft):
+    """
+    capon_method_marple_dev
+
+    capon_method_marple_dev returns the power spectrum uing Capon Marple algorithm (batch calling)
+
+    Parameters:
+    datain (2D array, complex64): Input time samples. [cases, time samples]
+    Nsen (integer): No of time samples = datain.shape[1]
+    Nfft (integer): No of frequency samples in pseudo - spectrum, typically 1024, 2048
+    Ncas (integer): No of cases needing to be submitted to Capon = datain.shape[0]
+
+    Returns:
+    pssps_dBm (2D array, float32) : Power spectrum [cases, Nfft]
+
+    """
+
+    Ncas= datain.shape[0]
+    pssp= np.zeros((Ncas,Nfft),dtype=np.float32)
+    order = (Nsen*3)//4
+    for i in range(Ncas): # this for loop needs to be handled in GPU
+        psdx = stsminvar_marple(datain[i,:],order,1,Nfft)
+        pssp[i,:]= psdx
+    pssp_dBm= -10*np.log10(pssp)+10
+    pssps_dBm= np.fft.fftshift(pssp_dBm,axes=1)
+
+    return pssps_dBm
+
+
+def stsminvar_marple(X,order,sampling,NFFT):
+    """
+    stsminvar_marple
+
+    stsminvar_marple returns the power spectrum uing Capon Marple algorithm (basic engine)
+
+    Parameters:
+    X (array, complex64): Input time samples.
+    order (integer): AR model order. This should be set as not exceeding 3/4 of the Nsen (no of samples)
+    sampling (integer): sampling rate is set as 1
+    NFFT (integer): No of frequency samples in pseudo - spectrum, typically 1024, 2048
+
+    Returns:
+    PSD (array, float32) : Power spectrum
+
+    References:
+
+    Super-Fast Algorithm for Minimum Variance (Capon) Spectral Estimation, S. Lawrence Marple, Majid Adeli et al.
+    Asilomar 2010
+
+    """
+
+    gamma,err,A= myhayes_burg(X, order - 1)
+
+    Am= np.fft.fft(A,NFFT)
+    Bm= np.fft.fft(A*np.arange(order),NFFT)
+
+    Amc= np.conj(Am)
+    Bmc= np.conj(Bm)
+
+    den= order*Am*Amc - Am*Bmc - Bm*Amc
+
+    PSD= np.real(den)  # this is energy
+
+    return PSD
+
+
+def myhayes_burg(x,p):
+
+
+    """
+    myhayes_burg
+
+    myhayes_burg returns the AR coefficients using Burg Algorithm (basic engine)
+
+    Parameters:
+    x (array, complex64): Input time samples.
+    p (integer): AR model order. This should be set as not exceeding 3/4 of the Nsen (no of samples)
+
+    Returns:
+    gamma (array, float32) : Reflection Coefficients which is the parameter of the Lattice filter representation
+    err (array, float32) : Error in the model for all model orers till p
+    ap (array, complex64): AR model for p. That is np.dot( [1 ap1 ap2 ... app],[xn xn-1 xn-2 ... xn-p]). ap= [1 ap1 ap2 ... app]
+
+    Only ap is used by the calling function.
+
+    References:
+
+    Hayes: page-319. The LD to compute AR coefficients from gamma is adopted from Orifanidis
+    Optimum Signal Processing (http://www.ece.rutgers.edu/~orfanidi/osp2e). Page 195-196
+
+    """
+
+    N= x.size
+
+# Initilizations
+
+    ep= x[1:]
+    em= x[0:-1]
+    N +=-1
+
+    gamma= np.zeros(p+1,dtype='complex64')
+    err= np.zeros(p+1,dtype='complex64')
+    A= np.eye(p+1,dtype='complex64') # A[-1,::-1] is the AR coeffecients
+
+    for j in range(1,p+1,1):
+        gamma[j]= -2*np.dot(em.conj(),ep) / (np.dot(ep.conj(),ep) + np.dot(em.conj(),em))
+
+        temp1= ep + gamma[j]*em
+        temp2= em + np.conj(gamma[j])*ep
+        err[j]= np.dot(temp1.conj(),temp1) + np.dot(temp2.conj(),temp2)
+
+        ep= temp1[1:]
+        em= temp2[0:-1]
+
+        A[j,0]= gamma[j]
+
+        if (j>1):
+            A[j,1:j]= A[j-1,0:j-1] +  gamma[j]* np.flipud(A[j-1,0:j-1].conj())
+
+        N +=-1
+
+    ap= A[-1,::-1]
+
+    return gamma,err,ap
+
 
 def music_snapshots(received_signal, num_sources, num_samples, digital_freq_grid):
 
     signal_length = received_signal.shape[0]
     # numSnapshots = received_signal.shape[1]
 
-    received_signal = np.flipud(received_signal) # Need to remove this compute and push the sign change to the peak picking
+    # received_signal = np.flipud(received_signal) # Need to remove this compute and push the sign change to the peak picking
     auto_corr_matrix = received_signal @ np.conj(received_signal.T) # E[YY*] is accomplished as summation (yi * yih)
 
     """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
@@ -160,13 +283,15 @@ def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
     return mimoPhasor, mimoPhasor_txrx, ulaInd
 
 
+# np.random.seed(5)
+plt.close('all')
 
 platform = 'L_shaped_array'
 lightSpeed = 3e8
 centerFreq = 76.5e9
 lamda = lightSpeed/centerFreq
-numTx = 6
-numRx = 6
+numTx = 6#36
+numRx = 6#36
 rxSpacing = lamda/2
 fsRx = lamda/rxSpacing
 txSpacing = lamda #lamda/2
@@ -194,7 +319,7 @@ AngbinResTx = np.arcsin(fsTx/numPointMUSIC)*180/np.pi
 # numSnapshots = numTx
 numMonteCarlo = 200
 num_sources = 2
-resol_fact = np.arange(0.1,1.1,0.1)
+resol_fact = np.arange(0.1,2.1,0.1)#np.arange(0.1,2.9,0.1)#np.arange(0.1,1.1,0.1)
 numResol = len(resol_fact)
 snrArray = np.array([40])#np.arange(10,60,10) # np.array([40])
 numSNR = len(snrArray)
@@ -214,6 +339,9 @@ elAngResDeg = np.arcsin((digFreqResEl/(2*np.pi))*fsTx)*180/np.pi
 
 estAzAngleSepDegArr = np.zeros((numSNR,numResol,numMonteCarlo))
 estElAngleSepDegArr = np.zeros((numSNR,numResol,numMonteCarlo))
+
+estAzAngleSepDegArrCapon = np.zeros((numSNR,numResol,numMonteCarlo))
+estElAngleSepDegArrCapon = np.zeros((numSNR,numResol,numMonteCarlo))
 for ele_snr in range(numSNR):
     snr = snrArray[ele_snr]
     object_snr = np.array([snr,snr-snrdelta])
@@ -228,13 +356,14 @@ for ele_snr in range(numSNR):
         objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
 
         _, mimoPhasor_txrx, _ = mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad) # numObj, numTx, numRx
-        mimoPhasor = np.conj(mimoPhasor_txrx) # Remove this conj by removing flipud in music snapshots function
+        mimoPhasor = mimoPhasor_txrx
         angleSignal = np.sum(mimoPhasor * complex_signal_amplitudes[:,None,None],axis=0)
 
         for ele_mc in range(numMonteCarlo):
             wgn_noise = (noise_sigma/np.sqrt(2))*np.random.randn(numTx * numRx) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(numTx * numRx)
             angleSignalwithNoise = angleSignal + wgn_noise.reshape(numTx,numRx)
 
+            """ MUSIC analysis"""
             pseudo_spectrum_rx = music_snapshots(angleSignalwithNoise.T, num_sources, numRx, digital_freq_grid)
             pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
             pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
@@ -243,6 +372,18 @@ for ele_snr in range(numSNR):
             pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
             pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
 
+            """ CAPON Analysis"""
+            azSignal = np.conj(angleSignalwithNoise)[0,:][None,:]
+            spectrum_capon_rx = capon_method_marple_dev(azSignal,numRx,numPointAngle)
+            spectrum_capon_rx = spectrum_capon_rx[0,:]
+            spectrum_capon_rx -= np.amax(spectrum_capon_rx)
+
+            elSignal = np.conj(angleSignalwithNoise)[:,0][None,:]
+            spectrum_capon_tx = capon_method_marple_dev(elSignal,numTx,numPointAngle)
+            spectrum_capon_tx = spectrum_capon_tx[0,:]
+            spectrum_capon_tx -= np.amax(spectrum_capon_tx)
+
+            """ Local Maxima for MUSIC pseudo spectrum"""
             """  Estimated Azimuth resolution computation"""
             localMaxInd = argrelextrema(pseudo_spectrum_rxdB,np.greater,axis=0,order=1)[0]
             try:
@@ -269,21 +410,49 @@ for ele_snr in range(numSNR):
 
             estElAngleSepDegArr[ele_snr,ele_res,ele_mc] = estElAngleSepDeg
 
+            """ Local Maxima for Capon spectrum"""
+            """  Estimated Azimuth resolution computation"""
+            localMaxInd = argrelextrema(spectrum_capon_rx,np.greater,axis=0,order=1)[0]
+            try:
+                peakInd = np.argsort(spectrum_capon_rx[localMaxInd])[-num_sources::]
+                localMaxPeaks = localMaxInd[peakInd]
+                estAzAngleSepDeg = np.abs(np.diff(angleGridRx[localMaxPeaks]))
+                if (np.isnan(estAzAngleSepDeg) or len(estAzAngleSepDeg)==0):
+                    estAzAngleSepDeg = 250
+            except IndexError:
+                estAzAngleSepDeg = 250
+
+            estAzAngleSepDegArrCapon[ele_snr,ele_res,ele_mc] = estAzAngleSepDeg
+
+            """  Estimated elevation resolution computation"""
+            localMaxInd = argrelextrema(spectrum_capon_tx,np.greater,axis=0,order=1)[0]
+            try:
+                peakInd = np.argsort(spectrum_capon_tx[localMaxInd])[-num_sources::]
+                localMaxPeaks = localMaxInd[peakInd]
+                estElAngleSepDeg = np.abs(np.diff(angleGridTx[localMaxPeaks]))
+                if (np.isnan(estElAngleSepDeg) or len(estElAngleSepDeg)==0):
+                    estElAngleSepDeg = 250
+            except IndexError:
+                estElAngleSepDeg = 250
+
+            estElAngleSepDegArrCapon[ele_snr,ele_res,ele_mc] = estElAngleSepDeg
+
 
 percentestAzAngSepArrMusic = np.percentile(estAzAngleSepDegArr,90,axis=2)
-# percentestAzAngSepArrCapon = np.percentile(estAzAngleSepDegArrCapon,90,axis=2)
+percentestAzAngSepArrCapon = np.percentile(estAzAngleSepDegArrCapon,90,axis=2)
 
 percentestElAngSepArrMusic = np.percentile(estElAngleSepDegArr,90,axis=2)
-# percentestElAngSepArrCapon = np.percentile(estElAngleSepDegArrCapon,90,axis=2)
+percentestElAngSepArrCapon = np.percentile(estElAngleSepDegArrCapon,90,axis=2)
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
 # plt.suptitle('Target SNR = ' + str(binSNRdBArray[0]) + ' dB')
-plt.subplot(1,2,1)
+# plt.subplot(1,2,1)
 plt.title('Azimuth 90 percentile separation')
 plt.plot(azAngResDeg,percentestAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
-# plt.plot(azAngResDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
+plt.plot(azAngResDeg,percentestAzAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
 plt.plot(azAngResDeg, azAngResDeg, color='k', label='Expectation')
+plt.axvline(rxAngRes, alpha=1,color='black',ls='dashed',label = 'Native resolution')
 plt.xlabel('GT angular separation (deg)')
 plt.ylabel('estimated angular separation (deg)')
 plt.ylim([0,np.ceil(azAngResDeg[-1])])
@@ -291,34 +460,37 @@ plt.grid(True)
 plt.legend()
 
 
-plt.subplot(1,2,2)
-plt.title('Elevation 90 percentile separation')
-plt.plot(elAngResDeg,percentestElAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
-# plt.plot(azAngResDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
-plt.plot(elAngResDeg, elAngResDeg, color='k', label='Expectation')
-plt.xlabel('GT angular separation (deg)')
-plt.ylabel('estimated angular separation (deg)')
-# plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
-plt.ylim([0,np.ceil(elAngResDeg[-1])])
-plt.grid(True)
-plt.legend()
-
-
-
-
-# plt.figure(1,figsize=(20,10),dpi=200)
-# plt.subplot(1,2,1)
-# plt.title('Num Rx samples = ' + str(numRx))
-# plt.plot(angleGridRx, pseudo_spectrum_rxdB)
-# plt.vlines(objectAzAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
-# plt.xlabel('Angle(deg)')
-# plt.legend()
-# plt.grid(True)
-
 # plt.subplot(1,2,2)
-# plt.title('Num Tx samples = ' + str(numTx))
-# plt.plot(angleGridTx, pseudo_spectrum_txdB)
-# plt.vlines(objectElAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
-# plt.xlabel('Angle(deg)')
-# plt.legend()
+# plt.title('Elevation 90 percentile separation')
+# plt.plot(elAngResDeg,percentestElAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
+# plt.plot(elAngResDeg,percentestElAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
+# plt.plot(elAngResDeg, elAngResDeg, color='k', label='Expectation')
+# plt.axvline(txAngRes, alpha=1,color='black',ls='dashed',label = 'Native resolution')
+# plt.xlabel('GT angular separation (deg)')
+# plt.ylabel('estimated angular separation (deg)')
+# # plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+# plt.ylim([0,np.ceil(elAngResDeg[-1])])
 # plt.grid(True)
+# plt.legend()
+
+
+
+
+plt.figure(2,figsize=(20,10),dpi=200)
+plt.subplot(1,2,1)
+plt.title('Num Rx samples = ' + str(numRx))
+plt.plot(angleGridRx, pseudo_spectrum_rxdB)
+plt.plot(angleGridRx, spectrum_capon_rx)
+plt.vlines(objectAzAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
+plt.xlabel('Angle(deg)')
+plt.legend()
+plt.grid(True)
+
+plt.subplot(1,2,2)
+plt.title('Num Tx samples = ' + str(numTx))
+plt.plot(angleGridTx, pseudo_spectrum_txdB)
+plt.plot(angleGridTx, spectrum_capon_tx)
+plt.vlines(objectElAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
+plt.xlabel('Angle(deg)')
+plt.legend()
+plt.grid(True)
