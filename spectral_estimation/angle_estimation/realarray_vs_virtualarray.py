@@ -59,15 +59,55 @@ elevation ULA has 4 elements separated by lamda. So the virtual array for array2
 
 import numpy as np
 import matplotlib.pyplot as plt
-import sys
-sys.path.append("../..")
-sys.path.append("..")
-from spectral_estimation.spectral_estimation_lib import music_snapshots
 from scipy.signal import argrelextrema
 
 
 np.random.seed(5)
 plt.close('all')
+
+def music_snapshots(received_signal, num_sources, num_samples, digital_freq_grid):
+
+    signal_length = received_signal.shape[0]
+    # numSnapshots = received_signal.shape[1]
+
+    received_signal = np.flipud(received_signal) # Need to remove this compute and push the sign change to the peak picking
+    auto_corr_matrix = received_signal @ np.conj(received_signal.T) # E[YY*] is accomplished as summation (yi * yih)
+
+    """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
+    The proof for this is available in a technical report by MIT Lincoln laboratory by Evans, Johnson, Sun.
+    The report was published in 1982. The proof is available in page 2-30. The link to the pdf is available in the below link:
+        https://archive.ll.mit.edu/mission/aviation/publications/publication-files/technical_reports/Evans_1982_TR-582_WW-18359.pdf
+    """
+    auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5
+
+    auto_corr_matrix = auto_corr_matrix/signal_length # Divide the auto-correlation matrix by the signal length
+    u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
+    noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
+    # vandermonde_matrix = np.exp(-1j*np.outer(np.arange(num_samples),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies
+
+    """ The below step is to reduce the compute by taking only 1 noise subspace eigen vector and
+    performing FFT on it instead of on all the noise subspace eigen vectors. Theoretically this is correct
+    but with real data, using all the noise subspace eigen vectors and taking FFT and then
+    magnitude square and sum across all the FFTed noise subspace eigen vectors helps
+    give a smoother pseudo spectrum. If we use only 1/2 noise subspace eigen vectors, The true peaks are
+    undisturbed but some smaller flase peaks start to show up. Using all the noise subspace eigen vectors helps smoothen
+    and eliminate the false peaks.
+    Thus I have taken only 2 of the noise subpace eigen vectors instead of all. Enable below line
+    if you want to use only 1/2 noise subspace eigen vectors to reduce compute.
+    """
+
+    """ GhA can be computed in 2 ways:
+        1. As a correlation with a vandermonde matrix
+        2. Oversampled FFT of each of the noise subspace vectors
+        Both 1 and 2 are essentially one and the same. But 1 is compute heavy in terms of MACS while 2 is more FFT friendly
+
+    """
+    # GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+    GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
+    AhG = GhA.conj() # A*G
+    AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
+    pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
+    return pseudo_spectrum
 
 def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
 
@@ -203,11 +243,6 @@ for ele_snr in range(numSNR):
             pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
             pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
 
-            # localMaxInd = argrelextrema(pseudo_spectrum_rxdB,np.greater,axis=0,order=1)[0]
-            # peakInd = np.argsort(pseudo_spectrum_rxdB[localMaxInd])[-num_sources::]
-            # localMaxPeaks = localMaxInd[peakInd]
-            # estAzAngles = angleGridRx[localMaxPeaks]
-
             """  Estimated Azimuth resolution computation"""
             localMaxInd = argrelextrema(pseudo_spectrum_rxdB,np.greater,axis=0,order=1)[0]
             try:
@@ -220,11 +255,6 @@ for ele_snr in range(numSNR):
                 estAzAngleSepDeg = 250
 
             estAzAngleSepDegArr[ele_snr,ele_res,ele_mc] = estAzAngleSepDeg
-
-            # localMaxInd = argrelextrema(pseudo_spectrum_txdB,np.greater,axis=0,order=1)[0]
-            # peakInd = np.argsort(pseudo_spectrum_txdB[localMaxInd])[-num_sources::]
-            # localMaxPeaks = localMaxInd[peakInd]
-            # estElAngles = angleGridTx[localMaxPeaks]
 
             """  Estimated elevation resolution computation"""
             localMaxInd = argrelextrema(pseudo_spectrum_txdB,np.greater,axis=0,order=1)[0]
@@ -240,18 +270,18 @@ for ele_snr in range(numSNR):
             estElAngleSepDegArr[ele_snr,ele_res,ele_mc] = estElAngleSepDeg
 
 
-percent90estAzAngSepArrMusic = np.percentile(estAzAngleSepDegArr,90,axis=2)
-# percent90estAngSepArrCapon = np.percentile(estAngSepArrCapon,90,axis=2)
+percentestAzAngSepArrMusic = np.percentile(estAzAngleSepDegArr,90,axis=2)
+# percentestAzAngSepArrCapon = np.percentile(estAzAngleSepDegArrCapon,90,axis=2)
 
-percent50estAzAngSepArrMusic = np.percentile(estAzAngleSepDegArr,50,axis=2)
-# percent50estAngSepArrCapon = np.percentile(estAngSepArrCapon,50,axis=2)
+percentestElAngSepArrMusic = np.percentile(estElAngleSepDegArr,90,axis=2)
+# percentestElAngSepArrCapon = np.percentile(estElAngleSepDegArrCapon,90,axis=2)
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
 # plt.suptitle('Target SNR = ' + str(binSNRdBArray[0]) + ' dB')
 plt.subplot(1,2,1)
-plt.title('90 percentile separation')
-plt.plot(azAngResDeg,percent90estAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
+plt.title('Azimuth 90 percentile separation')
+plt.plot(azAngResDeg,percentestAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
 # plt.plot(azAngResDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
 plt.plot(azAngResDeg, azAngResDeg, color='k', label='Expectation')
 plt.xlabel('GT angular separation (deg)')
@@ -262,14 +292,14 @@ plt.legend()
 
 
 plt.subplot(1,2,2)
-plt.title('50 percentile separation')
-plt.plot(azAngResDeg,percent50estAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
+plt.title('Elevation 90 percentile separation')
+plt.plot(elAngResDeg,percentestElAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
 # plt.plot(azAngResDeg,percent90estAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
-plt.plot(azAngResDeg, azAngResDeg, color='k', label='Expectation')
+plt.plot(elAngResDeg, elAngResDeg, color='k', label='Expectation')
 plt.xlabel('GT angular separation (deg)')
 plt.ylabel('estimated angular separation (deg)')
 # plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
-plt.ylim([0,np.ceil(azAngResDeg[-1])])
+plt.ylim([0,np.ceil(elAngResDeg[-1])])
 plt.grid(True)
 plt.legend()
 
