@@ -60,6 +60,8 @@ elevation ULA has 4 elements separated by lamda. So the virtual array for array2
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import argrelextrema
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def capon_method_marple_dev(datain,Nsen,Nfft):
@@ -232,25 +234,38 @@ def music_snapshots(received_signal, num_sources, num_samples, digital_freq_grid
     pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
     return pseudo_spectrum
 
-def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
+def mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad):
 
-    """ L_shaped_array """
     # numTx and numRx available as global variables
-
     txSeq = np.arange(numTx)
-    ulaInd = np.arange(numRx)
 
-    tx_Yoffset = 0#10e-3
-    tx_ycordinates = tx_Yoffset + txSpacing*np.arange(numTx)
+    if (platform == 'array_1'):
+        # platform description for array_1 in docstring
+        tx_Yoffset = 0#10e-3
+        tx_ycordinates = tx_Yoffset + txSpacing*np.arange(numTx)
 
-    rx_Xoffset = 0#20e-3
-    rx_xcordinates = rx_Xoffset + rxSpacing*np.arange(numRx)
+        rx_Xoffset = 0#20e-3
+        rx_xcordinates = rx_Xoffset + rxSpacing*np.arange(numRx)
 
-    physicalTxCordinates = np.zeros((numTx,3),dtype=np.float32) # [x,y,z]
-    physicalTxCordinates[:,1] = np.flipud(tx_ycordinates)
+        physicalTxCordinates = np.zeros((numTx,3),dtype=np.float32) # [x,y,z]
+        physicalTxCordinates[:,1] = np.flipud(tx_ycordinates)
 
-    physicalRxCordinates = np.zeros((numRx,3),dtype=np.float32)
-    physicalRxCordinates[:,0] = np.flipud(rx_xcordinates)
+        physicalRxCordinates = np.zeros((numRx,3),dtype=np.float32)
+        physicalRxCordinates[:,0] = np.flipud(rx_xcordinates)
+
+    elif (platform == 'array_2'):
+        # platform description for array_2 in docstring
+        """ Array 2"""
+        physicalTxCordinates = np.array([[0,0.01,0],
+                                         [0,0.017843,0],
+                                         [0.005882,0.017843,0],
+                                         [0.011764,0.017843,0]]) # [x,y,z]
+
+        physicalRxCordinates = np.array([[0,0,0],
+                                         [0,0.003921,0],
+                                         [0.001960,0.003921,0],
+                                         [0.003921, 0.003921, 0]])
+
 
 
     SeqBasedTxCordinates = physicalTxCordinates[txSeq,:]
@@ -262,8 +277,8 @@ def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
     # for debug
     # plt.scatter(physicalRxCordinates[:,0],physicalRxCordinates[:,1])
     # plt.scatter(physicalTxCordinates[:,0],physicalTxCordinates[:,1])
+    # plt.scatter(virtualArrayCordinates[0,:],virtualArrayCordinates[1,:])
     # plt.gca().set_aspect('equal')
-
 
     azComp = np.sin(objectAzAngle_rad)
     elComp = np.sin(objectElAngle_rad)
@@ -274,24 +289,35 @@ def mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad):
     # radialComp = np.cos(objectAzAngle_rad)
 
     objUnitVector = np.vstack((azComp,elComp,radialComp)).T # [numObj, 3]
-
     beta = 2*np.pi/lamda
     mimoPhasor = np.exp(1j * beta * (objUnitVector @ virtualArrayCordinates)) # [numObj, numTx x numRx]
 
     mimoPhasor_txrx = mimoPhasor.reshape(-1, numTx, numRx) # [numObj, numTx, numRx]
 
-    return mimoPhasor, mimoPhasor_txrx, ulaInd
+    return mimoPhasor, mimoPhasor_txrx
 
 
 # np.random.seed(5)
 plt.close('all')
 
-platform = 'L_shaped_array'
+platform = 'array_1'
+if (platform == 'array_1'):
+    numTx = 6
+    numRx = 6
+    numAzUla = 6
+    numElUla = 6
+elif (platform == 'array_2'):
+    numTx = 4
+    numRx = 4
+    azUlaInd = np.array([5,6,7,9,10,11,13,14,15])
+    elUlaInd = np.array([0,1,4,5])
+    numAzUla = 9
+    numElUla = 4
+
+
 lightSpeed = 3e8
 centerFreq = 76.5e9
 lamda = lightSpeed/centerFreq
-numTx = 6
-numRx = 6
 rxSpacing = lamda/2
 fsRx = lamda/rxSpacing
 txSpacing = lamda #lamda/2
@@ -299,8 +325,8 @@ fsTx = lamda/txSpacing
 num_sources = 2
 numPointAngle = 256
 
-rxAngRes = np.arcsin(fsRx/numRx)*180/np.pi
-txAngRes = np.arcsin(fsTx/numTx)*180/np.pi
+rxAngRes = np.arcsin(fsRx/numAzUla)*180/np.pi
+txAngRes = np.arcsin(fsTx/numElUla)*180/np.pi
 
 rxMaxAng = np.arcsin(fsRx/2)*180/np.pi
 txMaxAng = np.arcsin(fsTx/2)*180/np.pi
@@ -323,17 +349,17 @@ resol_fact = np.arange(0.1,2.1,0.1)#np.arange(0.1,2.9,0.1)#np.arange(0.1,1.1,0.1
 numResol = len(resol_fact)
 snrArray = np.array([40])
 numSNR = len(snrArray)
-snrdelta = 0#3 # This indicates by how much dB is the second target below the 1st target
+snrdelta = 0 #3 # This indicates by how much dB is the second target below the 1st target
 """ Noise parameters"""
 noiseFloordB = -100
 noise_power_db = noiseFloordB + 10*np.log10(numTx) # change this from numTx
 noise_variance = 10**(noise_power_db/10)
 noise_sigma = np.sqrt(noise_variance)
 
-digFreqResAz = resol_fact*((2*np.pi)/numRx)
+digFreqResAz = resol_fact*((2*np.pi)/numAzUla)
 azAngResDeg = np.arcsin((digFreqResAz/(2*np.pi))*fsRx)*180/np.pi
 
-digFreqResEl = resol_fact*((2*np.pi)/numTx)
+digFreqResEl = resol_fact*((2*np.pi)/numElUla)
 elAngResDeg = np.arcsin((digFreqResEl/(2*np.pi))*fsTx)*180/np.pi
 
 
@@ -355,7 +381,7 @@ for ele_snr in range(numSNR):
         objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
         objectElAngle_rad = (objectElAngle_deg/360) * (2*np.pi)
 
-        _, mimoPhasor_txrx, _ = mimoPhasorSynth(lamda, objectAzAngle_rad, objectElAngle_rad) # numObj, numTx, numRx
+        _, mimoPhasor_txrx = mimoPhasorSynth(platform, lamda, objectAzAngle_rad, objectElAngle_rad) # numObj, numTx, numRx
         mimoPhasor = mimoPhasor_txrx
         angleSignal = np.sum(mimoPhasor * complex_signal_amplitudes[:,None,None],axis=0)
 
@@ -363,26 +389,53 @@ for ele_snr in range(numSNR):
             wgn_noise = (noise_sigma/np.sqrt(2))*np.random.randn(numTx * numRx) + 1j*(noise_sigma/np.sqrt(2))*np.random.randn(numTx * numRx)
             angleSignalwithNoise = angleSignal + wgn_noise.reshape(numTx,numRx)
 
-            """ MUSIC analysis"""
-            pseudo_spectrum_rx = music_snapshots(angleSignalwithNoise.T, num_sources, numRx, digital_freq_grid)
-            pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
-            pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
-            # if (numRx == 9):
-            #     pseudo_spectrum_tx = music_snapshots(angleSignalwithNoise[:,0][:,None], num_sources, numTx, digital_freq_grid)
-            pseudo_spectrum_tx = music_snapshots(angleSignalwithNoise, num_sources, numTx, digital_freq_grid)
-            pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
-            pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
+            if (platform == 'array_1'):
+                """ MUSIC analysis"""
+                pseudo_spectrum_rx = music_snapshots(angleSignalwithNoise.T, num_sources, numRx, digital_freq_grid)
+                pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
+                pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
 
-            """ CAPON Analysis"""
-            azSignal = np.conj(angleSignalwithNoise)[0,:][None,:]
-            spectrum_capon_rx = capon_method_marple_dev(azSignal,numRx,numPointAngle)
-            spectrum_capon_rx = spectrum_capon_rx[0,:]
-            spectrum_capon_rx -= np.amax(spectrum_capon_rx)
+                pseudo_spectrum_tx = music_snapshots(angleSignalwithNoise, num_sources, numTx, digital_freq_grid)
+                pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
+                pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
 
-            elSignal = np.conj(angleSignalwithNoise)[:,0][None,:]
-            spectrum_capon_tx = capon_method_marple_dev(elSignal,numTx,numPointAngle)
-            spectrum_capon_tx = spectrum_capon_tx[0,:]
-            spectrum_capon_tx -= np.amax(spectrum_capon_tx)
+                """ CAPON Analysis"""
+                azSignal = np.conj(angleSignalwithNoise)[0,:][None,:]
+                spectrum_capon_rx = capon_method_marple_dev(azSignal,numRx,numPointAngle)
+                spectrum_capon_rx = spectrum_capon_rx[0,:]
+                spectrum_capon_rx -= np.amax(spectrum_capon_rx)
+
+                elSignal = np.conj(angleSignalwithNoise)[:,0][None,:]
+                spectrum_capon_tx = capon_method_marple_dev(elSignal,numTx,numPointAngle)
+                spectrum_capon_tx = spectrum_capon_tx[0,:]
+                spectrum_capon_tx -= np.amax(spectrum_capon_tx)
+
+            elif (platform == 'array_2'):
+
+                mimoSignalFlatten = angleSignalwithNoise.flatten()
+
+                azSignal = mimoSignalFlatten[azUlaInd]
+                elSignal = mimoSignalFlatten[elUlaInd]
+                """ MUSIC analysis"""
+                pseudo_spectrum_rx = music_snapshots(np.conj(azSignal)[:,None], num_sources, numAzUla, digital_freq_grid)
+                pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
+                pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
+
+                pseudo_spectrum_tx = music_snapshots(np.conj(elSignal)[:,None], num_sources, numElUla, digital_freq_grid)
+                pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
+                pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
+
+                """ CAPON Analysis"""
+                azSignal = azSignal[None,:]
+                spectrum_capon_rx = capon_method_marple_dev(azSignal,numAzUla,numPointAngle)
+                spectrum_capon_rx = spectrum_capon_rx[0,:]
+                spectrum_capon_rx -= np.amax(spectrum_capon_rx)
+
+                elSignal = elSignal[None,:]
+                spectrum_capon_tx = capon_method_marple_dev(elSignal,numElUla,numPointAngle)
+                spectrum_capon_tx = spectrum_capon_tx[0,:]
+                spectrum_capon_tx -= np.amax(spectrum_capon_tx)
+
 
             """ Local Maxima for MUSIC pseudo spectrum"""
             """  Estimated Azimuth resolution computation"""
@@ -447,7 +500,7 @@ percentestElAngSepArrCapon = np.percentile(estElAngleSepDegArrCapon,90,axis=2)
 
 
 plt.figure(1,figsize=(20,10),dpi=200)
-# plt.suptitle('Target SNR = ' + str(binSNRdBArray[0]) + ' dB')
+plt.suptitle('Target SNR = ' + str(snrArray[-1]) + ' dB')
 plt.subplot(1,2,1)
 plt.title('Azimuth')
 plt.plot(azAngResDeg,percentestAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
@@ -476,20 +529,20 @@ plt.legend()
 
 
 if 0:
-    np.save('azAngResDeg_' + str(numRx) + '.npy', azAngResDeg)
-    np.save('percentestAzAngSepArrMusic_' + str(numRx) + '.npy', percentestAzAngSepArrMusic)
-    np.save('percentestAzAngSepArrCapon_' + str(numRx) + '.npy', percentestAzAngSepArrCapon)
-    np.save('rxAngRes_' + str(numRx) + '.npy', rxAngRes)
+    np.save('azAngResDeg_' + str(numAzUla) + '.npy', azAngResDeg)
+    np.save('percentestAzAngSepArrMusic_' + str(numAzUla) + '.npy', percentestAzAngSepArrMusic)
+    np.save('percentestAzAngSepArrCapon_' + str(numAzUla) + '.npy', percentestAzAngSepArrCapon)
+    np.save('rxAngRes_' + str(numAzUla) + '.npy', rxAngRes)
 
-    np.save('elAngResDeg_' + str(numTx) + '.npy', elAngResDeg)
-    np.save('percentestElAngSepArrMusic_' + str(numTx) + '.npy', percentestElAngSepArrMusic)
-    np.save('percentestElAngSepArrCapon_' + str(numTx) + '.npy', percentestElAngSepArrCapon)
-    np.save('txAngRes_' + str(numTx) + '.npy', txAngRes)
+    np.save('elAngResDeg_' + str(numElUla) + '.npy', elAngResDeg)
+    np.save('percentestElAngSepArrMusic_' + str(numElUla) + '.npy', percentestElAngSepArrMusic)
+    np.save('percentestElAngSepArrCapon_' + str(numElUla) + '.npy', percentestElAngSepArrCapon)
+    np.save('txAngRes_' + str(numElUla) + '.npy', txAngRes)
 
 
 plt.figure(2,figsize=(20,10),dpi=200)
 plt.subplot(1,2,1)
-plt.title('Num Rx samples = ' + str(numRx))
+plt.title('Azimuth Spectrum. Num Rx samples = ' + str(numRx))
 plt.plot(angleGridRx, pseudo_spectrum_rxdB)
 plt.plot(angleGridRx, spectrum_capon_rx)
 plt.vlines(objectAzAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
@@ -498,7 +551,7 @@ plt.legend()
 plt.grid(True)
 
 plt.subplot(1,2,2)
-plt.title('Num Tx samples = ' + str(numTx))
+plt.title('Elevation spectrum. Num Tx samples = ' + str(numTx))
 plt.plot(angleGridTx, pseudo_spectrum_txdB)
 plt.plot(angleGridTx, spectrum_capon_tx)
 plt.vlines(objectElAngle_deg,-60,5, alpha=1,color='black',ls='dashed',label = 'Ground truth')
