@@ -290,8 +290,8 @@ platform = 'L_shaped_array'
 lightSpeed = 3e8
 centerFreq = 76.5e9
 lamda = lightSpeed/centerFreq
-numTx = 6#36
-numRx = 6#36
+numTx = 6
+numRx = 6
 rxSpacing = lamda/2
 fsRx = lamda/rxSpacing
 txSpacing = lamda #lamda/2
@@ -321,7 +321,7 @@ numMonteCarlo = 200
 num_sources = 2
 resol_fact = np.arange(0.1,2.1,0.1)#np.arange(0.1,2.9,0.1)#np.arange(0.1,1.1,0.1)
 numResol = len(resol_fact)
-snrArray = np.array([40])#np.arange(10,60,10) # np.array([40])
+snrArray = np.array([40])
 numSNR = len(snrArray)
 snrdelta = 0#3 # This indicates by how much dB is the second target below the 1st target
 """ Noise parameters"""
@@ -367,7 +367,8 @@ for ele_snr in range(numSNR):
             pseudo_spectrum_rx = music_snapshots(angleSignalwithNoise.T, num_sources, numRx, digital_freq_grid)
             pseudo_spectrum_rx = pseudo_spectrum_rx/np.amax(pseudo_spectrum_rx)
             pseudo_spectrum_rxdB = 10*np.log10(pseudo_spectrum_rx)
-
+            # if (numRx == 9):
+            #     pseudo_spectrum_tx = music_snapshots(angleSignalwithNoise[:,0][:,None], num_sources, numTx, digital_freq_grid)
             pseudo_spectrum_tx = music_snapshots(angleSignalwithNoise, num_sources, numTx, digital_freq_grid)
             pseudo_spectrum_tx = pseudo_spectrum_tx/np.amax(pseudo_spectrum_tx)
             pseudo_spectrum_txdB = 10*np.log10(pseudo_spectrum_tx)
@@ -390,7 +391,7 @@ for ele_snr in range(numSNR):
                 peakInd = np.argsort(pseudo_spectrum_rxdB[localMaxInd])[-num_sources::]
                 localMaxPeaks = localMaxInd[peakInd]
                 estAzAngleSepDeg = np.abs(np.diff(angleGridRx[localMaxPeaks]))
-                if (np.isnan(estAzAngleSepDeg)):
+                if (np.isnan(estAzAngleSepDeg) or len(estAzAngleSepDeg)==0):
                     estAzAngleSepDeg = 250
             except IndexError:
                 estAzAngleSepDeg = 250
@@ -403,7 +404,7 @@ for ele_snr in range(numSNR):
                 peakInd = np.argsort(pseudo_spectrum_txdB[localMaxInd])[-num_sources::]
                 localMaxPeaks = localMaxInd[peakInd]
                 estElAngleSepDeg = np.abs(np.diff(angleGridTx[localMaxPeaks]))
-                if (np.isnan(estElAngleSepDeg)):
+                if (np.isnan(estElAngleSepDeg) or len(estElAngleSepDeg)==0):
                     estElAngleSepDeg = 250
             except IndexError:
                 estElAngleSepDeg = 250
@@ -447,8 +448,8 @@ percentestElAngSepArrCapon = np.percentile(estElAngleSepDegArrCapon,90,axis=2)
 
 plt.figure(1,figsize=(20,10),dpi=200)
 # plt.suptitle('Target SNR = ' + str(binSNRdBArray[0]) + ' dB')
-# plt.subplot(1,2,1)
-plt.title('Azimuth 90 percentile separation')
+plt.subplot(1,2,1)
+plt.title('Azimuth')
 plt.plot(azAngResDeg,percentestAzAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
 plt.plot(azAngResDeg,percentestAzAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
 plt.plot(azAngResDeg, azAngResDeg, color='k', label='Expectation')
@@ -460,20 +461,30 @@ plt.grid(True)
 plt.legend()
 
 
-# plt.subplot(1,2,2)
-# plt.title('Elevation 90 percentile separation')
-# plt.plot(elAngResDeg,percentestElAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
-# plt.plot(elAngResDeg,percentestElAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
-# plt.plot(elAngResDeg, elAngResDeg, color='k', label='Expectation')
-# plt.axvline(txAngRes, alpha=1,color='black',ls='dashed',label = 'Native resolution')
-# plt.xlabel('GT angular separation (deg)')
-# plt.ylabel('estimated angular separation (deg)')
-# # plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
-# plt.ylim([0,np.ceil(elAngResDeg[-1])])
-# plt.grid(True)
-# plt.legend()
+plt.subplot(1,2,2)
+plt.title('Elevation')
+plt.plot(elAngResDeg,percentestElAngSepArrMusic.T, '-o', label='MUSIC', alpha=0.7)
+plt.plot(elAngResDeg,percentestElAngSepArrCapon.T, '-s', label='Capon', alpha=0.6)
+plt.plot(elAngResDeg, elAngResDeg, color='k', label='Expectation')
+plt.axvline(txAngRes, alpha=1,color='black',ls='dashed',label = 'Native resolution')
+plt.xlabel('GT angular separation (deg)')
+plt.ylabel('estimated angular separation (deg)')
+# plt.axis([angSepDeg[0], angSepDeg[-1], angSepDeg[0], angSepDeg[-1]])
+plt.ylim([0,np.ceil(elAngResDeg[-1])])
+plt.grid(True)
+plt.legend()
 
 
+if 0:
+    np.save('azAngResDeg_' + str(numRx) + '.npy', azAngResDeg)
+    np.save('percentestAzAngSepArrMusic_' + str(numRx) + '.npy', percentestAzAngSepArrMusic)
+    np.save('percentestAzAngSepArrCapon_' + str(numRx) + '.npy', percentestAzAngSepArrCapon)
+    np.save('rxAngRes_' + str(numRx) + '.npy', rxAngRes)
+
+    np.save('elAngResDeg_' + str(numTx) + '.npy', elAngResDeg)
+    np.save('percentestElAngSepArrMusic_' + str(numTx) + '.npy', percentestElAngSepArrMusic)
+    np.save('percentestElAngSepArrCapon_' + str(numTx) + '.npy', percentestElAngSepArrCapon)
+    np.save('txAngRes_' + str(numTx) + '.npy', txAngRes)
 
 
 plt.figure(2,figsize=(20,10),dpi=200)
