@@ -173,7 +173,7 @@ def music_snapshots(received_signal, num_sources, num_samples, digital_freq_grid
     signal_length = received_signal.shape[0]
     numSnapshots = received_signal.shape[1]
 
-    received_signal = np.flipud(received_signal)
+    received_signal = np.flipud(received_signal) # Need to remove this compute and push the sign change to the peak picking
     auto_corr_matrix = received_signal @ np.conj(received_signal.T) # E[YY*] is accomplished as summation (yi * yih)
 
     """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
@@ -612,6 +612,9 @@ def spatially_variant_apodization_optimized(received_signal, osrFact):
     svaOptimalMagSpectrumdB -= np.amax(svaOptimalMagSpectrumdB)
 
     return svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB
+
+
+
 
 
 
