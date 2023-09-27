@@ -614,7 +614,30 @@ def spatially_variant_apodization_optimized(received_signal, osrFact):
     return svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB
 
 
+def spatially_variant_apodization_multidimension(received_signal, osrFact, apod_axis):
 
+
+    num_samples = received_signal.shape[apod_axis]
+    received_signal_sva = received_signal
+    numFFTOSR = osrFact*num_samples
+    signalFFT = np.fft.fft(received_signal_sva,n=numFFTOSR,axis=apod_axis)/num_samples # Is normalization required here for sva
+    Xk = signalFFT
+    kmKInd = np.arange(0,numFFTOSR) - osrFact
+    kmKInd[kmKInd<0] += numFFTOSR
+    # XkmK = Xk[kmKInd,:]
+    XkmK = np.take(Xk,kmKInd,axis=apod_axis)
+    kpKInd = np.arange(0,numFFTOSR) + osrFact
+    kpKInd[kpKInd>numFFTOSR-1] -= numFFTOSR
+    # XkpK = Xk[kpKInd,:]
+    XkpK = np.take(Xk,kpKInd,axis=apod_axis)
+    alphaK = np.real(Xk/(XkmK+XkpK))
+    alphaK[alphaK<0] = 0
+    alphaK[alphaK>0.5] = 0.5
+    svaspectrum = Xk - alphaK*(XkmK+XkpK)
+    svaOptimalComplexSpectrumfftshifted = np.fft.fftshift(svaspectrum,axes=(apod_axis,))
+    svaOptimalMagSpectrumdB = 20*np.log10(np.abs(svaOptimalComplexSpectrumfftshifted))
+
+    return svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB
 
 
 
