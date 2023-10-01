@@ -33,7 +33,7 @@ and a fractional part. But in fixed point processors, we cannot directly represe
 
     3. Find i:
         To find i, is to find the power of 2 closest to (and smaller than) X. Now, X is a fixed point number say with 32 bits.
-        To find i is to find the first bit from the MSB which is 1. Thsi can be done in different ways but I follow the below approach.
+        To find i is to find the first bit from the MSB which is 1. This can be done in different ways but I follow the below approach.
         Keep right shifting X in an iterative fashion (dropping 1 LSB at a time) and keep monitoring the value of the resultant
         number. When the resultant number after dropping 1 bit at a time becomes equal to 1, then we know we have reached
         the first 1 from the MSB. We keep a counter of number of times we are dropping 1 LSB and keep checking
@@ -42,7 +42,7 @@ and a fractional part. But in fixed point processors, we cannot directly represe
 
 
     4. Find f:
-        We have X and from above step, we have got i. Coming back to our original fooating point representation of X, we have
+        We have X and from above step, we have got i. Coming back to our original floating point representation of X, we have
         X = 2^i * (1+f). This implies, X/(2^i) - 1 = f. So, to obtain f, we need to divide X by 2^i and then subtract 1.
         The resultant f is a number always between 0 and 1. But remember, we are working on a fixed point machine
         and hence we cannot have any fractional numbers. So how do we circumvent this? To avoid the fractional numbers for f,
@@ -78,9 +78,9 @@ and a fractional part. But in fixed point processors, we cannot directly represe
                fractional bits. So f becomes f * 2^10. So f now goes from 0 to 2^10. So the step size delta also gets scaled by
                2^10. So delta becomes 1/(2^p) * 2^10. If p = 32, then delta becomes 2^5. So in our new scale, we have
                delta = 2^5 and f goes from 0 to 2^10. Note that we still have 2^5 = 32 intervals. Now we have made delta a power of 2.
-               So coming back, the interval to which f belongs is computed as m = f/delta. Now delta = 2^5. So thsi essentially
-               means we left shift f by 5 to get the interval m. So we now know the interval to which f belongs. Next is to
-               evaluate log2(1+f) for the actual obtained f. LUT has only the values of log2(1+f) for the discrete points
+               So coming back, the interval to which f belongs is computed as m = f/delta. Now delta = 2^5. So this essentially
+               means we left shift f by 5 to get the interval m. So we now know the interval to which f belongs.
+            b) Next is to evaluate log2(1+f) for the actual obtained f. LUT has only the values of log2(1+f) for the discrete points
                But f need not always fall on the discrete points as set in the LUT. To get the exact value of log2(1+f),
                we use linear interpolation. We fit a straight line to the function log2(1+f) in the interval m, m+1 and
                then evaluate the line at the f obtained in step 4. The equation of the line fitting the points x1,y1 and
@@ -97,9 +97,9 @@ and a fractional part. But in fixed point processors, we cannot directly represe
         we need to either drop 10 fractional bits of log2(1+f) or add 10 fractional bits to i to make it 5Q10.
         Dropping 10 fractional bits for log2(1+f) defeats the entire purpose and hence the obvious way is to add 5 fractional bits to i.
         This is achieved by left shifting i by 10. So i now becomes 5Q10 and log2(1+f) is 0Q10. Now the decimal points are
-        aligned and hence can be added. There for the final log2(X) = i << 10 + log2(1+f). This is the fixed point
+        aligned and hence can be added. Therefore the final log2(X) = i << 10 + log2(1+f). This is the fixed point
         log2 evaluation of fixed point number X. To get the actual floating point value of log2(X), we have to
-        divide the fixed point output by the scaling factor 2^10 (since we added 0 fraction bits to make it mQ10).
+        divide the fixed point output by the scaling factor 2^10 (since we added 10 fraction bits to make it mQ10).
 
 Note: Even though the input number never reaches 2**32(since uint has max value = 2**32 -1), we create an LUT for f going
 from 0 10 1 including 1 (or 0 to 1024 including 1024). This is so that during interpolation, we can utilize the last interval as well.
