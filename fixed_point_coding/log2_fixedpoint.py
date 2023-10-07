@@ -110,7 +110,7 @@ import numpy as np
 # import matplotlib.pyplot as plt
 
 
-inputFixedPointNum = np.random.randint(0,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+inputFixedPointNum = np.random.randint(1,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
 log2_inputFixedPointNum = np.log2(inputFixedPointNum)
 
 """ Step 2: LUT for log2(1+f) """
@@ -133,6 +133,7 @@ if (NUM_FRAC_BITS >= nearestPowof2):
     resFixedPointNum = inputFixedPointNum << (NUM_FRAC_BITS-nearestPowof2)
 else:
     resFixedPointNum = inputFixedPointNum >> (nearestPowof2-NUM_FRAC_BITS)
+""" I think above if statement can be replaced with first left shift followed by right shift"""
 resFixedPointNumNormalized = resFixedPointNum - (1<<NUM_FRAC_BITS) # 0Q10
 interval = resFixedPointNumNormalized >> 5
 slope = (log2_1pf_lut_fp[interval+1] - log2_1pf_lut_fp[interval]) #>> 5

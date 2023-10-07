@@ -31,6 +31,7 @@ and a fractional part. But in fixed point processors, we cannot directly represe
     LUT for (2^i)^0.25:
     For a 32 bit input number, i varies from 0 to 31. So we can create an LUT with 32 entries( of i) and 10 fractional bits
     So now, we have a framework for obtaining (2^i)^0.25.
+    The LUT for (2^i)^0.25 can further be reduced from 32 entries! This is how.
 
     LUT for (1+f)^0.25:
     To create and store an LUT, we need some finite entries and so we will divide the f scale from 0 to 1 in steps of
@@ -108,14 +109,14 @@ and a fractional part. But in fixed point processors, we cannot directly represe
         divide the fixed point output by the scaling factor 2^10 (since we added 10 fraction bits to make it mQ10).
 
 Note: Even though the input number never reaches 2**32(since uint has max value = 2**32 -1), we create an LUT for f going
-from 0 10 1 including 1 (or 0 to 1024 including 1024). This is so that during interpolation, we can utilize the last interval as well.
+from 0 to 1 including 1 (or 0 to 1024 including 1024). This is so that during interpolation, we can utilize the last interval as well.
 """
 """ This is just the first implementation. I need to check if the accuracy can be improved further!"""
 
 import numpy as np
 # import matplotlib.pyplot as plt
 
-inputFixedPointNum = np.random.randint(0,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+inputFixedPointNum = np.random.randint(1,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
 fourthroot_inputFixedPointNum = (inputFixedPointNum)**0.25
 
 """ Step 2: LUT for (1+f)^0.25 """
@@ -153,7 +154,7 @@ mTimesXMinusX1 = slope * (resFixedPointNumNormalized - (interval<<5)) # 0Q5 * 0Q
 mTimesXMinusX1 = mTimesXMinusX1 >> 5 # Drop 5 fractional bits to get 0Q10.
 fourthroot_1pf_fp_eval = (fourthroot_1pf_lut_fp[interval] + mTimesXMinusX1).astype('int32') #1Q10 + 0Q10
 """ Step 5"""
-fourthroot_2powi_fp_eval = fourthroot_2powi_fp[nearestPowof2] # 8Q10 2^(i*0.25)
+fourthroot_2powi_fp_eval = fourthroot_2powi_fp[nearestPowof2] # 2^(i*0.25) = 8Q10
 """ Step 6"""
 fourthroot_eval_fp_num = fourthroot_2powi_fp_eval * fourthroot_1pf_fp_eval # 8Q10 * 1Q10 = 9Q20
 fourthroot_eval_fp_num = fourthroot_eval_fp_num >> NUM_FRAC_BITS # 9Q10
