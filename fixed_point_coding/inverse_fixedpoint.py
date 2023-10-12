@@ -114,9 +114,16 @@ from 0 to 1 including 1 (or 0 to 1024 including 1024). This is so that during in
 """ This is just the first implementation. I need to check if the accuracy can be improved further!"""
 
 import numpy as np
+import sys
 # import matplotlib.pyplot as plt
 
-inputFixedPointNum = np.random.randint(-2**31,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+integerBitWidth = 32 # bits
+inputFixedPointNum = np.random.randint(-2**(integerBitWidth-1),2**(integerBitWidth-1) - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+
+if (inputFixedPointNum == 0):
+    print('\n{}/{} does not exist!'.format(1,inputFixedPointNum))
+    sys.exit(0)
+
 inverse_inputFixedPointNum = 1/(inputFixedPointNum)
 
 """ Step 2: LUT for 1/(1+f) """

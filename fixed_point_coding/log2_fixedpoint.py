@@ -107,10 +107,16 @@ from 0 10 1 including 1 (or 0 to 1024 including 1024). This is so that during in
 
 
 import numpy as np
+import sys
 # import matplotlib.pyplot as plt
 
+integerBitWidth = 32 # bits
+inputFixedPointNum = np.random.randint(1,2**(integerBitWidth-1) - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
 
-inputFixedPointNum = np.random.randint(1,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+if (inputFixedPointNum <= 0):
+    print('\nlogarithm does not exist for {} or negative numbers!'.format(inputFixedPointNum))
+    sys.exit(0)
+
 log2_inputFixedPointNum = np.log2(inputFixedPointNum)
 
 """ Step 2: LUT for log2(1+f) """
