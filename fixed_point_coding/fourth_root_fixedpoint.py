@@ -113,11 +113,28 @@ from 0 to 1 including 1 (or 0 to 1024 including 1024). This is so that during in
 """
 """ This is just the first implementation. I need to check if the accuracy can be improved further!"""
 
+""" Method 2: Using smaller LUT"""
+""" Lets say we wish to find the fourth root of 2^26 + 100. This can be written as 2^26 * (1+f). SO, to find the fourth root
+of the number, we nned to find the fourth root of 2^26 and then the fourth root of (1+f) and then multiply these 2 terms.
+Now, 2^((26)*0.25) i.e foruth root of 2^26 can be written as 2^(26/4) = 2^((24+2)/4) = 2^(24/4 + 2/4)  = 2^(6 + 2/4)
+= 2^6 * 2^(2/4). We call the second term as the residual. The residual varies as 2^(0/4), 2^(1/4), 2^(2/4), 2^(3/4). We can store the LUT of these 4 numbers
+instead of storing the LUT of 32 numbers
+"""
+
 import numpy as np
+import sys
 # import matplotlib.pyplot as plt
 
-inputFixedPointNum = np.random.randint(1,2**31 - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+integerBitWidth = 32 # bits
+inputFixedPointNum = np.random.randint(1,2**(integerBitWidth-1) - 1) # randint generates a signed 32 bit number in range (-2**31, 2**31 - 1)
+
+if (inputFixedPointNum == 0):
+    print('\nEstimated Fixed point X^0.25 = {}'.format(inputFixedPointNum))
+    sys.exit(0)
+
 fourthroot_inputFixedPointNum = (inputFixedPointNum)**0.25
+
+""" Method 1"""
 
 """ Step 2: LUT for (1+f)^0.25 """
 NUM_FRAC_BITS = 10
@@ -126,9 +143,9 @@ f = np.arange(0,1+stepSize,stepSize) # Reason mentioned in Note
 fourthroot_1pf_lut = (1+f)**0.25
 fourthroot_1pf_lut_fp = np.floor((fourthroot_1pf_lut * (2**NUM_FRAC_BITS)) + 0.5).astype(np.uint32) # 1Q10
 
-""" Step 2: LUT for 2^(i*0.25) """
+""" Step 2: LUT for 2^(i*0.25) where i varies from 0 to 31. So 32 entries for LUT"""
 NUM_FRAC_BITS_1 = 10
-fourthroot_2powi = 2**(np.arange(32)*0.25)
+fourthroot_2powi = 2**(np.arange(integerBitWidth)*0.25)
 fourthroot_2powi_fp = np.floor((fourthroot_2powi * (2**NUM_FRAC_BITS_1)) + 0.5).astype(np.uint32) # 8Q10
 
 
@@ -141,6 +158,7 @@ while (num != 1):
     count += 1
 
 nearestPowof2 = count
+
 """ Step 4"""
 if (NUM_FRAC_BITS >= nearestPowof2):
     resFixedPointNum = inputFixedPointNum << (NUM_FRAC_BITS-nearestPowof2)
@@ -161,5 +179,32 @@ fourthroot_eval_fp_num = fourthroot_eval_fp_num >> NUM_FRAC_BITS # 9Q10
 """ To obtain the equivalent floating point value of X^(0.25)"""
 fourthroot_eval_float = fourthroot_eval_fp_num/(2**NUM_FRAC_BITS)
 
+
+""" Method 2: Using smaller LUT"""
+""" Lets say we wish to find the fourth root of 2^26 + 100. This can be written as 2^26 * (1+f). SO, to find the fourth root
+of the number, we nned to find the fourth root of 2^26 and then the fourth root of (1+f) and then multiply these 2 terms.
+Now, 2^((26)*0.25) i.e foruth root of 2^26 can be written as 2^(26/4) = 2^((24+2)/4) = 2^(24/4 + 2/4)  = 2^(6 + 2/4)
+= 2^6 * 2^(2/4). We call the second term as the residual. The residual varies as 2^(0/4), 2^(1/4), 2^(2/4), 2^(3/4).
+"""
+
+""" Step 2: LUT for 2^(i*0.25) where i varies from 0 to 3. Only 4 entries for LUT"""
+NUM_FRAC_BITS_MET2 = 10
+fourthroot_2powi_smallLUT = 2**(np.arange(4)*0.25) # 4 because of 4th root
+fourthroot_2powi_smallLUT_fp = np.floor((fourthroot_2powi_smallLUT * (2**NUM_FRAC_BITS_MET2)) + 0.5).astype(np.uint32) # 2Q10
+
+""" Step 3, step 4 are same as for above method"""
+
+integerQuotientWhenDividedby4 = nearestPowof2 >> 2 # Divide by 4 to get the nearest integer quotient (4 because we need fourth root)
+""" Step 5"""
+twoPowInt = 2**integerQuotientWhenDividedby4 # 7Q0 # 2**(l/4) where l is an integer multiple of 4. This can be achived through successive left shifting sequentially
+residual = nearestPowof2 - (integerQuotientWhenDividedby4 << 2) # Index of Residual after factoring out the fourth root of nearest power of 2 which is a multiple of 4
+fourthroot_2powi_met2_fp = twoPowInt * fourthroot_2powi_smallLUT_fp[residual] # 7Q0 * 2Q10 = 9Q10 # met2 satnds for method 2
+""" Step 6"""
+fourthroot_eval_met2_fp_num = fourthroot_2powi_met2_fp * fourthroot_1pf_fp_eval # 9Q10 * 1Q10 = 10Q20
+fourthroot_eval_met2_fp_num = fourthroot_eval_met2_fp_num >> NUM_FRAC_BITS # 10Q10
+""" To obtain the equivalent floating point value of X^(0.25)"""
+fourthroot_eval_met2_float = fourthroot_eval_met2_fp_num/(2**NUM_FRAC_BITS)
+
 print('Actual Fixed point X^0.25 = {}'.format(fourthroot_inputFixedPointNum))
 print('Estimated Fixed point X^0.25 = {}'.format(fourthroot_eval_float))
+print('Estimated Fixed point X^0.25 with smaller LUT = {}'.format(fourthroot_eval_met2_float))
