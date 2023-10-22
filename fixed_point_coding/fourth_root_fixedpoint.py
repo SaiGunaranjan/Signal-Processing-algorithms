@@ -118,8 +118,17 @@ from 0 to 1 including 1 (or 0 to 1024 including 1024). This is so that during in
 of the number, we nned to find the fourth root of 2^26 and then the fourth root of (1+f) and then multiply these 2 terms.
 Now, 2^((26)*0.25) i.e foruth root of 2^26 can be written as 2^(26/4) = 2^((24+2)/4) = 2^(24/4 + 2/4)  = 2^(6 + 2/4)
 = 2^6 * 2^(2/4). We call the second term as the residual. The residual varies as 2^(0/4), 2^(1/4), 2^(2/4), 2^(3/4). We can store the LUT of these 4 numbers
-instead of storing the LUT of 32 numbers
+instead of storing the LUT of 32 numbers.
+
+Im now printing the computed fourth root of the fixed point numbers with
+both the methods i.e. the earlier method of using 32 entry LUT and the
+new method with 4 entries of the LUT. But the accuracy with the 2nd
+method seems to be slightly off. Ideally both the methods should give
+similar accuracy. Is this due to the insufficiency of the fractional
+bits for the new LUT of 4 entiries.
+
 """
+
 
 import numpy as np
 import sys
