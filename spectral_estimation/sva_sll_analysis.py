@@ -61,12 +61,12 @@ import matplotlib.pyplot as plt
 from spectral_estimation_lib import spatially_variant_apodization_optimized
 from scipy.signal import argrelextrema
 
-np.random.seed(30)
+# np.random.seed(30)
 
 plt.close('all')
 
 num_sources = 1
-num_samples = 32#32
+
 c = 3e8
 fc = 79e9
 lamda = c/fc
@@ -74,10 +74,10 @@ mimoSpacing = lamda/2
 fsSpatial = lamda/mimoSpacing
 
 
-osrFact = 128 #128
+osrFact = 2#16 #128
+num_samples = 1024#32
 numFFTOSR = osrFact*num_samples
-digital_freq_grid = np.arange(-np.pi,np.pi,2*np.pi/(osrFact*num_samples))
-angleGrid = np.arcsin(((digital_freq_grid/(2*np.pi))*fsSpatial))*180/np.pi
+
 
 ## RF parameters
 thermalNoise = -174 # dBm/Hz
@@ -93,7 +93,7 @@ noisePower_perBin = 10**(noiseFloor_perBin/10)
 totalNoisePower = noisePower_perBin*num_samples # sigmasquare totalNoisePower
 noise_sigma = np.sqrt(totalNoisePower)
 
-snrArr = np.arange(10,150,10)
+snrArr = np.arange(10,150,10)#np.arange(10,90,20)
 numSNR = len(snrArr)
 numMC = 100
 
@@ -122,11 +122,11 @@ for object_snr in snrArr:
         wgn_noise = np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape) + 1j*np.random.normal(0,noise_sigma/np.sqrt(2),source_signals.shape)
         received_signal = source_signals + wgn_noise
 
-        magnitude_spectrum_fft = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal,axis=0, n=len(digital_freq_grid))/received_signal.shape[0],axes=0)))
+        magnitude_spectrum_fft = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal,axis=0, n=numFFTOSR)/received_signal.shape[0],axes=0)))
         magnitude_spectrum_fft -= np.amax(magnitude_spectrum_fft,axis=0)[None,:]
         magnitude_spectrum_fft = magnitude_spectrum_fft[:,0]
 
-        magnitude_spectrum_fft_hann = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal*np.hanning(num_samples)[:,None],axis=0, n=len(digital_freq_grid))/received_signal.shape[0],axes=0)))
+        magnitude_spectrum_fft_hann = 20*np.log10(np.abs(np.fft.fftshift(np.fft.fft(received_signal*np.hanning(num_samples)[:,None],axis=0, n=numFFTOSR)/received_signal.shape[0],axes=0)))
         magnitude_spectrum_fft_hann -= np.amax(magnitude_spectrum_fft_hann,axis=0)[None,:]
         magnitude_spectrum_fft_hann = magnitude_spectrum_fft_hann[:,0]
 
@@ -135,7 +135,7 @@ for object_snr in snrArr:
 
 
         """ SLL computation Rect"""
-        localMaxInd = argrelextrema(magnitude_spectrum_fft,np.greater,axis=0,order=2)[0]
+        localMaxInd = argrelextrema(magnitude_spectrum_fft,np.greater_equal,axis=0,order=1)[0]
         try:
             sllInd = np.argsort(magnitude_spectrum_fft[localMaxInd])[-2] # 1st SLL
             sllValdBcRect = magnitude_spectrum_fft[localMaxInd[sllInd]]
@@ -144,7 +144,7 @@ for object_snr in snrArr:
         angleSllArrayRect = np.hstack((angleSllArrayRect,sllValdBcRect))
 
         """ SLL computation Hann"""
-        localMaxInd = argrelextrema(magnitude_spectrum_fft_hann,np.greater,axis=0,order=2)[0]
+        localMaxInd = argrelextrema(magnitude_spectrum_fft_hann,np.greater_equal,axis=0,order=1)[0]
         try:
             sllInd = np.argsort(magnitude_spectrum_fft_hann[localMaxInd])[-2] # 1st SLL
             sllValdBcHann = magnitude_spectrum_fft_hann[localMaxInd[sllInd]]
@@ -153,7 +153,7 @@ for object_snr in snrArr:
         angleSllArrayHann = np.hstack((angleSllArrayHann,sllValdBcHann))
 
         """ SLL computation SVA"""
-        localMaxInd = argrelextrema(svaOptimalMagSpectrumdB,np.greater,axis=0,order=2)[0]
+        localMaxInd = argrelextrema(svaOptimalMagSpectrumdB,np.greater_equal,axis=0,order=1)[0]
         try:
             sllInd = np.argsort(svaOptimalMagSpectrumdB[localMaxInd])[-2] # 1st SLL
             sllValdBcSVA = svaOptimalMagSpectrumdB[localMaxInd[sllInd]]
