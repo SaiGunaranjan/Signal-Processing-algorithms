@@ -167,7 +167,8 @@ for binSNR in range_binSNRArray:
         """ SLL computation"""
         sllValdBc = np.zeros((ddma_radar.numDopUniqRbin),dtype=np.float32)
         for ele1 in np.arange(ddma_radar.numDopUniqRbin):
-            localMaxInd = argrelextrema(ddma_radar.ULA_spectrumdB[ele1,:],np.greater,axis=0,order=2)[0]
+            localMaxInd = argrelextrema(ddma_radar.ULA_spectrumdB[ele1,:],np.greater,axis=0,order=2)[0] # Use this when spectrum is evaluated on a large oversampled scale
+            # localMaxInd = argrelextrema(ddma_radar.ULA_spectrumdB[ele1,:],np.greater_equal,axis=0,order=1)[0] # Use this when spectrum is not evaluated on an oversampled scale.
             try:
                 sllInd = np.argsort(ddma_radar.ULA_spectrumdB[ele1,localMaxInd])[-2] # 1st SLL
                 sllValdBc[ele1] = ddma_radar.ULA_spectrumdB[ele1,localMaxInd[sllInd]]
