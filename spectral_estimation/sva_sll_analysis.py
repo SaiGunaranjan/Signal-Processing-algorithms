@@ -214,9 +214,9 @@ n+=1
 
 plt.figure(n+1,figsize=(20,10),dpi=200)
 plt.title('{} %ile {} db main lobe (bins) vs Signal Length'.format(percentile, beamWidthPointdB))
-plt.plot(numSamplesArray, beamWidthMatrixRect_percentile[-1,:], '-o',label='Rect Window')
+plt.plot(numSamplesArray, beamWidthMatrixRect_percentile[-1,:], '-o',lw=4,alpha=0.5,label='Rect Window')
 plt.plot(numSamplesArray, beamWidthMatrixHann_percentile[-1,:], '-o',label='Hanning Window')
-plt.plot(numSamplesArray, beamWidthMatrixSVA_percentile[-1,:], '-+', label='SVA')
+plt.plot(numSamplesArray, beamWidthMatrixSVA_percentile[-1,:], '-+', color = 'red',label='SVA')
 plt.xlabel('Signal Length')
 plt.ylabel('bins')
 plt.grid(True)
