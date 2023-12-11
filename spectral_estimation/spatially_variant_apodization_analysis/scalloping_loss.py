@@ -6,7 +6,9 @@ Created on Thu Dec  7 13:19:32 2023
 """
 
 """
-Scalloping loss is the loss in signal power when the frequency falls in the middle of 2 bins.
+Scalloping loss is the loss in signal power when the frequency falls in the middle of 2 bins with respect to if the signal fell on a bin.
+Scalloping loss is always computed without any oversampled FFT. If an oversampling FFT is computed,
+then the loss is anyway recovered because we will be computing signal power at very fine frequencies.
 This is a parameter spec for every window function. The scalloping loss for SVA is same as that of rectangular window ~ 4 dB
 More details about scalloping window are availabe here:
     https://www.recordingblogs.com/wiki/scalloping-loss#:~:text=The%20scalloping%20loss%20is%20the,the%20window%2C%20as%20explained%20below.
