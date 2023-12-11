@@ -18,8 +18,8 @@ from spectral_estimation_lib import spatially_variant_apodization_optimized
 
 plt.close('all')
 
-N = 512
-binNum = 32
+N = 2048
+binNum = 1024
 a1 = np.exp(1j*2*np.pi*binNum*np.arange(N)/N)
 a2 = np.exp(1j*2*np.pi*(binNum+0.5)*np.arange(N)/N)
 
