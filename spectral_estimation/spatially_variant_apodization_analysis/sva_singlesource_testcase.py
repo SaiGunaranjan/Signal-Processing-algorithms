@@ -58,6 +58,8 @@ to check if SVA-optimized is a spectral estimator which gives the phase of the s
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_bruteforce, spatially_variant_apodization_optimized
 from spectral_estimation_lib import music_backward as music
 

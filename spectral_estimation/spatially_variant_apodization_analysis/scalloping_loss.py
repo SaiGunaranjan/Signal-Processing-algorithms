@@ -14,6 +14,8 @@ More details about scalloping window are availabe here:
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_optimized
 
 plt.close('all')

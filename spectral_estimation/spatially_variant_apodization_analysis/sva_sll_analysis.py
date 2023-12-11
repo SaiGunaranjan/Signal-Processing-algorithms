@@ -15,6 +15,8 @@ and we know that for every doubling of the signal length, the signal power impro
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_optimized
 from scipy.signal import argrelextrema
 

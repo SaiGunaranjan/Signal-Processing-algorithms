@@ -7,8 +7,11 @@ Created on Tue Feb 21 18:30:18 2023
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_bruteforce, spatially_variant_apodization_optimized, iaa_recursive
 from spectral_estimation_lib import music_backward as music
+
 
 
 np.random.seed(10)
