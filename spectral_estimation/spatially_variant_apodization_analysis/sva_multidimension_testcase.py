@@ -8,6 +8,8 @@ Created on Wed Apr  8 20:01:56 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_multidimension
 
 

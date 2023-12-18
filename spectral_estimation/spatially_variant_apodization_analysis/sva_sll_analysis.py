@@ -15,6 +15,8 @@ and we know that for every doubling of the signal length, the signal power impro
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_optimized
 from scipy.signal import argrelextrema
 
@@ -62,6 +64,8 @@ beamWidthMatrixHann_percentile = np.zeros((numSNR,signalLengths))
 beamWidthMatrixSVA_percentile = np.zeros((numSNR,signalLengths))
 
 apodSpectrumArr = []
+hannSpectrumArr = []
+rectSpectrumArr = []
 
 count_numSamp = 0
 for num_samples in numSamplesArray:
@@ -156,7 +160,10 @@ for num_samples in numSamplesArray:
                 sllValdBcSVA = 0
             angleSllArraySVA = np.hstack((angleSllArraySVA,sllValdBcSVA))
 
+        rectSpectrumArr.append(magnitude_spectrum_fft)
+        hannSpectrumArr.append(magnitude_spectrum_fft_hann)
         apodSpectrumArr.append(svaOptimalMagSpectrumdB)
+
 
         angleSLLMatrixRect_percentile[count_snrMC,count_numSamp] = np.percentile(angleSllArrayRect,percentile)
         angleSLLMatrixHann_percentile[count_snrMC,count_numSamp] = np.percentile(angleSllArrayHann,percentile)
@@ -228,15 +235,18 @@ n+=1
 
 
 plt.figure(n+1,figsize=(20,10))
-plt.suptitle('Apodized spectrum(oversampled) for different signal lengths')
+plt.suptitle('Spectrum(oversampled) for different signal lengths')
 for ele in range(signalLengths):
     plt.subplot(2,4,ele+1)
     plt.title('Signal length = {}'.format(numSamplesArray[ele]))
-    plt.plot(apodSpectrumArr[ele])
+    plt.plot(rectSpectrumArr[ele], label='Rectangular')
+    plt.plot(hannSpectrumArr[ele], label='Hanning')
+    plt.plot(apodSpectrumArr[ele], color='k', label='Apodization')
     plt.ylim(-90,5)
     maxInd = np.argmax(apodSpectrumArr[ele])
     plt.xlim([maxInd-100, maxInd+100])
     plt.grid(True)
+    plt.legend()
 
 
 
