@@ -45,6 +45,9 @@ The problem of finding 1/d can be posed as follows:
             x_i+1 = x_i * (2 - d*x_i)
     7. This is the update step for finding the inverse of the number d.
 
+More material for the Newton Raphson algorithm is available here:
+    https://en.wikipedia.org/wiki/Division_algorithm#:~:text=%5Bedit%5D-,Newton%E2%80%93Raphson%20division,-%5Bedit%5D
+
 The update equation as such is straight forward and easy to implement. The challenge lies is appropriate initialization.
 The range of value of d can be anything and so how do we seed the algorithm with a value(x_0) which is close to the true
 1/d value. The way, we do it is we first bring d to the range of [0,1) with appropriate scaling (typically by a power of 2!)
@@ -152,7 +155,8 @@ The fixed point implementation is as follows:
 
         t. To obtain the equivalent floating point number, divide by 2**DEN_FRAC_BITS
 
-
+More material for the fixed point divider using Newton Raphson algorithm is available here:
+    https://docs.google.com/document/d/16j8StyirLyQ6gH1IHuCZEE-NPAUjVRiK/edit
 
 """
 
