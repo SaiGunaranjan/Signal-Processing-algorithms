@@ -136,14 +136,14 @@ The fixed point implementation is as follows:
         So 2 is left shifted by DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH bits and then also left/right shifted by scale depending on whether scale shift is +/-.
         Scale shift will be +ve if the original number was >1 and it will be -ve if the original number was itself <1
 
-        n. We subtract the scaled 2 and d*x_0. The result still has DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH fractional bits.
+        n. Subtract the scaled 2 and d*x_0. The result still has DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH fractional bits.
 
-        o. Multiply the result from above step with x_0. This will result in  DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH +  ONE_BY_DEN_FRACBITWIDTH
+        o. Apply the scaling shift to the above result.
+
+        p. Multiply the result from above step with x_0. This will result in  DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH +  ONE_BY_DEN_FRACBITWIDTH
         fractional number of bits.
 
-        p. Drop DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH bits from the above result else it will overflow.
-
-        q. Apply the scaling shift to the above result to obtain x_1.
+        q. Drop DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH bits from the above result else it will overflow.
 
         r. Repeat the above steps from l through p for NR_ITER iterations. Then we get the reciprocal of the scaled denominator i.e 1/d'
 
@@ -152,15 +152,6 @@ The fixed point implementation is as follows:
 
         t. To obtain the equivalent floating point number, divide by 2**DEN_FRAC_BITS
 
-
-The current code will give wrong result for large values of denominator and larger bitwidths for 1/d ex: 27881.24593943644 and  ONE_BY_DEN_FRACBITWIDTH=16 respectively
-This is because, the integer part for this number itself is 16 bits and hence the scaling is also 16 bits. So, in step m, 2 is first scaled by
-DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH and then further scaled by scale factor. Hence the effective bitwidth for 2 now becomes
-DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH + scalingFactor i.e 16 + 16 + 16 = 48!. Now, we multiply the result again with x_i as in step o.
-Now the bitwidth becomes 16 + 16 + 16 + 16 > 62 bits!!. Hence it overflows and gives wrong result.
-There are 2 ways to overcome this:
-    1. Reduce the fractional bitwidth of 1/d i.e reduce ONE_BY_DEN_FRACBITWIDTH from 16 to 10
-    2. Before step o itelf, downscale the result from step n by the scaling factor. i.e move step q before step o and after step n
 
 
 """
@@ -234,14 +225,14 @@ for ele in range(NR_ITER):
     If it is contained to only 32 bit, it will overflow, hence containing the below result in a 64 bit datatype"""
     a3 = (a2 - a1).astype(np.int64)
 
-    a4 = (x * a3) >> (DEN_FRAC_BITS+ONE_BY_DEN_FRACBITWIDTH) # Bring back the result to ONE_BY_DEN_FRACBITWIDTH
-
     if  (scalingFactor >=0):
         """Divide x by the scaling factor if scaling factor is +ve (>1) """
-        a4 = a4 >> scalingFactor
+        a3 = a3 >> scalingFactor
     else:
         """ Multiply x by the scaling factor if scaling factor is -ve (<1)"""
-        a4 = a4 << np.abs(scalingFactor)
+        a3 = a3 << np.abs(scalingFactor)
+
+    a4 = (x * a3) >> (DEN_FRAC_BITS+ONE_BY_DEN_FRACBITWIDTH) # Bring back the result to ONE_BY_DEN_FRACBITWIDTH
 
     x = a4 # fractional bitwidth of x = ONE_BY_DEN_FRACBITWIDTH
     # print('Iter # = {}'.format(ele))
