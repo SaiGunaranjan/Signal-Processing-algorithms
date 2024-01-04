@@ -153,8 +153,15 @@ The fixed point implementation is as follows:
         t. To obtain the equivalent floating point number, divide by 2**DEN_FRAC_BITS
 
 
+The current code will give wrong result for large values of denominator and larger bitwidths for 1/d ex: 27881.24593943644 and  ONE_BY_DEN_FRACBITWIDTH=16 respectively
+This is because, the integer part for this number itself is 16 bits and hence the scaling is also 16 bits. So, in step m, 2 is first scaled by
+DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH and then further scaled by scale factor. Hence the effective bitwidth for 2 now becomes
+DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH + scalingFactor i.e 16 + 16 + 16 = 48!. Now, we multiply the result again with x_i as in step o.
+Now the bitwidth becomes 16 + 16 + 16 + 16 > 62 bits!!. Hence it overflows and gives wrong result.
+There are 2 ways to overcome this:
+    1. Reduce the fractional bitwidth of 1/d i.e reduce ONE_BY_DEN_FRACBITWIDTH from 16 to 10
+    2. Before step o itelf, downscale the result from step n by the scaling factor. i.e move step q before step o and after step n
 
-Also, there is a small bug which causes wrong results when the d is chosen large! I will fix this issue in the subsequent commits.
 
 """
 
@@ -177,7 +184,7 @@ DEN_TOT_BITS = DEN_INT_BITS + DEN_FRAC_BITS - SIGN_BIT
 
 
 # denFloat = 1.965#100.997652#1.965#15.375
-denFloat = np.random.random()*np.random.randint(0,2**(DEN_INT_BITS-1))
+denFloat = np.random.random()*np.random.randint(0,2**(DEN_INT_BITS-1)) # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
 denFixed = np.floor((denFloat * 2**DEN_FRAC_BITS) + 0.5).astype(np.int32)
 
 NR_ITER = 3 # Newton-Raphson Iteration
