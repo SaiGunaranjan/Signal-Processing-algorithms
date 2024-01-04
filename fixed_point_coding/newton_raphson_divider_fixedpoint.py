@@ -189,11 +189,14 @@ count = 0
 while (num!=0):
     num = (num >> 1)
     count += 1
-numLeadingZeros = DEN_TOT_BITS - count
-scalingFactor = DEN_INT_BITS - numLeadingZeros # If positive, right shift else left shift
-# scalingFactor = count - DEN_FRAC_BITS # Scaling factor/shifts can be computed this way
+
+# numLeadingZeros = DEN_TOT_BITS - count
+# scalingFactor = DEN_INT_BITS - numLeadingZeros # If positive, right shift else left shift
 
 positionOfLeading1fromLSB = count
+scalingFactor = positionOfLeading1fromLSB - DEN_FRAC_BITS # Scaling factor/shifts can be computed this way. If positive, right shift else left shift
+
+
 
 if (positionOfLeading1fromLSB <  (LUT_INDEXING_BITWIDTH+1)):
     indexToSampleLUT = (denFixed << ((LUT_INDEXING_BITWIDTH+1) - positionOfLeading1fromLSB)) & (2**LUT_INDEXING_BITWIDTH - 1)
