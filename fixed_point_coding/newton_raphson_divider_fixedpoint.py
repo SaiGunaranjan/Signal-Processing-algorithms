@@ -174,22 +174,23 @@ ONE_BY_DEN_LUT = (np.floor((ONE_BY_DEN_LUT_FLOAT * (2**ONE_BY_DEN_FRACBITWIDTH))
 
 OUTPUT_FRAC_BITS = 32#16
 
+NUM_TOT_BITS = 32
 NUM_FRAC_BITS = 16
-NUM_INT_BITS = 16
 NUM_SIGN_BIT = 0
-NUM_TOT_BITS = NUM_INT_BITS + NUM_FRAC_BITS - NUM_SIGN_BIT
+NUM_INT_BITS = NUM_TOT_BITS - NUM_FRAC_BITS + NUM_SIGN_BIT
 
-numFloat = np.random.random()*np.random.randint(0,2**(NUM_INT_BITS-1)) # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
+numFloat = np.random.randint(0,2**(NUM_INT_BITS)-1) + np.random.random() # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
 numFixed = np.floor((numFloat * 2**NUM_FRAC_BITS) + 0.5).astype(np.int64)
 
-DEN_FRAC_BITS = 16
-DEN_INT_BITS = 16
+DEN_TOT_BITS = 32
+DEN_FRAC_BITS = 30#20#16
 DEN_SIGN_BIT = 0
-DEN_TOT_BITS = DEN_INT_BITS + DEN_FRAC_BITS - DEN_SIGN_BIT
+DEN_INT_BITS = DEN_TOT_BITS - DEN_FRAC_BITS + DEN_SIGN_BIT
+
 
 
 # denFloat = 1.965#100.997652#1.965#15.375
-denFloat = np.random.random()*np.random.randint(0,2**(DEN_INT_BITS-1)) # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
+denFloat = np.random.randint(0,2**(DEN_INT_BITS)-1) + np.random.random() # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
 denFixed = np.floor((denFloat * 2**DEN_FRAC_BITS) + 0.5).astype(np.int64)
 
 NR_ITER = 3 # Newton-Raphson Iteration
