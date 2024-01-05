@@ -158,6 +158,9 @@ The fixed point implementation is as follows:
 More material for the fixed point divider using Newton Raphson algorithm is available here:
     https://docs.google.com/document/d/16j8StyirLyQ6gH1IHuCZEE-NPAUjVRiK/edit
 
+The script has been modified to cater to the smart RADAR divider where in the numerator is 8Q8 and denominator is 8Q8.
+Hence now, I can afford to accomodate bit growth upto the final stage and then drop bits only at the end.
+
 """
 
 import numpy as np
@@ -172,18 +175,18 @@ ONE_BY_DEN_FRACBITWIDTH = 16#10
 ONE_BY_DEN_LUT_FLOAT = 1/(np.arange(0.5,1,2**-(LUT_INDEXING_BITWIDTH+1)))
 ONE_BY_DEN_LUT = (np.floor((ONE_BY_DEN_LUT_FLOAT * (2**ONE_BY_DEN_FRACBITWIDTH)) + 0.5)).astype(np.int32)
 
-OUTPUT_FRAC_BITS = 32#16
+OUTPUT_FRAC_BITS = 16#16
 
-NUM_TOT_BITS = 32
-NUM_FRAC_BITS = 16
+NUM_TOT_BITS = 16
+NUM_FRAC_BITS = 8
 NUM_SIGN_BIT = 0
 NUM_INT_BITS = NUM_TOT_BITS - NUM_FRAC_BITS + NUM_SIGN_BIT
 
 numFloat = np.random.randint(0,2**(NUM_INT_BITS)-1) + np.random.random() # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
 numFixed = np.floor((numFloat * 2**NUM_FRAC_BITS) + 0.5).astype(np.int64)
 
-DEN_TOT_BITS = 32
-DEN_FRAC_BITS = 30#20#16
+DEN_TOT_BITS = 16
+DEN_FRAC_BITS = 8#20#16
 DEN_SIGN_BIT = 0
 DEN_INT_BITS = DEN_TOT_BITS - DEN_FRAC_BITS + DEN_SIGN_BIT
 
@@ -243,14 +246,14 @@ for ele in range(NR_ITER):
     If it is contained to only 32 bit, it will overflow, hence containing the below result in a 64 bit datatype"""
     a3 = (a2 - a1).astype(np.int64)
 
+    a4 = (x * a3) >> (DEN_FRAC_BITS+ONE_BY_DEN_FRACBITWIDTH) # Bring back the result to ONE_BY_DEN_FRACBITWIDTH
+
     if  (scalingFactor >=0):
         """Divide x by the scaling factor if scaling factor is +ve (>1) """
-        a3 = a3 >> scalingFactor
+        a4 = a4 >> scalingFactor
     else:
         """ Multiply x by the scaling factor if scaling factor is -ve (<1)"""
-        a3 = a3 << np.abs(scalingFactor)
-
-    a4 = (x * a3) >> (DEN_FRAC_BITS+ONE_BY_DEN_FRACBITWIDTH) # Bring back the result to ONE_BY_DEN_FRACBITWIDTH
+        a4 = a4 << np.abs(scalingFactor)
 
     x = a4 # fractional bitwidth of x = ONE_BY_DEN_FRACBITWIDTH
     # print('Iter # = {}'.format(ele))
