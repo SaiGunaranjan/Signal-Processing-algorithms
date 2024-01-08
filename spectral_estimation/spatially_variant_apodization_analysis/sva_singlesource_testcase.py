@@ -58,6 +58,8 @@ to check if SVA-optimized is a spectral estimator which gives the phase of the s
 
 import numpy as np
 import matplotlib.pyplot as plt
+import sys
+sys.path.append('..//')
 from spectral_estimation_lib import spatially_variant_apodization_bruteforce, spatially_variant_apodization_optimized
 from spectral_estimation_lib import music_backward as music
 
@@ -73,13 +75,28 @@ fsSpatial = lamda/mimoSpacing
 nativeAngResDeg = np.arcsin(fsSpatial/num_samples)*180/np.pi
 # print('Native Angular Resolution = {0:.2f} deg'.format(nativeAngResDeg))
 num_sources = 1
+
+## RF parameters
+thermalNoise = -174 # dBm/Hz
+noiseFigure = 10 # dB
+baseBandgain = 34 #dB
+adcSamplingRate = 56.25e6 # 56.25 MHz
+adcSamplingTime = 1/adcSamplingRate # s
+dBFs_to_dBm = 10
 object_snr = np.array([40])
-noise_power_db = -40 # Noise Power in dB
-noise_variance = 10**(noise_power_db/10)
-noise_sigma = np.sqrt(noise_variance)
-weights = noise_variance*(10**(object_snr/10))
-signal_phases = np.exp(1j*np.random.uniform(low=-np.pi, high = np.pi, size = num_sources))
-complex_signal_amplitudes = weights*signal_phases
+totalNoisePower_dBm = thermalNoise + noiseFigure + baseBandgain + 10*np.log10(adcSamplingRate)
+totalNoisePower_dBFs = totalNoisePower_dBm - 10
+noiseFloor_perBin = -90#totalNoisePower_dBFs - 10*np.log10(num_samples) # dBFs/bin
+noisePower_perBin = 10**(noiseFloor_perBin/10)
+totalNoisePower = noisePower_perBin*num_samples # sigmasquare totalNoisePower
+noise_sigma = np.sqrt(totalNoisePower)
+signalPowerdBFs = noiseFloor_perBin + object_snr
+signalPower = 10**(signalPowerdBFs/10)
+signalAmplitude = np.sqrt(signalPower)
+signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi,size = num_sources))
+complex_signal_amplitudes = signalAmplitude*signalPhase
+
+
 random_freq = np.random.uniform(low=-np.pi, high=np.pi, size = 1)
 fft_resol_fact = 2
 resol_fact = 0.65
