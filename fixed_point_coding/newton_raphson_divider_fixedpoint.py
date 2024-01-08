@@ -271,6 +271,8 @@ print('Float 1/d = {}'.format(true1byDen))
 print('Fixed 1/d = {}'.format(newtonRaphsonBased1byDenFloat))
 
 numByDenFloat = numFloat * true1byDen
+
+# NUM_INT_BITSQ(NUM_FRAC_BITS) * zQ(ONE_BY_DEN_FRACBITWIDTH) --> (NUM_INT_BITS+z)Q(OUTPUT_FRAC_BITS)
 numByDenFixed = (numFixed * xRescaled) >> (NUM_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH - OUTPUT_FRAC_BITS) #  NUM_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH - OUTPUT_FRAC_BITS
 numByDenFixedConvertFloat = numByDenFixed/(2**OUTPUT_FRAC_BITS)
 print('Float n/d = {}'.format(numByDenFloat))
