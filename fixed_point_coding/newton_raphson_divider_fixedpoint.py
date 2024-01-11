@@ -50,7 +50,7 @@ More material for the Newton Raphson algorithm is available here:
 
 The update equation as such is straight forward and easy to implement. The challenge lies is appropriate initialization.
 The range of value of d can be anything and so how do we seed the algorithm with a value(x_0) which is close to the true
-1/d value. The way, we do it is we first bring d to the range of [0,1) with appropriate scaling (typically by a power of 2!)
+1/d value. The way, we do it is we first bring d to the range of [0.5,1) with appropriate scaling (typically by a power of 2!)
 d' = d/scale ; d > 1
    = d*scale ; d < 1
 
@@ -117,7 +117,7 @@ The fixed point implementation is as follows:
         LSB side and subtract it with the number of fractional bits. This gives the scaling factor/shift.
         Ex: Consider a binary fixed point number 000100101.1011010100110110,. To bring it the range [0.5,1),
         we need to shift the decimal point to the left of the leading 1 i.e 000.1001011011010100110110. Now the number lies between [0.5,1)
-        and the scaling shift is position of leading 1 from LSB i.e 22 - number of fractional bits = 16. So, the scaling shift
+        and the scaling shift is position of leading 1 from LSB i.e 22 - 16 (number of fractional bits). So, the scaling shift
         is 22 - 16 = 6 or the scaling factor is 2^6. If we look at it from decimal point of view, the number 000100101.1011010100110110
         is 37.decimalpart. Now, to bring 37.something to [0.5,1), we need to divide by a number which is a nearest power of 2 i.e
         64 which is 2^6. Hence it makes sense. The same holds true even if the leading one occurs in the fractional part i.e after the decimal point
@@ -130,30 +130,32 @@ The fixed point implementation is as follows:
         LUT_INDEXING_BITWIDTH (=5 in our example) bits from 1 onwards i.e 00101. Now, we index this entry into our LUT and get the
         corresponding seed value for 1/d' (Note that d' is the scaled verion of d). This becomes our x_0.
 
-        l. We apply the update equation:
-            x_i+1 = x_i * (2 - d/scale * x_i) => x_i+1 = x_i/scale * ((2*scale) - (d*x_i))
-        So, we first multiply the denominator d with x_0. d has  DEN_FRAC_BITS fractional bits, x_0 has  ONE_BY_DEN_FRACBITWIDTH fractional bits.
-        The resultant multiplication yields DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH fractional bits.
+        l. Bringing x_0 from ONE_BY_DEN_FRACBITWIDTH to NR_FRAC bits in the first iteration itself to improve final precision
 
-        m. This product has to subtracted from 2. But before this, we need to align the decimal point and also scale 2 with the scaling factor/shift
-        So 2 is left shifted by DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH bits and then also left/right shifted by scale depending on whether scale shift is +/-.
+        m. We apply the update equation:
+            x_i+1 = x_i * (2 - d/scale * x_i) => x_i+1 = x_i/scale * ((2*scale) - (d*x_i))
+        So, we first multiply the denominator d with x_0. d has  DEN_FRAC_BITS fractional bits, x_0 has NR_FRAC fractional bits.
+        The resultant multiplication yields DEN_FRAC_BITS +  NR_FRAC fractional bits. Now we drop DEN_FRAC_BITS bits
+        to bring the result back to NR_FRAC bits precision. This NR_FRAC is the precision with with every operation works
+        throughout the iteration steps.
+
+        n. This product has to subtracted from 2. But before this, we need to align the decimal point and also scale 2 with the scaling factor/shift
+        So 2 is left shifted by NR_FRAC bits and then also left/right shifted by scale depending on whether scale shift is +/-.
         Scale shift will be +ve if the original number was >1 and it will be -ve if the original number was itself <1
 
-        n. Subtract the scaled 2 and d*x_0. The result still has DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH fractional bits.
+        o. Subtract the scaled 2 and d*x_0. The result still has NR_FRAC fractional bits.
 
-        o. Apply the scaling shift to the above result.
-
-        p. Multiply the result from above step with x_0. This will result in  DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH +  ONE_BY_DEN_FRACBITWIDTH
+        p. Multiply the result from above step with x_0. This will result in  NR_FRAC +  NR_FRAC
         fractional number of bits.
 
-        q. Drop DEN_FRAC_BITS +  ONE_BY_DEN_FRACBITWIDTH bits from the above result else it will overflow.
+        q. Apply the scaling shift to the above result.
 
-        r. Repeat the above steps from l through p for NR_ITER iterations. Then we get the reciprocal of the scaled denominator i.e 1/d'
+        r. Repeat the above steps from l through r for NR_ITER iterations. Then we get the reciprocal of the scaled denominator i.e 1/d'
 
         s. But we need 1/d, so scale the result from above step with the scale factor. Now we obtain 1/d in fixed point with
-        DEN_FRAC_BITS fractional bits.
+        NR_FRAC fractional bits.
 
-        t. To obtain the equivalent floating point number, divide by 2**DEN_FRAC_BITS
+        t. To obtain the equivalent floating point number, divide by 2**NR_FRAC
 
 More material for the fixed point divider using Newton Raphson algorithm is available here:
     https://docs.google.com/document/d/16j8StyirLyQ6gH1IHuCZEE-NPAUjVRiK/edit
