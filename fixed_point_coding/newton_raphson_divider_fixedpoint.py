@@ -161,119 +161,151 @@ More material for the fixed point divider using Newton Raphson algorithm is avai
 The script has been modified to cater to the smart RADAR divider where in the numerator is 8Q8 and denominator is 8Q8.
 Hence now, I can afford to accomodate bit growth upto the final stage and then drop bits only at the end.
 
+Modifications: 11-01-2024
+In this commit, I have made some minor changes to improve the precision/accuracy of my divider.
+The x value (i.e approximation of 1/d at each stage) now has more precision than before.
+Previously, I was dropping 24 bits (DEN_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH) to bring the final output of x at
+each iteration to 16 bits (ONE_BY_DEN_FRACBITWIDTH). Now, however, I drop only 22 bits (NR_FRAC) so that
+the x at each iteration has 22 bits. Since, we are now operating on 6 extra bits of precision (22 - 16), we get
+more accurate results. In fact, now the num/den matches upto 4 decimals. Previously, it was matching only upt 2 decimals.
+Another change made in this commit is to bring the x to NR_FRAC=22 bits precison in the first iteration itself
+(and all subsequent iterations have x at NR_FRAC=22 bits precision). Whereas previously, x was operating at
+16 bits precision at each iteration.
+Thus we have improved the precision of x at each iteration and hence the better accuracy is achieved.
+
 """
 
 import numpy as np
 import sys
 
-# np.random.seed(10)
-
-LUT_LENGTH = 32 # Ideal to have it as a power of 2
-LUT_INDEXING_BITWIDTH = int(np.log2(LUT_LENGTH))
-ONE_BY_DEN_FRACBITWIDTH = 16#10
-
-ONE_BY_DEN_LUT_FLOAT = 1/(np.arange(0.5,1,2**-(LUT_INDEXING_BITWIDTH+1)))
-ONE_BY_DEN_LUT = (np.floor((ONE_BY_DEN_LUT_FLOAT * (2**ONE_BY_DEN_FRACBITWIDTH)) + 0.5)).astype(np.int32)
-
-OUTPUT_FRAC_BITS = 16#16
+# np.random.seed(12)
 
 NUM_TOT_BITS = 16
 NUM_FRAC_BITS = 8
 NUM_SIGN_BIT = 0
 NUM_INT_BITS = NUM_TOT_BITS - NUM_FRAC_BITS + NUM_SIGN_BIT
 
-numFloat = np.random.randint(0,2**(NUM_INT_BITS)-1) + np.random.random() # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
-numFixed = np.floor((numFloat * 2**NUM_FRAC_BITS) + 0.5).astype(np.int64)
+numFloat = np.random.randint(0,2**(NUM_INT_BITS)-1) + np.random.random()
+numFixed = np.floor((numFloat * 2**NUM_FRAC_BITS) + 0.5).astype(np.uint16)
 
 DEN_TOT_BITS = 16
 DEN_FRAC_BITS = 8#20#16
 DEN_SIGN_BIT = 0
 DEN_INT_BITS = DEN_TOT_BITS - DEN_FRAC_BITS + DEN_SIGN_BIT
 
+denFloat = np.random.randint(0,2**(DEN_INT_BITS)-1) + np.random.random()
+denFixed = np.floor((denFloat * 2**DEN_FRAC_BITS) + 0.5).astype(np.uint16)
 
+LUT_LENGTH = 16 # Ideal to have it as a power of 2
+LUT_INDEXING_BITWIDTH = int(np.log2(LUT_LENGTH))
+ONE_BY_DEN_FRACBITWIDTH = 16#10
+NR_FRAC = 22 # Should always be greater than ONE_BY_DEN_FRACBITWIDTH
 
-# denFloat = 1.965#100.997652#1.965#15.375
-denFloat = np.random.randint(0,2**(DEN_INT_BITS)-1) + np.random.random() # Failure case for ONE_BY_DEN_FRACBITWIDTH = 16 : 27881.24593943644
-denFixed = np.floor((denFloat * 2**DEN_FRAC_BITS) + 0.5).astype(np.int64)
+ONE_BY_DEN_LUT_FLOAT = 1/(np.arange(0.5,1,2**-(LUT_INDEXING_BITWIDTH+1)))
+ONE_BY_DEN_LUT = (np.floor((ONE_BY_DEN_LUT_FLOAT * (2**ONE_BY_DEN_FRACBITWIDTH)) + 0.5)).astype(np.int32)
+
+A_BY_B_OUTPUT_FRAC_BITS = 16#16
 
 NR_ITER = 3 # Newton-Raphson Iteration
 
-if (denFixed == 0):
-    print('Cannot compute 1/0 !')
-    sys.exit()
 
-num = denFixed
-count = 0
-while (num!=0):
-    num = (num >> 1)
-    count += 1
+def newton_raphson_divider(num,den,nIter=NR_ITER):
 
-positionOfLeading1fromLSB = count
-
-# numLeadingZeros = DEN_TOT_BITS - positionOfLeading1fromLSB
-# scalingFactor = DEN_INT_BITS - numLeadingZeros # If positive, right shift else left shift
-
-scalingFactor = positionOfLeading1fromLSB - DEN_FRAC_BITS # Scaling factor/shifts can be computed this way. If positive, right shift else left shift
-
-""" Step k. Extract the index to sample into the LUT"""
-if (positionOfLeading1fromLSB <  (LUT_INDEXING_BITWIDTH+1)):
-    indexToSampleLUT = (denFixed << ((LUT_INDEXING_BITWIDTH+1) - positionOfLeading1fromLSB)) & (2**LUT_INDEXING_BITWIDTH - 1)
-else:
-    indexToSampleLUT = (denFixed >> (positionOfLeading1fromLSB - (LUT_INDEXING_BITWIDTH+1))) & (2**LUT_INDEXING_BITWIDTH - 1)
-
-denDownScaled = np.int64(denFixed) # Denominator is actually of format DEN_INT_BITS Q DEN_FRAC_BITS but treated as 0 Q scalingFactor+DEN_FRAC_BITS
-x = ONE_BY_DEN_LUT[indexToSampleLUT] # This is the initial 1/d where d is downscaled to lie in [0.5,1)
+    global LUT_LENGTH, LUT_INDEXING_BITWIDTH, ONE_BY_DEN_FRACBITWIDTH, ONE_BY_DEN_LUT, A_BY_B_OUTPUT_FRAC_BITS
 
 
-for ele in range(NR_ITER):
-    """
-    x = x * (2-(den/scaling)*x)
-    x = x/scaling * ((2*scaling) - (den*x))
-    """
-    a1 = (denDownScaled * x) #  DEN_FRAC_BITS * 2QONE_BY_DEN_FRACBITWIDTH # Not dropping any fractional bits post d*x
+    if (den == 0):
+        print('Cannot compute 1/0 !')
+        sys.exit()
 
-    """Bring 2 to the same decimal scale as a1"""
-    a2 = 2 << (DEN_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH)
+    temp = den
+    count = 0
+    while (temp!=0):
+        temp = (temp >> 1)
+        count += 1
 
-    if (scalingFactor>=0):
-        """ Multiply 2 (a2) with the scaling factor if scaling factor is +ve (>1)"""
-        a2 = a2 << scalingFactor #
+    positionOfLeading1fromLSB = count
+
+    # numLeadingZeros = DEN_TOT_BITS - positionOfLeading1fromLSB
+    # scalingFactor = DEN_INT_BITS - numLeadingZeros # If positive, right shift else left shift
+
+    scalingFactor = positionOfLeading1fromLSB - DEN_FRAC_BITS # Scaling factor/shifts can be computed this way. If positive, right shift else left shift
+
+    """ Step k. Extract the index to sample into the LUT"""
+    if (positionOfLeading1fromLSB <  (LUT_INDEXING_BITWIDTH+1)):
+        indexToSampleLUT = (den << ((LUT_INDEXING_BITWIDTH+1) - positionOfLeading1fromLSB)) & (2**LUT_INDEXING_BITWIDTH - 1)
     else:
-        """ Divide 2 (a2) with the scaling factor if scaling factor is -ve (<1)"""
-        a2 = a2 >> np.abs(scalingFactor)
+        indexToSampleLUT = (den >> (positionOfLeading1fromLSB - (LUT_INDEXING_BITWIDTH+1))) & (2**LUT_INDEXING_BITWIDTH - 1)
 
-    """ There will be a bit growth post multiplication of den and x and also for the scaling of 2.
-    If it is contained to only 32 bit, it will overflow, hence containing the below result in a 64 bit datatype"""
-    a3 = (a2 - a1).astype(np.int64)
+    den = np.int64(den) # Denominator is actually of format DEN_INT_BITS Q DEN_FRAC_BITS but treated as 0 Q scalingFactor+DEN_FRAC_BITS
+    x = ONE_BY_DEN_LUT[indexToSampleLUT] # This is the initial 1/d where d is downscaled to lie in [0.5,1)
 
-    a4 = (x * a3) >> (DEN_FRAC_BITS+ONE_BY_DEN_FRACBITWIDTH) # Bring back the result to ONE_BY_DEN_FRACBITWIDTH
 
-    if  (scalingFactor >=0):
-        """Divide x by the scaling factor if scaling factor is +ve (>1) """
-        a4 = a4 >> scalingFactor
+    for ele in range(nIter):
+        """
+        x = x * (2-(den/scaling)*x)
+        x = x/scaling * ((2*scaling) - (den*x))
+        """
+        if (ele == 0):
+            """ For the first iteration only, bring seed from ONE_BY_DEN_FRACBITWIDTH fractional bits to NR_FRAC"""
+            x = x << (NR_FRAC-ONE_BY_DEN_FRACBITWIDTH)
+        # 0Q(DEN_FRAC_BITS) * 2Q(NR_FRAC) --> 2Q(DEN_FRAC_BITS + NR_FRAC)
+        a1 = (den * x)
+        a1 = (a1 >> DEN_FRAC_BITS) # Bring back x*d back to NR_FRAC fractional bits
+
+        """Bring 2 to the same decimal scale as a1"""
+        # 2Q0 --> 2Q(NR_FRAC)
+        a2 = 2 << (NR_FRAC)
+
+        # xQ(NR_FRAC) --> x'Q(NR_FRAC)
+        if (scalingFactor>=0):
+            """ Multiply 2 (a2) with the scaling factor if scaling factor is +ve (>1)"""
+            a2 = a2 << scalingFactor #
+        else:
+            """ Divide 2 (a2) with the scaling factor if scaling factor is -ve (<1)"""
+            a2 = a2 >> np.abs(scalingFactor)
+
+        """ There will be a bit growth post multiplication of den and x and also for the scaling of 2.
+        If it is contained to only 32 bit, it will overflow, hence containing the below result in a 64 bit datatype"""
+        # x'Q(NR_FRAC) -  2Q(NR_FRAC) --> yQ(NR_FRAC)
+        a3 = (a2 - a1).astype(np.int64)
+
+        # 2Q(NR_FRAC) * yQ(NR_FRAC) --> (2+y)Q(NR_FRAC)
+        a4 = (x * a3) >> (NR_FRAC)
+
+        # (2+y)Q(ONE_BY_DEN_FRACBITWIDTH) --> y'Q(ONE_BY_DEN_FRACBITWIDTH)
+        if  (scalingFactor >=0):
+            """Divide x by the scaling factor if scaling factor is +ve (>1) """
+            a4 = a4 >> scalingFactor
+        else:
+            """ Multiply x by the scaling factor if scaling factor is -ve (<1)"""
+            a4 = a4 << np.abs(scalingFactor)
+
+        x = a4 # fractional bitwidth of x = ONE_BY_DEN_FRACBITWIDTH
+        # print('Iter # = {}'.format(ele))
+
+    """Bring back the scaling factor to the final output to get the true value of 1/d """
+    # y'Q(ONE_BY_DEN_FRACBITWIDTH) --> zQ(ONE_BY_DEN_FRACBITWIDTH)
+    if (scalingFactor >=0):
+        xRescaled = x >> scalingFactor
     else:
-        """ Multiply x by the scaling factor if scaling factor is -ve (<1)"""
-        a4 = a4 << np.abs(scalingFactor)
+        xRescaled = x << np.abs(scalingFactor)
 
-    x = a4 # fractional bitwidth of x = ONE_BY_DEN_FRACBITWIDTH
-    # print('Iter # = {}'.format(ele))
+    # NUM_INT_BITSQ(NUM_FRAC_BITS) * zQ(NR_FRAC) --> (NUM_INT_BITS+z)Q(A_BY_B_OUTPUT_FRAC_BITS)
+    numByDen = (num * xRescaled) >> (NUM_FRAC_BITS + NR_FRAC - A_BY_B_OUTPUT_FRAC_BITS) #  NUM_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH - A_BY_B_OUTPUT_FRAC_BITS
 
-"""Bring back the scaling factor to the final output to get the true value of 1/d """
-if (scalingFactor >=0):
-    xRescaled = x >> scalingFactor
-else:
-    xRescaled = x << np.abs(scalingFactor)
+    return xRescaled, numByDen
 
-newtonRaphsonBased1byDenFloat = xRescaled/(2**(ONE_BY_DEN_FRACBITWIDTH))
+xRescaled, numByDen = newton_raphson_divider(numFixed,denFixed)
+
+newtonRaphsonBased1byDenFloat = xRescaled/(2**(NR_FRAC))
 true1byDen = 1/denFloat
 
 print('Float 1/d = {}'.format(true1byDen))
 print('Fixed 1/d = {}'.format(newtonRaphsonBased1byDenFloat))
 
 numByDenFloat = numFloat * true1byDen
+numByDenFixedConvertFloat = numByDen/(2**A_BY_B_OUTPUT_FRAC_BITS)
 
-# NUM_INT_BITSQ(NUM_FRAC_BITS) * zQ(ONE_BY_DEN_FRACBITWIDTH) --> (NUM_INT_BITS+z)Q(OUTPUT_FRAC_BITS)
-numByDenFixed = (numFixed * xRescaled) >> (NUM_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH - OUTPUT_FRAC_BITS) #  NUM_FRAC_BITS + ONE_BY_DEN_FRACBITWIDTH - OUTPUT_FRAC_BITS
-numByDenFixedConvertFloat = numByDenFixed/(2**OUTPUT_FRAC_BITS)
 print('Float n/d = {}'.format(numByDenFloat))
 print('Fixed n/d = {}'.format(numByDenFixedConvertFloat))
