@@ -140,15 +140,14 @@ The fixed point implementation is as follows:
             so that the final value is of format 0QNR_FRAC. Note: We are assuming it is brought to range [0.5,1) and
             hence no integer bits.
 
-        m. Bringing x from ONE_BY_DEN_FRACBITWIDTH to NR_FRAC bits in the first iteration itself to improve final prcision
-
+        m. Bringing x_0 from ONE_BY_DEN_FRACBITWIDTH to NR_FRAC bits in the first iteration itself to improve final prcision
 
         n. We apply the update equation:
             x_i+1 = x_i * (2 - d' * x_i)
         So, we first multiply the scaled denominator d with x_0. d has DEN_FRAC_BITS fractional bits and scaled d i.e d' has NR_FRAC bits with 1 as the MSB,
         x_0 has ONE_BY_DEN_FRACBITWIDTH fractional bits and post above step, x_0 has NR_FRAC bits.
         The resultant multiplication yields NR_FRAC +  NR_FRAC fractional bits. We then drop NR_FRAC bits to bring back to
-        NR_FRAC. This NR_FRAC is the precision with with every operation works throught the iteration steps.
+        NR_FRAC. This NR_FRAC is the precision with with every operation works throughout the iteration steps.
 
         o. This product has to subtracted from 2. But before this, we need to align the decimal point and also scale 2 with the scaling factor/shift
         So 2 is left shifted by NR_FRAC bits.
