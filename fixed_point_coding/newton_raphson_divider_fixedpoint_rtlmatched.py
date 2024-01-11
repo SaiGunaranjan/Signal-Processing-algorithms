@@ -173,6 +173,9 @@ More material for the fixed point divider using Newton Raphson algorithm is avai
 The script has been modified to cater to the smart RADAR divider where in the numerator is 8Q8 and denominator is 8Q8.
 Hence now, I can afford to accomodate bit growth upto the final stage and then drop bits only at the end.
 
+This method of Newton Raphson divider(RTL based implementation) has an unique feature that the
+scaling factor is not applied in any iteration but only at the final stage!
+
 """
 
 import numpy as np
