@@ -10,7 +10,7 @@ In this script, I have implemented the Eigen Value decomposition (EVD) using the
     This method works if the matrix is a square matrix and in particular if it is a symmetric matrix
     Any matrix can be decomposed as a product of an orthonormal matrix Q and an upper traingular matrix R.
     There are several methods of computing this QR decomposition like Gram-Schmidt method, Householder method, etc.
-    I will implement these methods in the subsequent commits. For now, lets assume we have the QR decompostion of a matrix A.
+    I have implemented Gram-Schmidt method, Householder method in this commit. For now, lets assume we have the QR decompostion of a matrix A.
     The algorithm is as follows:
     Step 1: A = Q_0 R_0
     Step 2: Define a new matrix A1 = R_0 Q_0 (multiply Q and R in reverse order)
@@ -71,6 +71,7 @@ estEigVec = np.eye(3)
 NUM_ITER = 6
 for ele in range(NUM_ITER):
     Q, R = np.linalg.qr(A)
+    # Q, R = qr_householder(A)
     A = R @ Q
     estEigVec = estEigVec @ Q
 estEigVal = np.diag(A)
