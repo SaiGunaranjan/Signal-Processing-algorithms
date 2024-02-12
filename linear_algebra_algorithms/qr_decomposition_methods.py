@@ -121,8 +121,8 @@ import numpy as np
 def qr_gramschmidt(square_matrix):
 
     nrows, ncols = square_matrix.shape
-    R = np.zeros((nrows,ncols))
-    Q = np.zeros((nrows,ncols))
+    R = np.zeros((nrows,ncols),dtype=square_matrix.dtype)
+    Q = np.zeros((nrows,ncols),dtype=square_matrix.dtype)
 
     for ele in range(ncols):
         """ Project an(nth column of A) onto e1, e2, ..en-1. (<an,e1>, <an,e2> ,.. <an,en-1>)"""
@@ -135,7 +135,7 @@ def qr_gramschmidt(square_matrix):
         Q[:,ele] = temp/np.linalg.norm(temp)
 
         """ <an,en> en is obtained in the previous step. Project an onto en"""
-        R[ele,ele] = Q[:,ele] @ square_matrix[:,ele]
+        R[ele,ele] = Q[:,ele].conj() @ square_matrix[:,ele]
 
     return Q, R
 
@@ -147,13 +147,22 @@ def qr_householder(square_matrix):
 
     for ele in range(ncols):
 
+        """ Step 5"""
         x = R[ele::,ele]
         e = np.zeros((nrows-ele),); e[0] = 1;
+
+        """ Construct the vector"""
         v = (x + np.sign(x[0])*np.linalg.norm(x)*e)[:,None]
+
+        """ Construct the Householder matrix"""
         houseHolderMatrix = np.eye(nrows-ele) - 2*((v @ v.T)/(v.T @ v))
+
+        """ Step 6"""
         a1 = np.hstack((np.eye(ele),np.zeros((ele,ncols-ele))))
         a2 = np.hstack((np.zeros((nrows-ele,ele)), houseHolderMatrix))
         rotatMatrix = np.vstack((a1,a2))
+
+        """ Step 7"""
         R = rotatMatrix @ R
         Q = Q @ rotatMatrix.T
 

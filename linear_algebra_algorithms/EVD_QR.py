@@ -62,16 +62,35 @@ In this script, I have implemented the Eigen Value decomposition (EVD) using the
 """
 
 import numpy as np
+from qr_decomposition_methods import qr_householder, qr_gramschmidt
 
-B = np.random.randn(9).reshape(3,3) # np.array([[1,2,3],[4,5,6], [7,8,9]])
+
+flagQRMethod = 'numpy_qr' #'numpy_qr' # 'householder_qr', 'gramschmidt_qr'
+
+if flagQRMethod == 'numpy_qr':
+    print('\nQR algorithm implemented using numpy library\n')
+if flagQRMethod == 'householder_qr':
+    print('\nQR algorithm implemented using Householder transformation\n')
+if flagQRMethod == 'gramschmidt_qr':
+    print('\nQR algorithm implemented using Gram-Schmidt orthogonalization\n')
+
+
+B = np.random.randn(9).reshape(3,3)
+# B = np.array([[-0.09356527, -0.64804442, -1.95540231],
+#        [-1.27123244,  0.62640042,  0.58877964],
+#        [-1.57418333, -0.07794155, -0.22874176]])
 A = B @ B.T
 eigVal, eigVec = np.linalg.eig(A)
 
 estEigVec = np.eye(3)
 NUM_ITER = 6
 for ele in range(NUM_ITER):
-    Q, R = np.linalg.qr(A)
-    # Q, R = qr_householder(A)
+    if flagQRMethod == 'numpy_qr':
+        Q, R = np.linalg.qr(A)
+    elif flagQRMethod == 'householder_qr':
+        Q, R = qr_householder(A)
+    elif flagQRMethod == 'gramschmidt_qr':
+        Q, R = qr_gramschmidt(A)
     A = R @ Q
     estEigVec = estEigVec @ Q
 estEigVal = np.diag(A)
@@ -85,11 +104,11 @@ argestEigVal = np.argsort(estEigVal)
 eigVecSort = eigVec[:,argeigVal]
 estEigVecSort = estEigVec[:,argestEigVal]
 
-print('Eigen Values using Lib = ', sorteigVals)
+print('True Eigen Values = ', sorteigVals)
 print('Eigen Values estimated using QR = ', sortestEigVal)
 
-print('True Eigen Vectors = \n', eigVecSort)
-print('Estimated Eigen Vectors = \n', estEigVecSort)
+print('\nTrue Eigen Vectors = \n', eigVecSort)
+print('Eigen Vectors estimated using QR = \n', estEigVecSort)
 
 # print('\n Check for Orthonormality')
 # print('U U* = \n', eigVec @ eigVec.T)
