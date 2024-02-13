@@ -104,15 +104,15 @@ Below is the algorithm to find the QR decomposition of a square matrix A using H
     So Q = B1* B2* ...Bn*, where * indicates hermitiaon (conjugate transpose)
 
 
-
 Householder transformation for QR decomposition:
     https://math.byu.edu/~bakker/Math344/Lectures/M344Lec18.pdf
 Worked out example to show the Householder algorithm for QR decomposition is available in the below link:
     https://rpubs.com/aaronsc32/qr-decomposition-householder
 
 
-Currently the QR decomposition is implemented for real, square matrices only. In the subsequent commits,
-I will extend to comlex matrices as well.
+I have extended the QR decomposition to both square and rectangular real matrices.
+The GS based QR caters to both real and complex matrices while the HH based QR caters to only real matrices.
+In the subsequent commits, I will extend the HH based QR to complex matrices as well.
 """
 
 import numpy as np
@@ -122,9 +122,9 @@ def qr_gramschmidt(square_matrix):
 
     nrows, ncols = square_matrix.shape
     R = np.zeros((nrows,ncols),dtype=square_matrix.dtype)
-    Q = np.zeros((nrows,ncols),dtype=square_matrix.dtype)
-
-    for ele in range(ncols):
+    Q = np.zeros((nrows,nrows),dtype=square_matrix.dtype)
+    numIter = min(nrows,ncols)
+    for ele in range(numIter):
         """ Project an(nth column of A) onto e1, e2, ..en-1. (<an,e1>, <an,e2> ,.. <an,en-1>)"""
         R[:,ele] = Q.T.conj() @ square_matrix[:,ele]
 
@@ -145,7 +145,8 @@ def qr_householder(square_matrix):
     R = square_matrix.copy()
     Q = np.eye(nrows)
 
-    for ele in range(ncols):
+    numIter = min(nrows,ncols)
+    for ele in range(numIter):
 
         """ Step 5"""
         x = R[ele::,ele]
@@ -158,7 +159,7 @@ def qr_householder(square_matrix):
         houseHolderMatrix = np.eye(nrows-ele) - 2*((v @ v.T)/(v.T @ v))
 
         """ Step 6"""
-        a1 = np.hstack((np.eye(ele),np.zeros((ele,ncols-ele))))
+        a1 = np.hstack((np.eye(ele),np.zeros((ele,nrows-ele))))
         a2 = np.hstack((np.zeros((nrows-ele,ele)), houseHolderMatrix))
         rotatMatrix = np.vstack((a1,a2))
 
