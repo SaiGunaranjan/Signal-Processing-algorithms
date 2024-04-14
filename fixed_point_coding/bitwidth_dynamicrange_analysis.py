@@ -13,7 +13,8 @@ plt.close('all')
 numADCBits = 16
 numADCFracBits = numADCBits-1
 
-numBitsRangeFFTOutput = 12-1 # -1 for the integer/sign bit
+numBitsRangeFFTOutput = 12
+numFracBitsRangeFFTOutput = numBitsRangeFFTOutput-1 # -1 for the integer/sign bit
 
 numADCSamples = 2048
 numRangeSamples = numADCSamples//2
@@ -60,10 +61,10 @@ rfft = rfft[0:numRangeSamples,:,:]
 
 
 
-rfftfp = np.floor(rfft.real * 2**numBitsRangeFFTOutput + 0*0.5) + \
-    1j*np.floor(rfft.imag * 2**numBitsRangeFFTOutput + 0*0.5)
+rfftfp = np.floor(rfft.real * 2**numFracBitsRangeFFTOutput + 0*0.5) + \
+    1j*np.floor(rfft.imag * 2**numFracBitsRangeFFTOutput + 0*0.5)
 
-rfftfpconvfloat = rfftfp/(2**numBitsRangeFFTOutput)
+rfftfpconvfloat = rfftfp/(2**numFracBitsRangeFFTOutput)
 rfftfpconvfloatSpec = np.mean(np.abs(rfftfpconvfloat)**2,axis=(1,2))
 
 flagRfftPowMean = 1
@@ -83,13 +84,13 @@ else:
 
 
 
-theoretRangeFloorValQuant = 10*np.log10(2**(2*-numBitsRangeFFTOutput))
+theoretRangeFloorValQuant = 10*np.log10(2**(2*-numFracBitsRangeFFTOutput))
 
 plt.figure(1,figsize=(20,10),dpi=200)
 plt.title('Range spectrum')
 plt.plot(rfftSpecdB,label='Without FFT quantization')
-plt.plot(rfftfpconvfloatSpecdB,lw=2,alpha=0.5,label='With {} bit FFT output'.format(numBitsRangeFFTOutput+1))
-plt.axhline(theoretRangeFloorValQuant,color='k',ls='dashed',label='Quant floor due to {} bit RFFT quantization'.format(numBitsRangeFFTOutput+1))
+plt.plot(rfftfpconvfloatSpecdB,lw=2,alpha=0.5,label='With {} bit FFT output'.format(numBitsRangeFFTOutput))
+plt.axhline(theoretRangeFloorValQuant,color='k',ls='dashed',label='Quant floor due to {} bit RFFT quantization'.format(numBitsRangeFFTOutput))
 plt.axhline(noiseFloordB,color='k',ls='dotted',label='Programmed noise floor')
 plt.xlabel('Range bins')
 plt.ylabel('dBm')
