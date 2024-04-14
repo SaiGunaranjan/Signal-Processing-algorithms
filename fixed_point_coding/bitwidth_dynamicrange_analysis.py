@@ -13,8 +13,9 @@ plt.close('all')
 numADCBits = 16
 numADCFracBits = numADCBits-1
 
-numBitsRangeFFTOutput = 12
+numBitsRangeFFTOutput = np.array([12,16,18,20,24,32],dtype=np.int64)
 numFracBitsRangeFFTOutput = numBitsRangeFFTOutput-1 # -1 for the integer/sign bit
+numTestCases = len(numBitsRangeFFTOutput)
 
 numADCSamples = 2048
 numRangeSamples = numADCSamples//2
@@ -59,41 +60,44 @@ adcRadarSignal = np.floor(radarSignal.real * 2**numADCFracBits + 0.5) + \
 rfft = np.fft.fft(adcRadarSignal,axis=0)/(numADCSamples* 2**numADCFracBits)
 rfft = rfft[0:numRangeSamples,:,:]
 
+rfftfpconvfloatAllBitWidths = np.zeros((numTestCases,rfft.shape[0],rfft.shape[1],rfft.shape[2]),dtype=np.complex128)
+for ele in range(numTestCases):
+    rfftfp = np.floor(rfft.real * 2**numFracBitsRangeFFTOutput[ele] + 0*0.5) + \
+        1j*np.floor(rfft.imag * 2**numFracBitsRangeFFTOutput[ele] + 0*0.5)
 
+    rfftfpconvfloat = rfftfp/(2**numFracBitsRangeFFTOutput[ele])
+    rfftfpconvfloatAllBitWidths[ele,:,:,:] = rfftfpconvfloat
 
-rfftfp = np.floor(rfft.real * 2**numFracBitsRangeFFTOutput + 0*0.5) + \
-    1j*np.floor(rfft.imag * 2**numFracBitsRangeFFTOutput + 0*0.5)
-
-rfftfpconvfloat = rfftfp/(2**numFracBitsRangeFFTOutput)
-rfftfpconvfloatSpec = np.mean(np.abs(rfftfpconvfloat)**2,axis=(1,2))
 
 flagRfftPowMean = 1
 
 if flagRfftPowMean:
     rfftSpecdB = 10*np.log10(np.mean(np.abs(rfft)**2,axis=(1,2)))
 
+    rfftfpconvfloatSpec = np.mean(np.abs(rfftfpconvfloatAllBitWidths)**2,axis=(2,3))
     rfftfpconvfloatSpecdB = 10*np.log10(rfftfpconvfloatSpec)
 else:
     rfftSpecdB = 10*np.log10(np.abs(rfft[:,0,0])**2)
 
-    rfftfpconvfloatSpecdB = 10*np.log10(np.abs(rfftfpconvfloat)**2)
-    rfftfpconvfloatSpecdB = rfftfpconvfloatSpecdB[:,0,0]
+    rfftfpconvfloatSpecdB = 10*np.log10(np.abs(rfftfpconvfloatAllBitWidths)**2)
+    rfftfpconvfloatSpecdB = rfftfpconvfloatSpecdB[:,:,0,0]
 
 
 
+theoretRangeFloorValQuant = -10*np.log10(2**(2*numFracBitsRangeFFTOutput))
 
 
-
-theoretRangeFloorValQuant = 10*np.log10(2**(2*-numFracBitsRangeFFTOutput))
-
-plt.figure(1,figsize=(20,10),dpi=200)
-plt.title('Range spectrum')
-plt.plot(rfftSpecdB,label='Without FFT quantization')
-plt.plot(rfftfpconvfloatSpecdB,lw=2,alpha=0.5,label='With {} bit FFT output'.format(numBitsRangeFFTOutput))
-plt.axhline(theoretRangeFloorValQuant,color='k',ls='dashed',label='Quant floor due to {} bit RFFT quantization'.format(numBitsRangeFFTOutput))
-plt.axhline(noiseFloordB,color='k',ls='dotted',label='Programmed noise floor')
-plt.xlabel('Range bins')
-plt.ylabel('dBm')
-plt.legend()
-plt.grid(True)
-plt.ylim(min(theoretRangeFloorValQuant,noiseFloordB)-10, 10)
+plt.figure(1,figsize=(20,10))
+plt.suptitle('Range spectrum')
+for ele in range(numTestCases):
+    plt.subplot(2,3,ele+1)
+    plt.title('{} bit RFFT'.format(numBitsRangeFFTOutput[ele]))
+    plt.plot(rfftSpecdB,label='Without FFT quantization')
+    plt.plot(rfftfpconvfloatSpecdB[ele],lw=2,alpha=0.5,label='With {} bit FFT quantization'.format(numBitsRangeFFTOutput[ele]))
+    plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed',label='Quant floor due to {} bit RFFT'.format(numBitsRangeFFTOutput[ele]))
+    plt.axhline(noiseFloordB,color='k',ls='dotted',label='Programmed noise floor')
+    plt.xlabel('Range bins')
+    plt.ylabel('dBm')
+    plt.legend()
+    plt.grid(True)
+    plt.ylim(min(min(theoretRangeFloorValQuant),noiseFloordB)-10, 10)
