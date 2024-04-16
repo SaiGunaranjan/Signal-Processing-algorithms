@@ -5,6 +5,14 @@ Created on Fri Apr 12 23:06:16 2024
 @author: Sai Gunaranjan
 """
 
+"""
+1. Plot the theoretical noise floor/underflow for different bitwidths post range fft, doppler fft, angle fft
+2. Plot measured snr vs actual snr for differnt bitwidths and a detection SNR. This should be for a given noise floor,
+system gain.
+
+"""
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -24,17 +32,28 @@ numADCSamples = 2048
 numRangeSamples = numADCSamples//2
 numChirps = 512
 numRxs = 4
+
+
 """ Noise parameters"""
 thermalFloor = -174 # dBm/Hz
 rxGain = 38 #dB
 NF = 9 # dB
 adcSamplRate = 56.25e6 # 56.25 MHz
 rbw = 10*np.log10(adcSamplRate/numADCSamples)
-# noiseFloordB = thermalFloor + rbw + rxGain + NF
-noiseFloordB = -90 # bin snr
+noiseFloordB = thermalFloor + rbw + rxGain + NF
+# noiseFloordB = -90 # bin snr
 noise_power_db = noiseFloordB + 10*np.log10(numADCSamples)
 noise_variance = 10**(noise_power_db/10)
 noise_sigma = np.sqrt(noise_variance)
+""" """
+
+systemGain = 10*np.log10(numChirps) + 10*np.log10(numRxs)
+detectionSNR = 18 # dB
+snrPostRFFT = 18 - systemGain
+minSignalPowerRFFT = snrPostRFFT + noiseFloordB
+
+print('\nMin signal power at RFFT should be = {0:.1f} dB to be detected post {1} point DFFT, \
+{2} point channel comb. for a detecion SNR of {3} dB\n'.format(minSignalPowerRFFT,numChirps,numRxs,detectionSNR))
 
 object_snr = np.array([60,10]) #np.array([60,-10])
 weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
@@ -151,3 +170,14 @@ for ele in range(numTestCases):
     plt.grid(True)
     plt.ylim(min(min(theoretRangeFloorValQuant),doppnoiseFloordB)-10, 10)
 
+
+plt.figure(3,figsize=(20,10),dpi=200)
+plt.title('Noise floor vs Qunatization bits')
+plt.plot(numBitsRangeFFTOutput,theoretRangeFloorValQuant,'-o')
+plt.axhline(noiseFloordB,label='True RFFT floor',color='k',ls='dashed')
+plt.axhline(doppnoiseFloordB,label='True DFFT floor',color='k',ls='dotted')
+plt.xlabel('bitwidth')
+plt.ylabel('dB')
+plt.legend()
+plt.grid(True)
+plt.xticks(numBitsRangeFFTOutput)
