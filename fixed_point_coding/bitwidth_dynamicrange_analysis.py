@@ -31,7 +31,7 @@ theoretRangeFloorValQuant = -10*np.log10(2**(2*numFracBitsRangeFFTOutput))
 numADCSamples = 2048
 numRangeSamples = numADCSamples//2
 numChirps = 512
-numRxs = 16#4
+numRxs = 4
 
 
 """ Noise parameters"""
@@ -40,7 +40,9 @@ rxGain = 38 #dB
 NF = 9 # dB
 adcSamplRate = 56.25e6 # 56.25 MHz
 rbw = 10*np.log10(adcSamplRate/numADCSamples)
-noiseFloordB = thermalFloor + rbw + rxGain + NF
+dbFstodBm = 10
+noiseFloordBm = thermalFloor + rbw + rxGain + NF # dBm
+noiseFloordB = noiseFloordBm - dbFstodBm # dBFs
 # noiseFloordB = -90 # bin snr
 noise_power_db = noiseFloordB + 10*np.log10(numADCSamples)
 noise_variance = 10**(noise_power_db/10)
@@ -53,7 +55,7 @@ snrPostRFFT = 18 - systemGain
 minSignalPowerRFFT = snrPostRFFT + noiseFloordB
 
 print('\nMin signal power at RFFT should be = {0:.1f} dB to be detected post {1} point DFFT, \
-{2} point channel comb. for a detecion SNR of {3} dB\n'.format(minSignalPowerRFFT,numChirps,numRxs,detectionSNR))
+{2} point channel comb. for a detection SNR of {3} dB\n'.format(minSignalPowerRFFT,numChirps,numRxs,detectionSNR))
 
 object_snr = np.array([60,10]) #np.array([60,-10])
 weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
@@ -167,7 +169,7 @@ for ele in range(numTestCases):
     plt.axhline(noiseFloordB,color='k',ls='dotted',label='Programmed noise floor')
     plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed',label='Quant floor due to {} bit RFFT'.format(numBitsRangeFFTOutput[ele]))
     plt.xlabel('Range bins')
-    plt.ylabel('dBm')
+    plt.ylabel('dBFs')
     plt.legend()
     plt.grid(True)
     plt.ylim(min(min(theoretRangeFloorValQuant),noiseFloordB)-10, 10)
@@ -186,7 +188,7 @@ for ele in range(numTestCases):
     plt.axhline(doppnoiseFloordB,color='k',ls='dotted')
     plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed')
     plt.xlabel('Doppler bins')
-    plt.ylabel('dBm')
+    plt.ylabel('dBFs')
     doppLegendFull = doppLegend + ['Quant floor due to {} bit DFFT'.format(numBitsRangeFFTOutput[ele])]
     plt.legend(doppLegendFull)
     plt.grid(True)
@@ -205,7 +207,7 @@ for ele in range(numTestCases):
     plt.axhline(rxnoiseFloordB,color='k',ls='dotted')
     plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed')
     plt.xlabel('Angle bins')
-    plt.ylabel('dBm')
+    plt.ylabel('dBFs')
     angLegendFull = angLegend + ['Quant floor due to {} bit DFFT'.format(numBitsRangeFFTOutput[ele])]
     plt.legend(angLegendFull)
     plt.grid(True)
@@ -213,13 +215,13 @@ for ele in range(numTestCases):
 
 
 plt.figure(4,figsize=(20,10),dpi=200)
-plt.title('Noise floor vs Quantization bits')
+plt.title('Quantization Noise floor(Minimum representable power) vs bitwidth')
 plt.plot(numBitsRangeFFTOutput,theoretRangeFloorValQuant,'-o')
 plt.axhline(noiseFloordB,label='True RFFT floor',color='k',ls='dashed')
 plt.axhline(doppnoiseFloordB,label='True DFFT floor',color='k',ls='dotted')
 plt.axhline(rxnoiseFloordB,label='True Rx FFT floor',color='k',ls='dashdot')
 plt.xlabel('bitwidth')
-plt.ylabel('dB')
+plt.ylabel('dBFs')
 plt.legend()
 plt.grid(True)
 plt.xticks(numBitsRangeFFTOutput)
