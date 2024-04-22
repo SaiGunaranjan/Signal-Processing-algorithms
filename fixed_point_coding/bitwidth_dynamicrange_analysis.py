@@ -31,7 +31,7 @@ theoretRangeFloorValQuant = -10*np.log10(2**(2*numFracBitsRangeFFTOutput))
 numADCSamples = 2048
 numRangeSamples = numADCSamples//2
 numChirps = 512
-numRxs = 4
+numRxs = 16#4
 
 
 """ Noise parameters"""
@@ -134,6 +134,28 @@ else:
 doppnoiseFloordB = noiseFloordB - 10*np.log10(numChirps)
 
 
+rxfft = np.fft.fft(dfft,axis=2)/numRxs
+
+""" Perform RxFFT on the quantized DFFT output"""
+rxfftfp = np.fft.fft(dfftfpconvfloatAllBitWidths,axis=3)/numRxs
+
+rxfftfpconvfloatAllBitWidths = np.zeros((numTestCases,rfft.shape[0],rfft.shape[1],rfft.shape[2]),dtype=np.complex128)
+for ele in range(numTestCases):
+
+    rxfftfp_ = np.floor(rxfftfp[ele,:,:,:].real * 2**numFracBitsRangeFFTOutput[ele] + 0*0.5) + \
+        1j*np.floor(rxfftfp[ele,:,:,:].imag * 2**numFracBitsRangeFFTOutput[ele] + 0*0.5)
+
+    rxfftfpconvfloat = rxfftfp_/(2**numFracBitsRangeFFTOutput[ele])
+    rxfftfpconvfloatAllBitWidths[ele,:,:,:] = rxfftfpconvfloat
+
+
+rxfftSpecdB = 10*np.log10(np.abs(rxfft[targetRangeBins,targetDopplerBins,:])**2)
+
+rxfftfpconvfloatSpecdB = 10*np.log10(np.abs(rxfftfpconvfloatAllBitWidths)**2)
+rxfftfpconvfloatSpecdB = rxfftfpconvfloatSpecdB[:,targetRangeBins,targetDopplerBins,:]
+
+rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs)
+
 
 plt.figure(1,figsize=(20,10))
 plt.suptitle('Range spectrum')
@@ -171,11 +193,31 @@ for ele in range(numTestCases):
     plt.ylim(min(min(theoretRangeFloorValQuant),doppnoiseFloordB)-10, 10)
 
 
-plt.figure(3,figsize=(20,10),dpi=200)
-plt.title('Noise floor vs Qunatization bits')
+angLegend = ['Target 1 without Rx FFT quant', 'Target 2 without Rx FFT quant',
+              'Target 1 with Rx FFT quant', 'Target 2 with Rx FFT quant', 'Expected noise floor']
+plt.figure(3,figsize=(20,10))
+plt.suptitle('Angle spectrum')
+for ele in range(numTestCases):
+    plt.subplot(2,3,ele+1)
+    plt.title('{} bit DFFT'.format(numBitsRangeFFTOutput[ele]))
+    plt.plot(rxfftSpecdB.T)
+    plt.plot(rxfftfpconvfloatSpecdB[ele,:,:].T,lw=2,alpha=0.5)
+    plt.axhline(rxnoiseFloordB,color='k',ls='dotted')
+    plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed')
+    plt.xlabel('Angle bins')
+    plt.ylabel('dBm')
+    angLegendFull = angLegend + ['Quant floor due to {} bit DFFT'.format(numBitsRangeFFTOutput[ele])]
+    plt.legend(angLegendFull)
+    plt.grid(True)
+    plt.ylim(min(min(theoretRangeFloorValQuant),rxnoiseFloordB)-10, 10)
+
+
+plt.figure(4,figsize=(20,10),dpi=200)
+plt.title('Noise floor vs Quantization bits')
 plt.plot(numBitsRangeFFTOutput,theoretRangeFloorValQuant,'-o')
 plt.axhline(noiseFloordB,label='True RFFT floor',color='k',ls='dashed')
 plt.axhline(doppnoiseFloordB,label='True DFFT floor',color='k',ls='dotted')
+plt.axhline(rxnoiseFloordB,label='True Rx FFT floor',color='k',ls='dashdot')
 plt.xlabel('bitwidth')
 plt.ylabel('dB')
 plt.legend()
