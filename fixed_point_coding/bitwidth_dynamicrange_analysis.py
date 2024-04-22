@@ -57,6 +57,7 @@ minSignalPowerRFFT = snrPostRFFT + noiseFloordB
 print('\nMin signal power at RFFT should be = {0:.1f} dB to be detected post {1} point DFFT, \
 {2} point channel comb. for a detection SNR of {3} dB\n'.format(minSignalPowerRFFT,numChirps,numRxs,detectionSNR))
 
+numTargets = 2
 object_snr = np.array([60,10]) #np.array([60,-10])
 weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
 
@@ -133,7 +134,7 @@ else:
     dfftfpconvfloatSpecdB = 10*np.log10(np.abs(dfftfpconvfloatAllBitWidths)**2)
     dfftfpconvfloatSpecdB = dfftfpconvfloatSpecdB[:,targetRangeBins,:,0]
 
-doppnoiseFloordB = noiseFloordB - 10*np.log10(numChirps)
+doppnoiseFloordB = noiseFloordB - 10*np.log10(numChirps) # because we are normalizing, the signal power stays same and noise power drops by 10logN
 
 
 rxfft = np.fft.fft(dfft,axis=2)/numRxs
@@ -156,7 +157,19 @@ rxfftSpecdB = 10*np.log10(np.abs(rxfft[targetRangeBins,targetDopplerBins,:])**2)
 rxfftfpconvfloatSpecdB = 10*np.log10(np.abs(rxfftfpconvfloatAllBitWidths)**2)
 rxfftfpconvfloatSpecdB = rxfftfpconvfloatSpecdB[:,targetRangeBins,targetDopplerBins,:]
 
-rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs)
+rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs) # because we are normalizing, the signal power stays same and noise power drops by 10logN
+
+
+trueSignalPower = rxfftSpecdB[np.arange(numTargets),targetAngleBins]
+trueNoisePower = rxnoiseFloordB
+trueSNR = object_snr+systemGain #trueSignalPower - trueNoisePower
+
+measSignalPower = rxfftfpconvfloatSpecdB[:,np.arange(numTargets),targetAngleBins]
+measNoisePower = np.maximum(theoretRangeFloorValQuant,rxnoiseFloordB)
+measSNR = measSignalPower - measNoisePower[:,None]
+measSNR[measSNR<0] = 0 # signal lost in the floor quantization
+
+
 
 
 plt.figure(1,figsize=(20,10))
