@@ -57,13 +57,14 @@ minSignalPowerRFFT = snrPostRFFT + noiseFloordB
 print('\nMin signal power at RFFT should be = {0:.1f} dB to be detected post {1} point DFFT, \
 {2} point channel comb. for a detection SNR of {3} dB\n'.format(minSignalPowerRFFT,numChirps,numRxs,detectionSNR))
 
-numTargets = 2
-object_snr = np.array([60,10]) #np.array([60,-10])
+minTargetRangeBin = 20
+numTargets = 8#np.ceil(np.log2(numRangeSamples/minTargetRangeBin)).astype(np.int32) # Targets at double the previous distance
+object_snr = np.linspace(60,-15,numTargets)#np.array([60,10]) #np.array([60,-10])
 weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
 
-targetRangeBins = np.array([20,800])
-targetDopplerBins = np.array([0,200])
-targetAngleBins = np.array([0,2])
+targetRangeBins = np.int32(np.linspace(minTargetRangeBin,numRangeSamples-1,numTargets))#minTargetRangeBin* 2**(np.arange(numTargets))#np.array([20,800])
+targetDopplerBins = np.random.randint(0,numChirps,size=numTargets)#np.array([0,200])
+targetAngleBins = np.random.randint(0,numRxs,size=numTargets)#np.array([0,2])
 
 rangeSignal = np.exp(1j*2*np.pi*targetRangeBins[:,None]*np.arange(numADCSamples)[None,:]/numADCSamples)
 dopplerSignal = np.exp(1j*2*np.pi*targetDopplerBins[:,None]*np.arange(numChirps)[None,:]/numChirps)
@@ -196,8 +197,8 @@ plt.suptitle('Doppler spectrum')
 for ele in range(numTestCases):
     plt.subplot(2,3,ele+1)
     plt.title('{} bit DFFT'.format(numBitsRangeFFTOutput[ele]))
-    plt.plot(dfftSpecdB.T)
-    plt.plot(dfftfpconvfloatSpecdB[ele,:,:].T,lw=2,alpha=0.5)
+    plt.plot(dfftSpecdB[np.array([0,-1]),:].T)
+    plt.plot(dfftfpconvfloatSpecdB[ele,np.array([0,-1]),:].T,lw=2,alpha=0.5)
     plt.axhline(doppnoiseFloordB,color='k',ls='dotted')
     plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed')
     plt.xlabel('Doppler bins')
@@ -207,24 +208,24 @@ for ele in range(numTestCases):
     plt.grid(True)
     plt.ylim(min(min(theoretRangeFloorValQuant),doppnoiseFloordB)-10, 10)
 
-
-angLegend = ['Target 1 without Rx FFT quant', 'Target 2 without Rx FFT quant',
-              'Target 1 with Rx FFT quant', 'Target 2 with Rx FFT quant', 'Expected noise floor']
-plt.figure(3,figsize=(20,10))
-plt.suptitle('Angle spectrum')
-for ele in range(numTestCases):
-    plt.subplot(2,3,ele+1)
-    plt.title('{} bit DFFT'.format(numBitsRangeFFTOutput[ele]))
-    plt.plot(rxfftSpecdB.T)
-    plt.plot(rxfftfpconvfloatSpecdB[ele,:,:].T,lw=2,alpha=0.5)
-    plt.axhline(rxnoiseFloordB,color='k',ls='dotted')
-    plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed')
-    plt.xlabel('Angle bins')
-    plt.ylabel('dBFs')
-    angLegendFull = angLegend + ['Quant floor due to {} bit DFFT'.format(numBitsRangeFFTOutput[ele])]
-    plt.legend(angLegendFull)
-    plt.grid(True)
-    plt.ylim(min(min(theoretRangeFloorValQuant),rxnoiseFloordB)-10, 10)
+if 0:
+    angLegend = ['Target 1 without Rx FFT quant', 'Target 2 without Rx FFT quant',
+                  'Target 1 with Rx FFT quant', 'Target 2 with Rx FFT quant', 'Expected noise floor']
+    plt.figure(3,figsize=(20,10))
+    plt.suptitle('Angle spectrum')
+    for ele in range(numTestCases):
+        plt.subplot(2,3,ele+1)
+        plt.title('{} bit DFFT'.format(numBitsRangeFFTOutput[ele]))
+        plt.plot(rxfftSpecdB[np.array([0,-1]),:].T)
+        plt.plot(rxfftfpconvfloatSpecdB[ele,np.array([0,-1]),:].T,lw=2,alpha=0.5)
+        plt.axhline(rxnoiseFloordB,color='k',ls='dotted')
+        plt.axhline(theoretRangeFloorValQuant[ele],color='k',ls='dashed')
+        plt.xlabel('Angle bins')
+        plt.ylabel('dBFs')
+        angLegendFull = angLegend + ['Quant floor due to {} bit DFFT'.format(numBitsRangeFFTOutput[ele])]
+        plt.legend(angLegendFull)
+        plt.grid(True)
+        plt.ylim(min(min(theoretRangeFloorValQuant),rxnoiseFloordB)-10, 10)
 
 
 plt.figure(4,figsize=(20,10),dpi=200)
@@ -238,3 +239,17 @@ plt.ylabel('dBFs')
 plt.legend()
 plt.grid(True)
 plt.xticks(numBitsRangeFFTOutput)
+
+
+bitwidthLeg = [str(ele) + ' bit quant.' for ele in numBitsRangeFFTOutput]
+bitwidthLeg.append('GT')
+bitwidthLeg.append('Detection SNR = {} dB'.format(detectionSNR))
+plt.figure(5,figsize=(20,10),dpi=200)
+plt.title('Measured SNR vs True SNR (post detection gain of {} chirps, {} Rxs)'.format(numChirps,numRxs))
+plt.plot(trueSNR,measSNR.T,'-o')
+plt.plot(trueSNR,trueSNR,'^',color='k')
+plt.axhline(detectionSNR,ls='dashed',color='k')
+plt.xlabel('True SNR (dB)')
+plt.ylabel('Measured SNR post quantization (dB)')
+plt.legend(bitwidthLeg)
+plt.grid(True)
