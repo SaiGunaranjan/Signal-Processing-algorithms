@@ -255,11 +255,11 @@ bitwidthLeg.append('GT')
 bitwidthLeg.append('Detection SNR = {} dB'.format(detectionSNR))
 fig = plt.figure(5,figsize=(20,10),dpi=100)
 ax1 = fig.add_subplot(111)
-plt.title('SNR post FFT qunatization vs True SNR (post detection gain of {} chirps, {} Rxs)'.format(numChirps,numRxs))
+plt.title('SNR post FFT quantization vs True SNR (post detection gain of {} chirps, {} Rxs)'.format(numChirps,numRxs))
 # ax1.plot(trueSNR,measSNR.T,'-o')
-ax1.plot(trueSNR,measSNR[0:-2,:].T,'-o')
-ax1.plot(trueSNR,measSNR[-2,:],'-o',lw=6,alpha=0.5)
-ax1.plot(trueSNR,measSNR[-1,:],'-o')
+lwArray = 6*np.ones(numTestCases); lwArray[-1] = 2
+for ele in range(numTestCases):
+    ax1.plot(trueSNR,measSNR[ele,:],'-o',lw=lwArray[ele],alpha=0.5)
 
 ax1.plot(trueSNR,trueSNR,'^',color='k')
 ax1.axhline(detectionSNR,ls='dashed',color='k')
