@@ -128,11 +128,16 @@ if flagDfftPowMean:
     dfftSpecdB = 10*np.log10(np.mean(np.abs(dfft[targetRangeBins,:,:])**2,axis=(2)))
 
     dfftfpconvfloatSpec = np.mean(np.abs(dfftfpconvfloatAllBitWidths[:,targetRangeBins,:,:])**2,axis=(3))
+    secondSmallestVal = np.unique(dfftfpconvfloatSpec)[1]
+    dfftfpconvfloatSpec[dfftfpconvfloatSpec==0] = secondSmallestVal
     dfftfpconvfloatSpecdB = 10*np.log10(dfftfpconvfloatSpec)
 else:
     dfftSpecdB = 10*np.log10(np.abs(dfft[targetRangeBins,:,0])**2)
 
-    dfftfpconvfloatSpecdB = 10*np.log10(np.abs(dfftfpconvfloatAllBitWidths)**2)
+    dfftfpconvfloatAllBitWidthsMagSq = np.abs(dfftfpconvfloatAllBitWidths)**2
+    secondSmallestVal = np.unique(dfftfpconvfloatAllBitWidthsMagSq)[1]
+    dfftfpconvfloatAllBitWidthsMagSq[dfftfpconvfloatAllBitWidthsMagSq==0] = secondSmallestVal
+    dfftfpconvfloatSpecdB = 10*np.log10(dfftfpconvfloatAllBitWidthsMagSq)
     dfftfpconvfloatSpecdB = dfftfpconvfloatSpecdB[:,targetRangeBins,:,0]
 
 doppnoiseFloordB = noiseFloordB - 10*np.log10(numChirps) # because we are normalizing, the signal power stays same and noise power drops by 10logN
@@ -155,7 +160,10 @@ for ele in range(numTestCases):
 
 rxfftSpecdB = 10*np.log10(np.abs(rxfft[targetRangeBins,targetDopplerBins,:])**2)
 
-rxfftfpconvfloatSpecdB = 10*np.log10(np.abs(rxfftfpconvfloatAllBitWidths)**2)
+rxfftfpconvfloatAllBitWidthsMagSq = np.abs(rxfftfpconvfloatAllBitWidths)**2
+secondSmallestVal = np.unique(rxfftfpconvfloatAllBitWidthsMagSq)[1]
+rxfftfpconvfloatAllBitWidthsMagSq[rxfftfpconvfloatAllBitWidthsMagSq==0] = secondSmallestVal
+rxfftfpconvfloatSpecdB = 10*np.log10(rxfftfpconvfloatAllBitWidthsMagSq)
 rxfftfpconvfloatSpecdB = rxfftfpconvfloatSpecdB[:,targetRangeBins,targetDopplerBins,:]
 
 rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs) # because we are normalizing, the signal power stays same and noise power drops by 10logN
@@ -164,11 +172,12 @@ rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs) # because we are normali
 trueSignalPower = rxfftSpecdB[np.arange(numTargets),targetAngleBins]
 trueNoisePower = rxnoiseFloordB
 trueSNR = object_snr+systemGain #trueSignalPower - trueNoisePower
+trueSNR = np.round(trueSNR,2)
 
 measSignalPower = rxfftfpconvfloatSpecdB[:,np.arange(numTargets),targetAngleBins]
 measNoisePower = np.maximum(theoretRangeFloorValQuant,rxnoiseFloordB)
 measSNR = measSignalPower - measNoisePower[:,None]
-measSNR[measSNR<0] = 0 # signal lost in the floor quantization
+measSNR[measSNR<=0] = -1000 # signal lost in the floor quantization. These targets are lost and will not be detected.
 
 
 
@@ -246,10 +255,15 @@ bitwidthLeg.append('GT')
 bitwidthLeg.append('Detection SNR = {} dB'.format(detectionSNR))
 plt.figure(5,figsize=(20,10),dpi=200)
 plt.title('Measured SNR vs True SNR (post detection gain of {} chirps, {} Rxs)'.format(numChirps,numRxs))
-plt.plot(trueSNR,measSNR.T,'-o')
+# plt.plot(trueSNR,measSNR.T,'-o')
+plt.plot(trueSNR,measSNR[0:-2,:].T,'-o')
+plt.plot(trueSNR,measSNR[-2,:],'-o',lw=6,alpha=0.5)
+plt.plot(trueSNR,measSNR[-1,:],'-o')
 plt.plot(trueSNR,trueSNR,'^',color='k')
 plt.axhline(detectionSNR,ls='dashed',color='k')
 plt.xlabel('True SNR (dB)')
 plt.ylabel('Measured SNR post quantization (dB)')
 plt.legend(bitwidthLeg)
 plt.grid(True)
+plt.ylim([0, max(trueSNR)+5])
+plt.xlim([0, max(trueSNR)+5])
