@@ -172,7 +172,7 @@ rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs) # because we are normali
 trueSignalPower = rxfftSpecdB[np.arange(numTargets),targetAngleBins]
 trueNoisePower = rxnoiseFloordB
 trueSNR = object_snr+systemGain #trueSignalPower - trueNoisePower
-trueSNR = np.round(trueSNR,2)
+trueSNR = np.round(trueSNR)
 
 measSignalPower = rxfftfpconvfloatSpecdB[:,np.arange(numTargets),targetAngleBins]
 measNoisePower = np.maximum(theoretRangeFloorValQuant,rxnoiseFloordB)
@@ -253,17 +253,30 @@ plt.xticks(numBitsRangeFFTOutput)
 bitwidthLeg = [str(ele) + ' bit quant.' for ele in numBitsRangeFFTOutput]
 bitwidthLeg.append('GT')
 bitwidthLeg.append('Detection SNR = {} dB'.format(detectionSNR))
-plt.figure(5,figsize=(20,10),dpi=200)
-plt.title('Measured SNR vs True SNR (post detection gain of {} chirps, {} Rxs)'.format(numChirps,numRxs))
-# plt.plot(trueSNR,measSNR.T,'-o')
-plt.plot(trueSNR,measSNR[0:-2,:].T,'-o')
-plt.plot(trueSNR,measSNR[-2,:],'-o',lw=6,alpha=0.5)
-plt.plot(trueSNR,measSNR[-1,:],'-o')
-plt.plot(trueSNR,trueSNR,'^',color='k')
-plt.axhline(detectionSNR,ls='dashed',color='k')
-plt.xlabel('True SNR (dB)')
-plt.ylabel('Measured SNR post quantization (dB)')
-plt.legend(bitwidthLeg)
-plt.grid(True)
-plt.ylim([0, max(trueSNR)+5])
-plt.xlim([0, max(trueSNR)+5])
+fig = plt.figure(5,figsize=(20,10),dpi=100)
+ax1 = fig.add_subplot(111)
+plt.title('SNR post FFT qunatization vs True SNR (post detection gain of {} chirps, {} Rxs)'.format(numChirps,numRxs))
+# ax1.plot(trueSNR,measSNR.T,'-o')
+ax1.plot(trueSNR,measSNR[0:-2,:].T,'-o')
+ax1.plot(trueSNR,measSNR[-2,:],'-o',lw=6,alpha=0.5)
+ax1.plot(trueSNR,measSNR[-1,:],'-o')
+
+ax1.plot(trueSNR,trueSNR,'^',color='k')
+ax1.axhline(detectionSNR,ls='dashed',color='k')
+ax1.set_xlabel('True SNR post doppler and Rx gain (dB)')
+ax1.set_ylabel('SNR post doppler and Rx gain with FFT quantization (dB)')
+ax1.legend(bitwidthLeg)
+ax1.grid(True)
+ax1.set_ylim([0, max(trueSNR)+5])
+ax1.set_xlim([trueSNR[-1], trueSNR[0]])
+ax1.set_xticks(trueSNR)
+
+
+object_snr = np.flipud(np.round(object_snr))
+ax2 = ax1.twiny()
+ax2.set_xticks(object_snr)
+ax2.set_xlabel("True Range FFT SNR (dB)")
+ax2.set_xticklabels(object_snr)
+
+
+
