@@ -24,9 +24,16 @@ sum codeWordLength * Number of occurences of te CodeWordLength. Theoreticaly, bo
 that is what is observed as well.
 
 
+A simple and beautiful explanation and reference implementation for Huffman coding is available in the below links:
+    1. https://www.youtube.com/watch?v=_Kl3TtBXxq8
+    2. https://www.youtube.com/watch?v=JCOph23TQTY&t=1121s
 
-1. Extend the scheme to any generic symbols ad not necessarily numbers
-Only leaf nodes can have symbols, rest all nodes have only data [Done]
+My implementation is quite different from the above links and is not as optimal as shown in the above tutorials.
+But the output is the same.
+
+Action Item:
+    1. Extend the scheme to any generic symbols ad not necessarily numbers
+    Only leaf nodes can have symbols, rest all nodes have only data [Done]
 
 """
 
