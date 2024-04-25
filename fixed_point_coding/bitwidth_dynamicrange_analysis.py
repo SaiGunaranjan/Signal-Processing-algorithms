@@ -180,6 +180,8 @@ measSNR = measSignalPower - measNoisePower[:,None]
 measSNR[measSNR<=0] = -1000 # signal lost in the floor quantization. These targets are lost and will not be detected.
 
 
+detSNRLoss = rxnoiseFloordB - theoretRangeFloorValQuant
+detSNRLoss[detSNRLoss>=0] = 0
 
 
 plt.figure(1,figsize=(20,10))
@@ -237,7 +239,8 @@ if 0:
         plt.ylim(min(min(theoretRangeFloorValQuant),rxnoiseFloordB)-10, 10)
 
 
-plt.figure(4,figsize=(20,10),dpi=200)
+plt.figure(4,figsize=(20,10),dpi=100)
+plt.subplot(1,2,1)
 plt.title('Quantization Noise floor(Minimum representable power) vs bitwidth')
 plt.plot(numBitsRangeFFTOutput,theoretRangeFloorValQuant,'-o')
 plt.axhline(noiseFloordB,label='True RFFT floor',color='k',ls='dashed')
@@ -246,6 +249,13 @@ plt.axhline(rxnoiseFloordB,label='True Rx FFT floor',color='k',ls='dashdot')
 plt.xlabel('bitwidth')
 plt.ylabel('dBFs')
 plt.legend()
+plt.grid(True)
+plt.xticks(numBitsRangeFFTOutput)
+plt.subplot(1,2,2)
+plt.title('Loss in detection snr vs bitwidth')
+plt.plot(numBitsRangeFFTOutput,detSNRLoss,'-o')
+plt.xlabel('bitwidth')
+plt.ylabel('dB')
 plt.grid(True)
 plt.xticks(numBitsRangeFFTOutput)
 
