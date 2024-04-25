@@ -110,62 +110,68 @@ Worked out example to show the Householder algorithm for QR decomposition is ava
     https://rpubs.com/aaronsc32/qr-decomposition-householder
 
 
-I have extended the QR decomposition to both square and rectangular real matrices.
-The GS based QR caters to both real and complex matrices while the HH based QR caters to only real matrices.
-In the subsequent commits, I will extend the HH based QR to complex matrices as well.
+Now, the QR decomposition(both GS, HH) works on both real and complex matrices and also square and rectangular matrices.
 """
 
 import numpy as np
 
 
-def qr_gramschmidt(square_matrix):
+def qr_gramschmidt(input_matrix):
 
-    nrows, ncols = square_matrix.shape
-    R = np.zeros((nrows,ncols),dtype=square_matrix.dtype)
-    Q = np.zeros((nrows,nrows),dtype=square_matrix.dtype)
+    nrows, ncols = input_matrix.shape
+    R = np.zeros((nrows,ncols),dtype=input_matrix.dtype)
+    Q = np.zeros((nrows,nrows),dtype=input_matrix.dtype)
     numIter = min(nrows,ncols)
     for ele in range(numIter):
         """ Project an(nth column of A) onto e1, e2, ..en-1. (<an,e1>, <an,e2> ,.. <an,en-1>)"""
-        R[:,ele] = Q.T.conj() @ square_matrix[:,ele]
+        R[:,ele] = Q.T.conj() @ input_matrix[:,ele]
 
         """ bn = an - (<an,e1>e1 + <an,e2>e2 +.. <an,en-1>en-1)"""
-        temp = square_matrix[:,ele] - (Q @ R[:,ele])
+        temp = input_matrix[:,ele] - (Q @ R[:,ele])
 
         """ en = bn/||bn||"""
         Q[:,ele] = temp/np.linalg.norm(temp)
 
         """ <an,en> en is obtained in the previous step. Project an onto en"""
-        R[ele,ele] = Q[:,ele].conj() @ square_matrix[:,ele]
+        R[ele,ele] = Q[:,ele].conj() @ input_matrix[:,ele]
 
     return Q, R
 
-def qr_householder(square_matrix):
+def qr_householder(input_matrix):
 
-    nrows, ncols = square_matrix.shape
-    R = square_matrix.copy()
-    Q = np.eye(nrows)
+    nrows, ncols = input_matrix.shape
+    R = input_matrix.copy()
+    Q = np.eye(nrows,dtype=input_matrix.dtype)
+
+    if (input_matrix.dtype == 'complex'):
+        sign = lambda x: x/np.abs(x) if x!= 0 else 1 # For complex matrices sign(x[0]) is taken as x[0]/abs(x[0])
+    else:
+        sign = lambda x: 1 if x >=0 else -1
 
     numIter = min(nrows,ncols)
     for ele in range(numIter):
 
         """ Step 5"""
         x = R[ele::,ele]
-        e = np.zeros((nrows-ele),); e[0] = 1;
+        e = np.zeros((nrows-ele),dtype=input_matrix.dtype); e[0] = 1;
 
         """ Construct the vector"""
-        v = (x + np.sign(x[0])*np.linalg.norm(x)*e)[:,None]
+        norm_x = np.linalg.norm(x)
+        # if (norm_x==0):
+        #     continue # Handle the case when x = 0, v = 0, then we might encounter divide by 0
+        v = (x + sign(x[0])*norm_x*e)[:,None]
 
         """ Construct the Householder matrix"""
-        houseHolderMatrix = np.eye(nrows-ele) - 2*((v @ v.T)/(v.T @ v))
+        houseHolderMatrix = np.eye(nrows-ele,dtype=input_matrix.dtype) - 2*((v @ v.T.conj())/(v.T.conj() @ v))
 
         """ Step 6"""
-        a1 = np.hstack((np.eye(ele),np.zeros((ele,nrows-ele))))
-        a2 = np.hstack((np.zeros((nrows-ele,ele)), houseHolderMatrix))
+        a1 = np.hstack((np.eye(ele,dtype=input_matrix.dtype),np.zeros((ele,nrows-ele),dtype=input_matrix.dtype)))
+        a2 = np.hstack((np.zeros((nrows-ele,ele),dtype=input_matrix.dtype), houseHolderMatrix))
         rotatMatrix = np.vstack((a1,a2))
 
         """ Step 7"""
         R = rotatMatrix @ R
-        Q = Q @ rotatMatrix.T
+        Q = Q @ rotatMatrix.T.conj()
 
     return Q, R
 
