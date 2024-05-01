@@ -34,6 +34,7 @@ But the output is the same.
 Action Item:
     1. Extend the scheme to any generic symbols ad not necessarily numbers
     Only leaf nodes can have symbols, rest all nodes have only data [Done]
+    2. Show size of the Huffman LUT
 
 """
 
@@ -150,7 +151,7 @@ class HuffmanTree:
 
         residualBits = np.mod(len(binaryString),8)
 
-        print('\nActual Data size = {} bytes'.format(len(binaryString)/8))
+        print('\nActual data size = {} bytes'.format(len(binaryString)/8))
         print('Residual bits after bytes formation = {}'.format(residualBits))
 
         numAppendedBits = 8 - residualBits
@@ -162,7 +163,7 @@ class HuffmanTree:
 
         binaryString = headerByte + binaryString + '0'*numAppendedBits
 
-        print('Data size post appending = {}'.format(len(binaryString)/8))
+        print('Data size post appending = {} bytes'.format(len(binaryString)/8))
 
         f = open(outputCompressBinFileName, 'wb')
         chrString = bytearray(int(binaryString[x:x+8], 2) for x in range(0, len(binaryString), 8))
@@ -287,7 +288,7 @@ HTree = HuffmanTree(symbolFreqDict)
 HTree.build_huffman_tree()
 rootNode = HTree.HuffmanTreeList[0]
 HTree.generate_huffman_codes(rootNode, "")
-print(HTree.codeWordDict,'\n')
+# print(HTree.codeWordDict,'\n')
 HTree.compute_entropy()
 textFileToCompress = inputTextFile
 outputCompressedBinaryFile = "compressed.bin"
