@@ -62,7 +62,7 @@ numTargets = 8#np.ceil(np.log2(numRangeSamples/minTargetRangeBin)).astype(np.int
 object_snr = np.linspace(60,-15,numTargets)#np.array([60,10]) #np.array([60,-10])
 weights = np.sqrt(10**((noiseFloordB + object_snr)/10))
 
-targetRangeBins = np.int32(np.linspace(minTargetRangeBin,numRangeSamples-1,numTargets))#minTargetRangeBin* 2**(np.arange(numTargets))#np.array([20,800])
+targetRangeBins = np.int32(np.linspace(minTargetRangeBin,numRangeSamples-2,numTargets))#minTargetRangeBin* 2**(np.arange(numTargets))#np.array([20,800])
 targetDopplerBins = np.random.randint(0,numChirps,size=numTargets)#np.array([0,200])
 targetAngleBins = np.random.randint(0,numRxs,size=numTargets)#np.array([0,2])
 
@@ -131,7 +131,7 @@ if flagDfftPowMean:
     for ele1 in range(numTestCases):
         for ele2 in range(numTargets):
             temp1 = dfftfpconvfloatSpec[ele1,ele2,:]
-            secondSmallestVal = np.unique(temp1)[1]
+            secondSmallestVal = 2**(-2*numFracBitsRangeFFTOutput[ele1].astype(np.float32)) # Replace 0 with 1 LSB value
             temp1[temp1==0] = secondSmallestVal
             dfftfpconvfloatSpec[ele1,ele2,:] = temp1
     dfftfpconvfloatSpecdB = 10*np.log10(dfftfpconvfloatSpec)
@@ -143,7 +143,7 @@ else:
         for ele2 in range(numTargets):
             for ele3 in range(numRxs):
                 temp1 = dfftfpconvfloatAllBitWidthsMagSq[ele1,ele2,:,ele3]
-                secondSmallestVal = np.unique(temp1)[1]
+                secondSmallestVal = 2**(-2*numFracBitsRangeFFTOutput[ele1].astype(np.float32)) # Replace 0 with 1 LSB value
                 temp1[temp1==0] = secondSmallestVal
                 dfftfpconvfloatAllBitWidthsMagSq[ele1,ele2,:,ele3] = temp1
 
@@ -171,11 +171,16 @@ for ele in range(numTestCases):
 rxfftSpecdB = 10*np.log10(np.abs(rxfft[targetRangeBins,targetDopplerBins,:])**2)
 
 rxfftfpconvfloatAllBitWidthsMagSq = np.abs(rxfftfpconvfloatAllBitWidths)**2
-secondSmallestVal = np.unique(rxfftfpconvfloatAllBitWidthsMagSq)[1]
-rxfftfpconvfloatAllBitWidthsMagSq[rxfftfpconvfloatAllBitWidthsMagSq==0] = secondSmallestVal
+for ele1 in range(numTestCases):
+    for ele2 in range(numTargets):
+        temp1 = rxfftfpconvfloatAllBitWidthsMagSq[ele1,targetRangeBins[ele2],targetDopplerBins[ele2],:]
+        if np.any(temp1==0):
+            secondSmallestVal = 2**(-2*numFracBitsRangeFFTOutput[ele1].astype(np.float32)) # Replace 0 with 1 LSB value
+            temp1[temp1==0] = secondSmallestVal
+        rxfftfpconvfloatAllBitWidthsMagSq[ele1,targetRangeBins[ele2],targetDopplerBins[ele2],:] = temp1
 
-rxfftfpconvfloatSpecdB = 10*np.log10(rxfftfpconvfloatAllBitWidthsMagSq)
-rxfftfpconvfloatSpecdB = rxfftfpconvfloatSpecdB[:,targetRangeBins,targetDopplerBins,:]
+rxfftfpconvfloatSpecdB = 10*np.log10(rxfftfpconvfloatAllBitWidthsMagSq[:,targetRangeBins,targetDopplerBins,:])
+
 
 rxnoiseFloordB = doppnoiseFloordB - 10*np.log10(numRxs) # because we are normalizing, the signal power stays same and noise power drops by 10logN
 
