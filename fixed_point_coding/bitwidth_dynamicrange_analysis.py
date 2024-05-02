@@ -128,17 +128,27 @@ if flagDfftPowMean:
     dfftSpecdB = 10*np.log10(np.mean(np.abs(dfft[targetRangeBins,:,:])**2,axis=(2)))
 
     dfftfpconvfloatSpec = np.mean(np.abs(dfftfpconvfloatAllBitWidths[:,targetRangeBins,:,:])**2,axis=(3))
-    secondSmallestVal = np.unique(dfftfpconvfloatSpec)[1]
-    dfftfpconvfloatSpec[dfftfpconvfloatSpec==0] = secondSmallestVal
+    for ele1 in range(numTestCases):
+        for ele2 in range(numTargets):
+            temp1 = dfftfpconvfloatSpec[ele1,ele2,:]
+            secondSmallestVal = np.unique(temp1)[1]
+            temp1[temp1==0] = secondSmallestVal
+            dfftfpconvfloatSpec[ele1,ele2,:] = temp1
     dfftfpconvfloatSpecdB = 10*np.log10(dfftfpconvfloatSpec)
 else:
     dfftSpecdB = 10*np.log10(np.abs(dfft[targetRangeBins,:,0])**2)
 
-    dfftfpconvfloatAllBitWidthsMagSq = np.abs(dfftfpconvfloatAllBitWidths)**2
-    secondSmallestVal = np.unique(dfftfpconvfloatAllBitWidthsMagSq)[1]
-    dfftfpconvfloatAllBitWidthsMagSq[dfftfpconvfloatAllBitWidthsMagSq==0] = secondSmallestVal
+    dfftfpconvfloatAllBitWidthsMagSq = np.abs(dfftfpconvfloatAllBitWidths[:,targetRangeBins,:,:])**2
+    for ele1 in range(numTestCases):
+        for ele2 in range(numTargets):
+            for ele3 in range(numRxs):
+                temp1 = dfftfpconvfloatAllBitWidthsMagSq[ele1,ele2,:,ele3]
+                secondSmallestVal = np.unique(temp1)[1]
+                temp1[temp1==0] = secondSmallestVal
+                dfftfpconvfloatAllBitWidthsMagSq[ele1,ele2,:,ele3] = temp1
+
     dfftfpconvfloatSpecdB = 10*np.log10(dfftfpconvfloatAllBitWidthsMagSq)
-    dfftfpconvfloatSpecdB = dfftfpconvfloatSpecdB[:,targetRangeBins,:,0]
+    dfftfpconvfloatSpecdB = dfftfpconvfloatSpecdB[:,:,:,0]
 
 doppnoiseFloordB = noiseFloordB - 10*np.log10(numChirps) # because we are normalizing, the signal power stays same and noise power drops by 10logN
 
@@ -163,6 +173,7 @@ rxfftSpecdB = 10*np.log10(np.abs(rxfft[targetRangeBins,targetDopplerBins,:])**2)
 rxfftfpconvfloatAllBitWidthsMagSq = np.abs(rxfftfpconvfloatAllBitWidths)**2
 secondSmallestVal = np.unique(rxfftfpconvfloatAllBitWidthsMagSq)[1]
 rxfftfpconvfloatAllBitWidthsMagSq[rxfftfpconvfloatAllBitWidthsMagSq==0] = secondSmallestVal
+
 rxfftfpconvfloatSpecdB = 10*np.log10(rxfftfpconvfloatAllBitWidthsMagSq)
 rxfftfpconvfloatSpecdB = rxfftfpconvfloatSpecdB[:,targetRangeBins,targetDopplerBins,:]
 
@@ -243,9 +254,9 @@ plt.figure(4,figsize=(20,10),dpi=100)
 plt.subplot(1,2,1)
 plt.title('Quantization Noise floor(Minimum representable power) vs bitwidth')
 plt.plot(numBitsRangeFFTOutput,theoretRangeFloorValQuant,'-o')
-plt.axhline(noiseFloordB,label='True RFFT floor',color='k',ls='dashed')
-plt.axhline(doppnoiseFloordB,label='True DFFT floor',color='k',ls='dotted')
-plt.axhline(rxnoiseFloordB,label='True Rx FFT floor',color='k',ls='dashdot')
+plt.axhline(noiseFloordB,label='True RFFT floor = {0:.0f} dB'.format(noiseFloordB),color='k',ls='dashed')
+plt.axhline(doppnoiseFloordB,label='True DFFT floor = {0:.0f} dB'.format(doppnoiseFloordB),color='k',ls='dotted')
+plt.axhline(rxnoiseFloordB,label='True Rx FFT floor = {0:.0f} dB'.format(rxnoiseFloordB),color='k',ls='dashdot')
 plt.xlabel('bitwidth')
 plt.ylabel('dBFs')
 plt.legend()
