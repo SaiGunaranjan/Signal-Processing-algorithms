@@ -39,7 +39,7 @@ Action Item:
 """
 
 import numpy as np
-from collections import Counter
+
 
 
 class Node:
@@ -191,7 +191,7 @@ class HuffmanTree:
         self.decode_data(count,n)
         # self.decode_data_recursion(count,n) # Recursion based decoding works only for smaller lenghts of texts. If the text size is large, then recursion does not work and throws an error
 
-        textString = "".join(HTree.symbolList) # Collapse the list of symbols(strings in this case) to a large string/text
+        textString = "".join(self.symbolList) # Collapse the list of symbols(strings in this case) to a large string/text
 
         f = open(outputDecompressedTextFile, 'w')
         f.write(textString)
@@ -254,45 +254,5 @@ class HuffmanTree:
 
 
 
-def load_text_file_character_by_character(filename):
-  """Loads a text file character by character.
 
-  Args:
-    filename: The name of the text file to load.
-
-  Returns:
-    A list of characters in the text file.
-  """
-
-  with open(filename, "r") as f:
-    characters = []
-    while True:
-      c = f.read(1)
-      if not c:
-        break
-      characters.append(c)
-
-
-    return characters
-
-inputTextFile = "uncompressed.txt"
-characters = load_text_file_character_by_character(inputTextFile)
-occurrences = Counter(characters)
-symbolFreqDict = {}
-for element, count in occurrences.items():
-    symbolFreqDict[element] = count
-
-# symbolFreqDict = {'A':32,'B':16, 'C':8, 'D': 4, 'E':2, 'F': 1} #{'A':2,'B':4, 'C':5, 'D': 9, 'E':19, 'F': 38}
-
-HTree = HuffmanTree(symbolFreqDict)
-HTree.build_huffman_tree()
-rootNode = HTree.HuffmanTreeList[0]
-HTree.generate_huffman_codes(rootNode, "")
-# print(HTree.codeWordDict,'\n')
-HTree.compute_entropy()
-textFileToCompress = inputTextFile
-outputCompressedBinaryFile = "compressed.bin"
-HTree.encode_data(textFileToCompress, outputCompressedBinaryFile)
-outputDecompressedTextFile = "decompressed.txt"
-HTree.decode_data_wrapper(outputCompressedBinaryFile, outputDecompressedTextFile)
 
