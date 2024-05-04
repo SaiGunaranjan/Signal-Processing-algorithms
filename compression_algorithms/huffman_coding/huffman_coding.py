@@ -66,15 +66,28 @@ class HuffmanTree:
             self.listNodes.append(Node(value, key))
 
 
+    # def sort_nodes(self,listNodes):
+
+    #     n = len(listNodes)
+    #     for i in range(n):
+    #         for j in range(0, n-i-1):
+    #             if listNodes[j].data > listNodes[j+1].data:
+    #                 listNodes[j], listNodes[j+1] = listNodes[j+1], listNodes[j]
+
+    #     return listNodes
+
     def sort_nodes(self,listNodes):
 
         n = len(listNodes)
+        dataList = []
         for i in range(n):
-            for j in range(0, n-i-1):
-                if listNodes[j].data > listNodes[j+1].data:
-                    listNodes[j], listNodes[j+1] = listNodes[j+1], listNodes[j]
+            dataList.append(listNodes[i].data)
+
+        ind = sorted(range(n), key = dataList.__getitem__)
+        listNodes = [listNodes[i] for i in ind]
 
         return listNodes
+
 
     def build_huffman_tree(self):
 
