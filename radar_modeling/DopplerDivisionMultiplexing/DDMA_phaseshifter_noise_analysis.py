@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 
 
 plt.close('all')
-
+np.random.seed(3) # 3
 
 """ Chirp Parameters"""
 numTx_simult = 4
@@ -102,6 +102,8 @@ objectRangeBin = objectRange/rangeRes
 rangeMoved = objectRange + objectVelocity_mps*interRampTime*np.arange(numRamps)
 rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
 
+
+
 """ Phase shifter settings"""
 """ With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
 numBitsPhaseShifter = 7
@@ -126,6 +128,11 @@ rampPhaseIdeal_degWrapped = np.mod(rampPhaseIdeal_deg, 360)
 phaseCodesIndexToBeApplied = np.argmin(np.abs(rampPhaseIdeal_degWrapped[:,:,None] - phaseShifterCodes_withNoise[None,None,:]),axis=2)
 phaseCodesToBeApplied = phaseShifterCodes_withNoise[phaseCodesIndexToBeApplied]
 phaseCodesToBeApplied_rad = (phaseCodesToBeApplied/180) * np.pi
+
+objectVelocityBinNewScale = (objectVelocityBin/numRamps)*numDoppFFT
+binOffset_Txphase = (phaseStepPerRamp_rad/(2*np.pi))*numDoppFFT
+dopplerBinsToSample = np.round(objectVelocityBinNewScale + binOffset_Txphase).astype('int32')
+dopplerBinsToSample = np.mod(dopplerBinsToSample, numDoppFFT)
 
 rfftBinSNRArray = np.arange(-15,70,4)
 numCases = len(rfftBinSNRArray)
@@ -194,7 +201,7 @@ for ele in range(numCases):
 
     powerMeanSpectrum_arossRxs = np.mean(signalFFTShiftSpectrum,axis=1) # Take mean spectrum across Rxs
     noiseFloorEstFromSignal = 10*np.log10(np.mean(powerMeanSpectrum_arossRxs[200:450]))#10*np.log10(np.percentile(powerMeanSpectrum_arossRxs,70))
-    signalPowerDoppSpectrum = 10*np.log10(np.amax(powerMeanSpectrum_arossRxs))
+    signalPowerDoppSpectrum = 10*np.log10(np.amax(powerMeanSpectrum_arossRxs[dopplerBinsToSample]))
     snrDoppSpectrum = signalPowerDoppSpectrum - noiseFloorEstFromSignal
     noiseFloorSetByDNL = signalPowerDoppSpectrum + dBcnoiseFloorSetByDNL
 
