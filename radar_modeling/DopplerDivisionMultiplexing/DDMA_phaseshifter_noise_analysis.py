@@ -68,6 +68,13 @@ rangeRes = lightSpeed/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
 
+""" Derived Parameters """
+chirpSamplingRate = 1/interRampTime
+maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
+FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
+velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
+
+
 
 ## RF parameters
 thermalNoise = -174 # dBm/Hz
@@ -91,13 +98,7 @@ signalAmplitude = np.sqrt(signalPower)
 signalPhase = np.exp(1j*np.random.uniform(-np.pi, np.pi))
 signalphasor = signalAmplitude*signalPhase
 
-""" Derived Parameters """
-chirpSamplingRate = 1/interRampTime
-maxVelBaseband_mps = (chirpSamplingRate/2) * (lamda/2) # m/s
-# print('Max base band velocity = {0:.2f} m/s'.format(maxVelBaseband_mps))
-FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
-velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
-# print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
+
 
 """ Target definition"""
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
@@ -212,9 +213,11 @@ snrDoppSpectrum = signalPowerDoppSpectrum - noiseFloorEstFromSignal
 noiseFloorSetByDNL = signalPowerDoppSpectrum + dBcnoiseFloorSetByDNL
 thermalNoiseFloorPostDFFT = noiseFloor_perBin - 10*np.log10(numRamps)
 
-print('\nSNR post Doppler FFT: {} dB'.format(np.round(snrDoppSpectrum)))
+# print('\nSNR post Doppler FFT: {} dB'.format(np.round(snrDoppSpectrum)))
+print('Actual Thermal Noise Floor post Doppler FFT: {} dB'.format(np.round(thermalNoiseFloorPostDFFT)))
 print('Noise Floor Estimated from Doppler domain: {} dB'.format(np.round(noiseFloorEstFromSignal)))
-print('Noise Floor set by DNL: {} dBc'.format(np.round(dBcnoiseFloorSetByDNL)))
+print('Actual phase shifter noise floor: {} dB'.format(np.round(noiseFloorSetByDNL)))
+print('Noise Floor set by {0} Tx phase shifter DNL: {1} dBc'.format(numTx_simult, np.round(dBcnoiseFloorSetByDNL)))
 
 
 
