@@ -52,21 +52,13 @@ import matplotlib.pyplot as plt
 plt.close('all')
 
 
+""" Chirp Parameters"""
 numTx_simult = 4
 numRx = 4
 numRamps = 512
-
 numSamp = 2048 # Number of ADC time domain samples
 numSampPostRfft = numSamp//2
-numAngleFFT = 2048
-mimoArraySpacing = 2e-3 # 2mm
 lightSpeed = 3e8
-numBitsPhaseShifter = 7
-numPhaseCodes = 2**numBitsPhaseShifter
-DNL = 360/(numPhaseCodes) # DNL in degrees
-
-
-""" Chirp Parameters"""
 numDoppFFT = 512#2048
 chirpBW = 1e9 # Hz
 centerFreq = 76.5e9 # GHz
@@ -75,8 +67,6 @@ rampSamplingRate = 1/interRampTime
 rangeRes = lightSpeed/(2*chirpBW)
 maxRange = numSampPostRfft*rangeRes # m
 lamda = lightSpeed/centerFreq
-""" With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
-phaseStepPerTx_deg = 29#29.3
 
 
 ## RF parameters
@@ -109,13 +99,11 @@ FsEquivalentVelocity = 2*maxVelBaseband_mps # Fs = 2*Fs/2
 velocityRes = (chirpSamplingRate/numRamps) * (lamda/2)
 # print('Velocity resolution = {0:.2f} m/s'.format(velocityRes))
 
-
 """ Target definition"""
 objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
 objectVelocity_mps = 0
 objectAzAngle_deg = np.random.uniform(-50,50)
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
-
 
 objectVelocity_baseBand_mps = np.mod(objectVelocity_mps, FsEquivalentVelocity) # modulo Fs [from 0 to Fs]
 objectVelocityBin = objectVelocity_baseBand_mps/velocityRes
@@ -123,6 +111,12 @@ objectRangeBin = objectRange/rangeRes
 rangeMoved = objectRange + objectVelocity_mps*interRampTime*np.arange(numRamps)
 rangeBinsMoved = np.floor(rangeMoved/rangeRes).astype('int32')
 
+""" Phase shifter settings"""
+""" With 30 deg, we see periodicity since 30 divides 360 but with say 29 deg, it doesn't divide 360 and hence periodicity is significantly reduced"""
+numBitsPhaseShifter = 7
+numPhaseCodes = 2**numBitsPhaseShifter
+DNL = 360/(numPhaseCodes) # DNL in degrees
+phaseStepPerTx_deg = 29#29.3
 phaseStepPerRamp_deg = np.array([ 0.      , 28.828125, 57.65625 , 86.484375])#np.arange(numTx_simult)*phaseStepPerTx_deg # Phase step per ramp per Tx
 phaseStepPerRamp_rad = (phaseStepPerRamp_deg/360)*2*np.pi
 
