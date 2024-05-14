@@ -52,15 +52,14 @@ rxdecompGT[1::2] = rxImagdecompGT
 
 
 contComp = ContiCompression(signalBitwidth,numMantissaBits,numComplexRxs)
-contComp.compress_rx_samples(rxRealGT,rxImagGT)
-compressedData = contComp.compressedRxSamples
+compressedData = contComp.compress_rx_samples(rxRealGT,rxImagGT)
 # print('GT compressed data = {}, implementation compressed data = {}\n'.format(compressedDataGT,compressedData))
 if (compressedDataGT == compressedData):
     print('Compressed data exactly matches!\n')
 else:
     print('Compressed data mismatch!!!')
 
-contComp.decompress_rx_samples()
+contComp.decompress_rx_samples(compressedData)
 rxRealdecomp = contComp.rxSamplesRealRecon
 rxImagdecomp = contComp.rxSamplesImagRecon
 

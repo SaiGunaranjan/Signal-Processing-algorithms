@@ -148,14 +148,16 @@ class ContiCompression:
             temp = channelMantissa << (self.totalBitsPerSamp - self.numBlockShiftBits - (ele1+1)*self.numMantissaBits)
             self.compressedRxSamples  = self.compressedRxSamples | temp
 
+        return self.compressedRxSamples
 
 
-    def decompress_rx_samples(self):
 
-        self.blockShiftReconstr = self.compressedRxSamples >> (self.numMantissaBits * self.numRealRxChannels)
+    def decompress_rx_samples(self, compressedRxSamples):
+
+        self.blockShiftReconstr = compressedRxSamples >> (self.numMantissaBits * self.numRealRxChannels)
         self.decompressedRxSamples = np.zeros((self.numRealRxChannels),dtype=np.uint32)
         for ele3 in range(self.numRealRxChannels):
-            channelMantissaRecon = (self.compressedRxSamples >> self.numMantissaBits*ele3) & 0x7F
+            channelMantissaRecon = (compressedRxSamples >> self.numMantissaBits*ele3) & 0x7F
             msbRecon = channelMantissaRecon >> (self.numMantissaBits-1)
             if msbRecon == 1:
                 signExtensionPart = np.uint32((2**self.blockShiftReconstr - 1) << (self.signalBitwidth - self.blockShiftReconstr))
