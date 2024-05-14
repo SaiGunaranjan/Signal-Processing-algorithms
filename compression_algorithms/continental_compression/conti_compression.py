@@ -134,8 +134,16 @@ class ContiCompression:
 
         self.compressedRxSamples = np.uint64(0) # Initialize as a uint 64 bit number
         self.compressedRxSamples = self.blockShift << (self.totalBitsPerSamp - self.numBlockShiftBits)
+        """When block shift is large, we may not be able to get numMantissaBits number of valid mantissa bits,
+        in that case append zeros to the end or equivalently, left shift the data by the remaining bits required to get
+        numMantissaBits number of bits"""
         for ele1 in range(self.numRealRxChannels):
-            rxSamplesRealImagQuant = rxSampRealImag[ele1] >> (self.signalBitwidth - (self.blockShift + self.numMantissaBits))
+            precisionBitsDropped = (self.signalBitwidth - (self.blockShift + self.numMantissaBits))
+            if precisionBitsDropped >= 0:
+                rxSamplesRealImagQuant = rxSampRealImag[ele1] >> precisionBitsDropped
+            else:
+                numValidMantissaBits = np.uint32(self.signalBitwidth - self.blockShift)
+                rxSamplesRealImagQuant = rxSampRealImag[ele1] << (self.numMantissaBits - numValidMantissaBits)
             channelMantissa = rxSamplesRealImagQuant & 0x7F # 127 (pick the 7 LSBs(mantissa bits) without the sig extension/block shift bits)
             temp = channelMantissa << (self.totalBitsPerSamp - self.numBlockShiftBits - (ele1+1)*self.numMantissaBits)
             self.compressedRxSamples  = self.compressedRxSamples | temp
