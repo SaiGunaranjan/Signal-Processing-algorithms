@@ -89,11 +89,17 @@ class ContiCompression:
         self.numComplexRxChannels = numComplexRxChannels
         self.numRealRxChannels = 2*self.numComplexRxChannels
         compressedDataSize = self.numMantissaBits*self.numRealRxChannels
-        self.totalBitsPerSamp = int(2**(np.ceil(np.log2(compressedDataSize))))
+        self.totalBitsPerSamp = int(2**(np.ceil(np.log2(compressedDataSize)))) #64
         self.numBlockShiftBits =  self.totalBitsPerSamp - compressedDataSize  # numBlockShiftBits also called sign extension bits
+        self.compressionRatio = int((self.signalBitwidth*self.numRealRxChannels)/self.totalBitsPerSamp)
+
+
+    def print_compression_ratio(self):
+
+        print('{}x compression achieved!'.format(self.compressionRatio))
+
 
     def compute_blockshift(self, rxSampRealImag):
-
 
         self.BlockShiftArray = np.zeros(self.numRealRxChannels,dtype=np.uint32)
         for ele2 in range(self.numRealRxChannels):
