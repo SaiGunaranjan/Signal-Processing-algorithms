@@ -144,7 +144,7 @@ class ContiCompression:
             else:
                 numValidMantissaBits = np.uint32(self.signalBitwidth - self.blockShift)
                 rxSamplesRealImagQuant = rxSampRealImag[ele1] << (self.numMantissaBits - numValidMantissaBits)
-            channelMantissa = rxSamplesRealImagQuant & 0x7F # 127 (pick the 7 LSBs(mantissa bits) without the sig extension/block shift bits)
+            channelMantissa = rxSamplesRealImagQuant & (2**self.numMantissaBits - 1)#0x7F # 127 (pick the 7 LSBs(mantissa bits) without the sig extension/block shift bits)
             temp = channelMantissa << (self.totalBitsPerSamp - self.numBlockShiftBits - (ele1+1)*self.numMantissaBits)
             self.compressedRxSamples  = self.compressedRxSamples | temp
 
@@ -157,7 +157,7 @@ class ContiCompression:
         self.blockShiftReconstr = compressedRxSamples >> (self.numMantissaBits * self.numRealRxChannels)
         self.decompressedRxSamples = np.zeros((self.numRealRxChannels),dtype=np.uint32)
         for ele3 in range(self.numRealRxChannels):
-            channelMantissaRecon = (compressedRxSamples >> self.numMantissaBits*ele3) & 0x7F
+            channelMantissaRecon = (compressedRxSamples >> self.numMantissaBits*ele3) & (2**self.numMantissaBits - 1)#0x7F
             msbRecon = channelMantissaRecon >> (self.numMantissaBits-1)
             if msbRecon == 1:
                 signExtensionPart = np.uint32((2**self.blockShiftReconstr - 1) << (self.signalBitwidth - self.blockShiftReconstr))
