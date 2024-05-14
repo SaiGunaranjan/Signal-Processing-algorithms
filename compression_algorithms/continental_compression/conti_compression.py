@@ -105,18 +105,15 @@ class ContiCompression:
         for ele2 in range(self.numRealRxChannels):
             if (rxSampRealImag[ele2] != 0):
                 msb = rxSampRealImag[ele2] >> (self.signalBitwidth-1) # msb can be 0 or 1. 0 for positive numbers and 1 for negative numbers
-                # print('MSB = {} for channel {}'.format(msb,ele2))
                 bitFromLeft = msb
                 count = 0
-                # if ele2 == 3:
-                #     print('Im here')
                 while bitFromLeft == msb:
                     count += 1
                     bitFromLeft = (rxSampRealImag[ele2] & (np.uint32(1) << (self.signalBitwidth-1-count))) >> (self.signalBitwidth-1-count)
                 self.BlockShiftArray[ele2] = count - 1
             else:
                 self.BlockShiftArray[ele2] = self.signalBitwidth-1
-            # print('Block shift for channel {} is {}'.format(ele2,BlockShiftArray[ele2]))
+
 
 
         self.blockShift = np.amin(self.BlockShiftArray) # as type uint64
@@ -125,8 +122,8 @@ class ContiCompression:
     def compress_rx_samples(self,rxSamplesReal, rxSamplesImag):
 
         """
-        rxSamplesReal: should be signalBitwidth and datatype uint32
-        rxSamplesImag: should be signalBitwidth and datatype uint32
+        rxSamplesReal: should be signalBitwidth and datatype uint32 i.e. 2's complement format
+        rxSamplesImag: should be signalBitwidth and datatype uint32 i.e. 2's complement format
 
         """
         rxSampRealImag = np.zeros((self.numRealRxChannels,),dtype=np.uint32) # storing as 2's complement form which is like uint
