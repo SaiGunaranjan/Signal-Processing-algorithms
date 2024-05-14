@@ -6,33 +6,7 @@ Created on Fri Dec  3 16:36:29 2021
 """
 
 """
-Multiplicative noise or phase noise appears as a product term to the signal where as additive noise appears
-as an additive term to the signal.
-Multiplicative noise --> x[n] = s[n] * w[n]
-Additive noise       --> x[n] = s[n] + w[n]
-Since the phase noise appears as a product to the signal term, as the signal amplitude increases,
-the phase noise also starts scaling.
-
-In this script, I have shown how the phase shifter quantization noise (PSQN) appears as a
-multiplicative noise (phase noise) and hence limits the SNR for strong targets. More specifically,
-I will show that the phase shifter quantization noise is a dBc noise (or phase noise or multiplicative noise)
-and scales with the signal power beyond a point. For weaker SNR targets, the phase noise floor
-will be buried below the thermal floor (post Doppler FFT). When the SNR of the targets increases
-and reaches >=58 dB (PSQN floor for 512 ramps), the SNR will saturate to the phase noise i.e 58 dBc (in this case).
-
-1. For low SNR targets, the PSQN is buried below the thermal floor(post Doppler FFT).
-2. For very strong targets (Doppler FFT SNR >> 58 dBc), the PSQN limits the SNR. So, targets having
-Doppler FFT SNR >= 58dBc, will all report the same SNR.
-3. Mathematically, this can be written as:
-SNR_PSQN  = SNR ; SNR < PSQN
-            PSQN; SNR ≥ PSQN
-	where,
-	 SNR_PSQN is Doppler FFT SNR with phase shifter quantization noise(PSQN) for 4 Tx DDMA system,
-	 SNR is the Doppler FFT SNR without PSQN
-	 PSQN = 58 dBc for 512 ramps, 4 TX DDMA system with 7 bit phase shifter covering 360°
-
-Phase shifter Quantization noise power(for 4 Tx) spread over 512 ramps/Doppler bins = (Δ^2 / 12) * (4 / 512)
-PSQN (dBc) = 10log_10 ((Δ^2 / 12) * (4 / 512)) ~ 58 dBc
+This script compares the SNR without any compression and with Conti compression schem.
 """
 
 
@@ -198,7 +172,7 @@ for ele in range(numCases):
     noise = noise.reshape(numRamps, numRx, numSamp)
     signal = signal + noise
 
-    signal_rangeWin = signal#*np.hanning(numSamp)[None,None,:]
+    signal_rangeWin = signal
     signal_rfft = np.fft.fft(signal_rangeWin,axis=2)/numSamp
     signal_rfft = signal_rfft[:,:,0:numSampPostRfft]
     """ Quantize RFFT"""
@@ -229,17 +203,16 @@ for ele in range(numCases):
     doppNoiseFloorArr[ele] = noiseFloorEstFromSignal
     noiseFloorSetByDNLArr[ele] = noiseFloorSetByDNL
 
+
+
     """ With Compression/decompression"""
     signal_rfftQuantReal = np.real(signal_rfftQuant).astype(np.uint32)
     signal_rfftQuantImag = np.imag(signal_rfftQuant).astype(np.uint32)
 
     signal_rfftQuantRealdecomp = np.zeros((numRamps,numRx,numSampPostRfft),dtype=np.uint32)
     signal_rfftQuantImagdecomp = np.zeros((numRamps,numRx,numSampPostRfft),dtype=np.uint32)
-
     for ele1 in range(numSampPostRfft):
         for ele2 in range(numRamps):
-            # if (ele+1 == 20):
-            #     print('rbin = {}/{}, dbin = {}/{}'.format(ele1,numSampPostRfft,ele2,numRamps))
             rxSamplesReal, rxSamplesImag = signal_rfftQuantReal[ele2,:,ele1], signal_rfftQuantImag[ele2,:,ele1]
             compressedData = contCompr.compress_rx_samples(rxSamplesReal,rxSamplesImag)
             signExtensionBits[ele1,ele2,:,ele] = contCompr.BlockShiftArray
@@ -258,9 +231,9 @@ for ele in range(numCases):
     chirpSamp_givenRangeBin_decomp = chirpSamp_givenRangeBin_decomp*binMigrationPhasorCorrTerm[:,None]
     chirpSamp_givenRangeBin_decomp = chirpSamp_givenRangeBin_decomp*rbmModulationCorrectionTerm[:,None]
 
-    signalWindoweddecomp = chirpSamp_givenRangeBin_decomp#*np.hanning(numRamps)[:,None]
+    signalWindoweddecomp = chirpSamp_givenRangeBin_decomp
     signalFFTdecomp = np.fft.fft(signalWindoweddecomp, axis=0, n = numDoppFFT)/numRamps
-    signalFFTShiftdecomp = signalFFTdecomp #np.fft.fftshift(signalFFT, axes= (0,))
+    signalFFTShiftdecomp = signalFFTdecomp
     signalFFTShiftSpectrumdecomp = np.abs(signalFFTShiftdecomp)**2
     signalMagSpectrumdecomp = 10*np.log10(np.abs(signalFFTShiftSpectrumdecomp))
 
@@ -268,18 +241,10 @@ for ele in range(numCases):
     noiseFloorEstFromSignaldecomp = 10*np.log10(np.mean(powerMeanSpectrum_arossRxsdecomp[200:450]))#10*np.log10(np.percentile(powerMeanSpectrum_arossRxs,70))
     signalPowerDoppSpectrumdecomp = 10*np.log10(np.amax(powerMeanSpectrum_arossRxsdecomp[dopplerBinsToSample]))
     snrDoppSpectrumdecomp = signalPowerDoppSpectrumdecomp - noiseFloorEstFromSignaldecomp
-    # noiseFloorSetByDNLdecomp = signalPowerDoppSpectrumdecomp + dBcnoiseFloorSetByDNL
 
     doppSpecdecomp[ele,:] = 10*np.log10(powerMeanSpectrum_arossRxsdecomp)
     doppSignalPowerArrdecomp[ele] = signalPowerDoppSpectrumdecomp
     doppNoiseFloorArrdecomp[ele] = noiseFloorEstFromSignaldecomp
-    # noiseFloorSetByDNLArrdecomp[ele] = noiseFloorSetByDNLdecomp
-
-
-    # #print('\nSNR post Doppler FFT: {} dB'.format(np.round(snrDoppSpectrum)))
-    # print('Actual Thermal Noise Floor post Doppler FFT: {} dB'.format(np.round(thermalNoiseFloorPostDFFT)))
-    # print('Noise Floor Estimated from Doppler domain: {} dB'.format(np.round(noiseFloorEstFromSignal)))
-    # print('Actual phase shifter noise floor: {} dB'.format(np.round(noiseFloorSetByDNL)))
 
 
     print('{0} / {1} cases completed'.format(ele+1, numCases))
