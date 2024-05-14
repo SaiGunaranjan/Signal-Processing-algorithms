@@ -238,8 +238,8 @@ for ele in range(numCases):
 
     for ele1 in range(numSampPostRfft):
         for ele2 in range(numRamps):
-            if (ele+1 == 20):
-                # print('rbin = {}/{}, dbin = {}/{}'.format(ele1,numSampPostRfft,ele2,numRamps))
+            # if (ele+1 == 20):
+            #     print('rbin = {}/{}, dbin = {}/{}'.format(ele1,numSampPostRfft,ele2,numRamps))
             rxSamplesReal, rxSamplesImag = signal_rfftQuantReal[ele2,:,ele1], signal_rfftQuantImag[ele2,:,ele1]
             compressedData = contCompr.compress_rx_samples(rxSamplesReal,rxSamplesImag)
             signExtensionBits[ele1,ele2,:,ele] = contCompr.BlockShiftArray
