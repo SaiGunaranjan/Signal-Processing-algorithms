@@ -51,7 +51,6 @@ numMantissaBits = 7 #4
 contCompr = ContiCompression(numBitsRangeFFTOutput,numMantissaBits,numRx)
 
 
-
 ## RF parameters
 thermalNoise = -174 # dBm/Hz
 noiseFigure = 9 # dB
@@ -69,8 +68,6 @@ totalNoisePower = noisePower_perBin*numSamp # sigmasquare totalNoisePower
 sigma = np.sqrt(totalNoisePower)
 
 thermalNoiseFloorPostDFFT = noiseFloor_perBin - 10*np.log10(numRamps)
-
-
 
 
 """ Target definition"""
@@ -158,9 +155,7 @@ for ele in range(numCases):
     rangeBinMigration = \
         np.exp(1j*2*np.pi*chirpSlope*(2*objectVelocity_mps/lightSpeed)*interRampTime*adcSamplingTime*np.arange(numRamps)[:,None]*np.arange(numSamp)[None,:])
 
-
     rxSignal = np.exp(1j*2*np.pi*0.5*np.sin(objectAzAngle_rad)*np.arange(numRx))
-
     signal_phaseCode = np.exp(1j*phaseCodesToBeApplied_rad)
     phaseCodedTxSignal = dopplerTerm[None,:] * signal_phaseCode # [numTx, numRamps]
     phaseCodedTxRxSignal = phaseCodedTxSignal[:,:,None]*rxSignal[None,None,:] #[numTx, numRamps, numTx, numRx]
@@ -249,8 +244,6 @@ for ele in range(numCases):
 
     print('{0} / {1} cases completed'.format(ele+1, numCases))
 
-print('\n\nNoise Floor set by {0} Tx phase shifter DNL: {1} dBc'.format(numTx_simult, np.round(dBcnoiseFloorSetByDNL)))
-
 measuredSNRPostDoppFFT = doppSignalPowerArr - doppNoiseFloorArr
 trueSNRPostDoppFFT = rfftBinSNRArray + 10*np.log10(numRamps)
 measuredSNRPostDoppFFTdecomp = doppSignalPowerArrdecomp - doppNoiseFloorArrdecomp
@@ -278,7 +271,6 @@ plt.xlabel('Doppler Bins')
 plt.ylabel('Power dBFs')
 plt.grid(True)
 plt.ylim([thermalNoiseFloorPostDFFT+dBcnoiseFloorSetByDNL, 0])
-
 plt.subplot(1,2,2)
 plt.title('RFFT SNR = {} dB'.format(rfftBinSNRArray[-1]))
 plt.plot(doppSpec[-1,:], lw=2,label='without compression')
@@ -312,8 +304,6 @@ plt.xlabel('Expected SNR dB (post Dopp FFT)')
 plt.ylabel('Measured SNR dB (post Dopp FFT)')
 plt.legend()
 plt.grid(True)
-
-
 
 
 plt.figure(4,figsize=(20,10),dpi=200)
