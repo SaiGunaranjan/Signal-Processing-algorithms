@@ -18,8 +18,8 @@ from conti_compression import ContiCompression
 
 
 plt.close('all')
-np.random.seed(3) # 3
 
+# np.random.seed(3)
 
 
 """ Chirp Parameters"""
@@ -27,7 +27,7 @@ numTx_simult = 4
 numRx = 4 # Increased number of Rxs from 4 to 32 to get a smoother averaging of signal/noise power
 numRamps = 512
 numSamp = 2048 # Number of ADC time domain samples
-numSampPostRfft = 50#numSamp//2
+numSampPostRfft = 3 # Processing only 3 range bins. Since others are of no use. Saves compute.
 lightSpeed = 3e8
 numDoppFFT = 512#2048
 chirpBW = 1e9 # Hz
@@ -71,7 +71,7 @@ thermalNoiseFloorPostDFFT = noiseFloor_perBin - 10*np.log10(numRamps)
 
 
 """ Target definition"""
-objectRange = np.random.uniform(10,maxRange-10) # 60.3 # m
+objectRange = 1*rangeRes # Fixing the taregt range bin to range bin = 1 out of the total 3 range bins for processing
 objectVelocity_mps = 0
 objectAzAngle_deg = np.random.uniform(-50,50)
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
@@ -200,8 +200,8 @@ for ele in range(numCases):
 
 
 
-    """ With Compression/decompression"""
-    signal_rfftQuantReal = np.real(signal_rfftQuant).astype(np.uint32)
+    """ With Conti Compression/decompression"""
+    signal_rfftQuantReal = np.real(signal_rfftQuant).astype(np.uint32) # required in 2's complement format and hence typecast as uint
     signal_rfftQuantImag = np.imag(signal_rfftQuant).astype(np.uint32)
 
     signal_rfftQuantRealdecomp = np.zeros((numRamps,numRx,numSampPostRfft),dtype=np.uint32)
