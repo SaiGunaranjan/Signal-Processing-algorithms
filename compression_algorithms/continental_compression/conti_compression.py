@@ -166,6 +166,9 @@ class ContiCompression:
 
             self.decompressedRxSamples[self.numRealRxChannels-ele3-1] = signExtensionPart | (channelMantissaRecon << \
                                                            (self.signalBitwidth-self.blockShiftReconstr-self.numMantissaBits))
+            """ The below step is performed to reduce the spurs due to quantization.
+            Instead of filling the bits post mantissa bits with all 0's, we fill it with 1 followed by zeros. This reduces the spurs"""
+            self.decompressedRxSamples[self.numRealRxChannels-ele3-1] |= (1 << (self.signalBitwidth-self.blockShiftReconstr-self.numMantissaBits-1))
 
 
         self.rxSamplesRealRecon = self.decompressedRxSamples[0::2] # uint32

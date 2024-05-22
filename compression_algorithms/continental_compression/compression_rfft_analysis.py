@@ -72,7 +72,7 @@ thermalNoiseFloorPostDFFT = noiseFloor_perBin - 10*np.log10(numRamps)
 
 """ Target definition"""
 objectRange = 1*rangeRes # Fixing the taregt range bin to range bin = 1 out of the total 3 range bins for processing
-objectVelocity_mps = 0
+objectVelocity_mps = 25*velocityRes
 objectAzAngle_deg = np.random.uniform(-50,50)
 objectAzAngle_rad = (objectAzAngle_deg/360) * (2*np.pi)
 
@@ -226,7 +226,7 @@ for ele in range(numCases):
     chirpSamp_givenRangeBin_decomp = chirpSamp_givenRangeBin_decomp*binMigrationPhasorCorrTerm[:,None]
     chirpSamp_givenRangeBin_decomp = chirpSamp_givenRangeBin_decomp*rbmModulationCorrectionTerm[:,None]
 
-    signalWindoweddecomp = chirpSamp_givenRangeBin_decomp
+    signalWindoweddecomp = chirpSamp_givenRangeBin_decomp#*np.hanning(numRamps)[:,None]
     signalFFTdecomp = np.fft.fft(signalWindoweddecomp, axis=0, n = numDoppFFT)/numRamps
     signalFFTShiftdecomp = signalFFTdecomp
     signalFFTShiftSpectrumdecomp = np.abs(signalFFTShiftdecomp)**2
