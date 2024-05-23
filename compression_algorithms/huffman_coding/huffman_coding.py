@@ -235,8 +235,7 @@ class HuffmanTree:
         print('Compressed data size post appending = {} bytes'.format(len(arrayOfBytes)))
 
         f = open(outputCompressBinFileName, 'wb')
-        chrString = arrayOfBytes
-        f.write(chrString)
+        f.write(arrayOfBytes)
         f.close()
 
         print('\nCompleted data encoding....')
@@ -285,16 +284,6 @@ class HuffmanTree:
                     break
                 else:
                     n += 1
-
-
-
-
-
-
-
-
-
-
 
 
 
