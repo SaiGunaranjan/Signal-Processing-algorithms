@@ -8,6 +8,7 @@ Created on Fri May  3 11:14:26 2024
 
 from collections import Counter
 from huffman_coding import HuffmanTree
+import time as time
 
 def load_text_file_character_by_character(filename):
   """Loads a text file character by character.
@@ -43,11 +44,20 @@ HTree = HuffmanTree(symbolFreqDict)
 HTree.build_huffman_tree()
 rootNode = HTree.HuffmanTreeList[0]
 HTree.generate_huffman_codes(rootNode, "")
-# print(HTree.codeWordDict,'\n')
+longest_key, longest_string = HTree.find_longest_string(HTree.codeWordDict)
+print('\nSymbol {} has the largest length = {}\n'.format(longest_key,len(longest_string)))
 HTree.compute_entropy()
 
 textFileToCompress = inputTextFile
 outputCompressedBinaryFile = "compressed.bin"
+t1 = time.time()
 HTree.encode_data(textFileToCompress, outputCompressedBinaryFile)
+t2 = time.time()
+timeEncoding = t2 - t1
+print('Total time for Huffman Endoding = {0:.2f} sec'.format(timeEncoding))
+
 outputDecompressedTextFile = "decompressed.txt"
 HTree.decode_data_wrapper(outputCompressedBinaryFile, outputDecompressedTextFile)
+t3 = time.time()
+timeDecoding = t3 - t2
+print('Total time for Huffman Decoding = {0:.2f} min'.format(timeDecoding/60))

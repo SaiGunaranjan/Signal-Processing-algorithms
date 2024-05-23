@@ -129,6 +129,22 @@ class HuffmanTree:
 
 
 
+    def find_longest_string(self,dictionary):
+        if not dictionary:  # Check if the dictionary is empty
+            return None
+
+        longest_key = None
+        longest_string = ""
+
+        for key, value in dictionary.items():
+            if len(value) > len(longest_string):
+                longest_string = value
+                longest_key = key
+
+        return longest_key, longest_string
+
+
+
     def compute_entropy(self):
 
         count = 0
@@ -151,35 +167,75 @@ class HuffmanTree:
         print('Average code length = {0:.2f}'.format(self.averageWordLength))
 
 
+
+    # def encode_data(self,inputTextFileName, outputCompressBinFileName):
+
+    #     """ This function/method of encoding the data is very compute heavy due to suboptimal implementation"""
+
+    #     with open(inputTextFileName, "r") as f:
+    #         binaryString = ""
+    #         while True:
+    #             symbol = f.read(1)
+    #             if not symbol:
+    #                 break
+    #             binaryString += self.codeWordDict[symbol]
+
+    #     residualBits = np.mod(len(binaryString),8)
+
+    #     print('\nCompressed data size = {} bytes'.format(len(binaryString)/8))
+    #     print('Residual bits after bytes formation = {}'.format(residualBits))
+
+    #     numAppendedBits = 8 - residualBits
+    #     numAppendedBitsBinary = bin(numAppendedBits)[2::]
+    #     """ Header byte carries the info about how many bits were appended at the end. To make the header
+    #     also as a byte, we appened 8-len(numAppendedBitsBinary) number of 0 bits to the binary representation of
+    #     # of appened bits to make the header 1 byte"""
+    #     headerByte = '0'*(8-len(numAppendedBitsBinary))  + numAppendedBitsBinary
+
+    #     binaryString = headerByte + binaryString + '0'*numAppendedBits
+
+    #     print('Compressed data size post appending = {} bytes'.format(len(binaryString)/8))
+
+    #     f = open(outputCompressBinFileName, 'wb')
+    #     chrString = bytearray(int(binaryString[x:x+8], 2) for x in range(0, len(binaryString), 8))
+    #     f.write(chrString)
+    #     f.close()
+
+    #     print('\nCompleted data encoding....')
+
+
     def encode_data(self,inputTextFileName, outputCompressBinFileName):
 
 
         with open(inputTextFileName, "r") as f:
             binaryString = ""
+            arrayOfBytes = bytearray([])
             while True:
                 symbol = f.read(1)
                 if not symbol:
                     break
                 binaryString += self.codeWordDict[symbol]
+                """ Pack into byte arrays as and when the binary string reaches length = 8"""
+                if len(binaryString) == 8:
+                    arrayOfBytes += bytearray([int(binaryString, 2)])
+                    binaryString = ""
+                elif len(binaryString) > 8:
+                    arrayOfBytes += bytearray([int(binaryString[0:8], 2)])
+                    binaryString = binaryString[8::]
 
-        residualBits = np.mod(len(binaryString),8)
 
-        print('\nActual data size = {} bytes'.format(len(binaryString)/8))
+        residualBits = len(binaryString)
+        print('\nCompressed data size = {} bytes'.format(len(arrayOfBytes) + residualBits/8))
         print('Residual bits after bytes formation = {}'.format(residualBits))
-
         numAppendedBits = 8 - residualBits
-        numAppendedBitsBinary = bin(numAppendedBits)[2::]
-        """ Header byte carries the info about how many bits were appended at the end. To make the header
-        also as a byte, we appened 8-len(numAppendedBitsBinary) number of 0 bits to the binary representation of
-        # of appened bits to make the header 1 byte"""
-        headerByte = '0'*(8-len(numAppendedBitsBinary))  + numAppendedBitsBinary
-
-        binaryString = headerByte + binaryString + '0'*numAppendedBits
-
-        print('Data size post appending = {} bytes'.format(len(binaryString)/8))
+        headerByte = bytearray(np.array([numAppendedBits],dtype=np.uint8))
+        arrayOfBytes = headerByte + arrayOfBytes
+        binaryStringByteAlign = binaryString + '0'*numAppendedBits # Append 0s at end to make the residual bits byte aligned
+        arrayOfBytes += bytearray([int(binaryStringByteAlign, 2)])
+        print('Compressed data size post appending = {} bytes'.format(len(arrayOfBytes)))
 
         f = open(outputCompressBinFileName, 'wb')
-        chrString = bytearray(int(binaryString[x:x+8], 2) for x in range(0, len(binaryString), 8))
+        chrString = arrayOfBytes
         f.write(chrString)
         f.close()
 
