@@ -251,14 +251,9 @@ class HuffmanTree:
         numBitsappended = int(headerByteString,2)
         self.decodedbinaryString = self.decodedbinaryString[8:-numBitsappended] # Strip the header and the extra padded 0 bits
 
-        self.symbolList = [] # create a placeholder to decoded symbols
-
         print('\nCommencing decoding....')
 
-        count = 0
-        n = 0
-        self.decode_data(count,n)
-        # self.decode_data_recursion(count,n) # Recursion based decoding works only for smaller lenghts of texts. If the text size is large, then recursion does not work and throws an error
+        self.decode_data()
 
         textString = "".join(self.symbolList) # Collapse the list of symbols(strings in this case) to a large string/text
 
@@ -270,29 +265,11 @@ class HuffmanTree:
 
 
 
+    def decode_data(self):
 
-    # def decode_data_recursion(self,count,n):
-
-    #     if count == len(self.decodedbinaryString): # Replace later with count == len(self.decodedbinaryString)
-    #         return
-    #     if self.decodedbinaryString[count:count+n] in self.codeWordDict.values():
-    #         for symbol, codeword in self.codeWordDict.items():
-    #             if (codeword == self.decodedbinaryString[count:count+n]):
-    #                 self.symbolList.append(symbol)
-    #                 break
-
-
-    #         count = count + n #+ 1
-    #         n = 0
-
-    #     self.count = count
-
-    #     self.decode_data_recursion(count,n+1)
-
-
-    def decode_data(self,count,n):
-
-
+        self.symbolList = [] # create a placeholder to decoded symbols
+        count = 0
+        n = 0
         while count < len(self.decodedbinaryString):
             while True:
                 if count+n > len(self.decodedbinaryString):
