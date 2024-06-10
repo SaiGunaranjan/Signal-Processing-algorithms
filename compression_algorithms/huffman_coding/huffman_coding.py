@@ -222,6 +222,10 @@ class HuffmanTree:
                 elif len(binaryString) > 8:
                     arrayOfBytes += bytearray([int(binaryString[0:8], 2)])
                     binaryString = binaryString[8::]
+        
+        while len(binaryString) > 8:
+            arrayOfBytes += bytearray([int(binaryString[0:8], 2)])
+            binaryString = binaryString[8::]
 
 
         residualBits = len(binaryString)
@@ -248,7 +252,11 @@ class HuffmanTree:
         self.decodedbinaryString = "".join(f"{n:08b}" for n in open(CompressBinFileName, "rb").read()) # Converts byte array to bitstring
         headerByteString = self.decodedbinaryString[0:8] # Extract the header byte carrying info about the number of 0 bits padded at end
         numBitsappended = int(headerByteString,2)
-        self.decodedbinaryString = self.decodedbinaryString[8:-numBitsappended] # Strip the header and the extra padded 0 bits
+        
+        if (numBitsappended!=0):
+            self.decodedbinaryString = self.decodedbinaryString[8:-numBitsappended] # Strip the header and the extra padded 0 bits
+        else:
+            self.decodedbinaryString = self.decodedbinaryString[8::] # Strip the header and the extra padded 0 bits
 
         print('\nCommencing decoding....')
 
