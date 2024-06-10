@@ -139,6 +139,14 @@ def music_backward(received_signal, num_sources, corr_mat_model_order, digital_f
             auto_corr_matrix += np.matmul(received_signal[ele::-1,:],received_signal[ele::-1,:].T.conj())
         else:
             auto_corr_matrix += np.matmul(received_signal[ele:ele-corr_mat_model_order:-1,:],received_signal[ele:ele-corr_mat_model_order:-1,:].T.conj())
+
+    """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
+    The proof for this is available in a technical report by MIT Lincoln laboratory by Evans, Johnson, Sun.
+    The report was published in 1982. The proof is available in page 2-30. The link to the pdf is available in the below link:
+        https://archive.ll.mit.edu/mission/aviation/publications/publication-files/technical_reports/Evans_1982_TR-582_WW-18359.pdf
+    """
+    # auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5
+
     auto_corr_matrix = auto_corr_matrix/signal_length # Divide the auto-correlation matrix by the signal length
     u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
     noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
@@ -158,6 +166,122 @@ def music_backward(received_signal, num_sources, corr_mat_model_order, digital_f
     AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
     pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
     return pseudo_spectrum
+
+
+def music_snapshots(received_signal, num_sources, num_samples, digital_freq_grid):
+
+    signal_length = received_signal.shape[0]
+    numSnapshots = received_signal.shape[1]
+
+    received_signal = np.flipud(received_signal) # Need to remove this compute and push the sign change to the peak picking
+    auto_corr_matrix = received_signal @ np.conj(received_signal.T) # E[YY*] is accomplished as summation (yi * yih)
+
+    """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
+    The proof for this is available in a technical report by MIT Lincoln laboratory by Evans, Johnson, Sun.
+    The report was published in 1982. The proof is available in page 2-30. The link to the pdf is available in the below link:
+        https://archive.ll.mit.edu/mission/aviation/publications/publication-files/technical_reports/Evans_1982_TR-582_WW-18359.pdf
+    """
+    auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5
+
+    auto_corr_matrix = auto_corr_matrix/signal_length # Divide the auto-correlation matrix by the signal length
+    u, s, vh = np.linalg.svd(auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
+    noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
+    vandermonde_matrix = np.exp(-1j*np.outer(np.arange(num_samples),digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies
+
+    """ The below step is to reduce the compute by taking only 1 noise subspace eigen vector and
+    performing FFT on it instead of on all the noise subspace eigen vectors. Theoretically this is correct
+    but with real data, using all the noise subspace eigen vectors and taking FFT and then
+    magnitude square and sum across all the FFTed noise subspace eigen vectors helps
+    give a smoother pseudo spectrum. If we use only 1/2 noise subspace eigen vectors, The true peaks are
+    undisturbed but some smaller flase peaks start to show up. Using all the noise subspace eigen vectors helps smoothen
+    and eliminate the false peaks.
+    Thus I have taken only 2 of the noise subpace eigen vectors instead of all. Enable below line
+    if you want to use only 1/2 noise subspace eigen vectors to reduce compute.
+    """
+
+    """ GhA can be computed in 2 ways:
+        1. As a correlation with a vandermonde matrix
+        2. Oversampled FFT of each of the noise subspace vectors
+        Both 1 and 2 are essentially one and the same. But 1 is compute heavy in terms of MACS while 2 is more FFT friendly
+
+    """
+    # GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+    GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
+    AhG = GhA.conj() # A*G
+    AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
+    pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
+    return pseudo_spectrum
+
+if 0:
+    def music_denso(received_signal, num_sources, num_samples, digital_freq_grid):
+
+        """ For this method, the signal length must be an odd number to achieve the symmetry and
+        hence convert the Qh A to a real matrix"""
+
+        signal_length = received_signal.shape[0]
+        if (np.mod(signal_length,2) == 0):
+            print('\n\nSignal length is even! Will not achieve optimal performance for Denso MUSIC\n\n')
+
+        numSnapshots = received_signal.shape[1]
+
+        # received_signal = np.flipud(received_signal)
+        auto_corr_matrix = (received_signal @ np.conj(received_signal.T)) # E[YY*] is accomplished as summation (yi * yih)
+
+        M = np.floor(signal_length/2).astype('int32')
+        identityMat = np.eye(M)
+        jmat = np.zeros((M,M))
+        jmat[np.arange(M),np.arange(M-1,-1,-1)] = 1
+        numRemainingElements = signal_length - 2*M
+
+        topRowQmat = np.hstack((identityMat,np.zeros((M,numRemainingElements)),1j*identityMat))
+        middleRowQmat = np.hstack((np.zeros((numRemainingElements,M)),np.sqrt(2)*np.ones((numRemainingElements,numRemainingElements)),\
+                                   np.zeros((numRemainingElements,M))))
+        bottomRowQmat = np.hstack((jmat,np.zeros((M,numRemainingElements)),-1j*jmat))
+        Qmat = (np.vstack((topRowQmat,middleRowQmat,bottomRowQmat)))/np.sqrt(2)
+
+        """ The below step is done to improve noise spatial smoothing which further improves the resolvability.
+        The proof for this is available in a technical report by MIT Lincoln laboratory by Evans, Johnson, Sun.
+        The report was published in 1982. The proof is available in page 2-30. The link to the pdf is available in the below link:
+            https://archive.ll.mit.edu/mission/aviation/publications/publication-files/technical_reports/Evans_1982_TR-582_WW-18359.pdf
+        """
+        # auto_corr_matrix = (auto_corr_matrix + np.fliplr(np.flipud(np.conj(auto_corr_matrix))))*0.5 # This step not in paper. I have added this step. Seems to give a better performance
+
+        modified_auto_corr_matrix = np.real(Qmat.T.conj() @ auto_corr_matrix @ Qmat) # As mentioned in paper. Doesn't seem to be working
+        # modified_auto_corr_matrix = np.real(Qmat @ auto_corr_matrix @ Qmat.T.conj()) # This seems to be working better than above.
+
+        # modified_auto_corr_matrix = (modified_auto_corr_matrix + np.fliplr(np.flipud(modified_auto_corr_matrix)))*0.5 # This step not in paper. I have added this step. Seems to give a better performance
+
+        modified_auto_corr_matrix = modified_auto_corr_matrix/numSnapshots # Divide the auto-correlation matrix by the signal length
+        u, s, vh = np.linalg.svd(modified_auto_corr_matrix) # Perform SVD of the Auto-correlation matrix
+        noise_subspace = u[:,num_sources::] # The first # number of sources eigen vectors belong to the signal subspace and the remaining eigen vectors of U belong to the noise subspace which is orthogonal to the signal subspace. Hence pick these eigen vectors
+        vandermonde_matrix = np.exp(1j*np.outer(np.arange(num_samples)-M,digital_freq_grid)) # [num_samples,num_freq] # construct the vandermond matrix for several uniformly spaced frequencies
+
+        """ The below step is to reduce the compute by taking only 1 noise subspace eigen vector and
+        performing FFT on it instead of on all the noise subspace eigen vectors. Theoretically this is correct
+        but with real data, using all the noise subspace eigen vectors and taking FFT and then
+        magnitude square and sum across all the FFTed noise subspace eigen vectors helps
+        give a smoother pseudo spectrum. If we use only 1/2 noise subspace eigen vectors, The true peaks are
+        undisturbed but some smaller flase peaks start to show up. Using all the noise subspace eigen vectors helps smoothen
+        and eliminate the false peaks.
+        Thus I have taken only 2 of the noise subpace eigen vectors instead of all. Enable below line
+        if you want to use only 1/2 noise subspace eigen vectors to reduce compute.
+        """
+
+        """ GhA can be computed in 2 ways:
+            1. As a correlation with a vandermonde matrix
+            2. Oversampled FFT of each of the noise subspace vectors
+            Both 1 and 2 are essentially one and the same. But 1 is compute heavy in terms of MACS while 2 is more FFT friendly
+
+        """
+        GhA = np.matmul(noise_subspace.T.conj(),vandermonde_matrix) #G*A essentially projects the vandermond matrix (which spans the signal subspace) on the noise subspace
+        # GhA = np.fft.fftshift(np.fft.fft(noise_subspace.T.conj(),n=len(digital_freq_grid),axis=1),axes=(1,)) # Method 2
+        AhG = GhA.conj() # A*G
+        AhGGhA = np.sum(AhG*GhA,axis=0) # A*GG*A
+        # pseudo_spectrum = np.sum(np.real(vandermonde_matrix * vandermonde_matrix.conj()), axis=0) /np.abs(AhGGhA) # Pseudo spectrum
+        pseudo_spectrum = 1/np.abs(AhGGhA) # Pseudo spectrum
+        return pseudo_spectrum
+
+
 
 def esprit_toeplitz(received_signal, num_sources):
     signal_length = len(received_signal)
@@ -394,7 +518,126 @@ def iaa_recursive_levinson_temp(received_signal, digital_freq_grid, iterations):
     return spectrum
 
 
+"""
 
+Spatially Variant Apodization
+
+In this script, I have implemented a technique called Spatially Variant Apodization (SVA). SVA is a like for like replacement
+for a windowed FFT. A typical windowed FFT is characterized by main lobe width and side lobe level.
+Rectangular window has very good main lobe width but poor SLLs (13 dBc). Hanning window has poor main lobe width but good side
+SLLs (31 dBc). SVA is a technique which combines the best of both these windows. It gives the main lobe width of a rectangular window
+while giving the SLL of a Hanning window. Thus it gives the best of both worlds. The working principle of SVA is as follows:
+
+The SVA attemps to select a different window function for each frequency. Let us understand this more closely.
+A raised cosine window is a generic window which is controlled by an alpha parameter. The functional form of the window is
+1-2*alpha*cos(2*pi/N*n), where 'alpha' lies in [0,0.5], 'N' is the number of samples and 'n' varies from 0 to N-1.
+When 'alpha' = 0, the raised cosine window becomes a rectangular window. When 'alpha' = 0.5, the window becomes a hanning window.
+By varying alpha from 0 to 0.5 in fine steps, we can create multiple variants of the raised cosine window.
+A brute force version of the SVA is as follows. Subject the signal to each of these windows and perform an FFT on each of
+the windowed signals. This results in several FFTs of the signal each with a different window. Now, compute the psd/magnitude square
+of each of these FFTs. To obtain the final psd/spectrum, take minimum along the window axis. This results in a spectrum which has
+minimum energy at each frequency point across all window function. In essence, we are selecting a window function which generates
+the minimum energy at each frequency point. Since, we are selecting munimum energy at each frequency point (across all windows),
+this will result in minimum SLLs as well as best main lobe width. But this brute force method requires heavy compute since
+we need to generate several windows and multiply the signal also with each of these windows and compute FFT on each of these signals.
+Finally we also need to take a minimum for each of the frequency point. This is serioulsy heavy compute as well as memory.
+This can be circumvented by implementing the optimized version of the SVA. For this, we need to take a closer look at the structure
+of the raised cosine window. The functional form of the window is w[n] = 1-2*alpha*cos(2*pi/N*n).
+If we assume the signal of interest is x[n], then the windowed signal is y[n] = x[n]w[n]. Now multiplication in time domain is
+equivalent to convolution in the frequency domain. So if we were to analyse the windowed signal in the Fourier domain,
+we get Y(w) = X(w) * W(w), where * denotes convolution operation. Now W(w) = 2pi * ( delta(w) - alpha*[delta(w-2*pi/N) + delta(w+2*pi/N)]).
+So,  Y(w) = 2pi * (X(w) - alpha*[X(w-2pi/N) + X(w+2pi/N)]). Now, the optimum value of alpha(at each frequency) is chosen by
+minimizing the magnitude squared of Y(w) over all alpha lying between 0 to 0.5. This is a constrained optimization problem.
+Solving this, we obtain a closed form expression for alpha at each frequency point omega.
+Hence alpha is a function of the omega chosen. The other details of the derivation are available in the paper link below:
+https://saigunaranjan.atlassian.net/wiki/spaces/RM/pages/22249477/Spatially+Variant+Apodization
+
+After obtaining a closed form expression for alpha and substituting in the expression for Y(w), we obtain the spectrum for SVA.
+This method of computing the SVA spectrum is computationally light. As evident from the closed form expression for alpha,
+the only major compute (apart from the FFT computation of x[n]) is an N point division for an N point oversampled FFT.
+So there are N complex divisions corresponding to each of the N frequency points.
+I have implemented both the brute force method as well as the optimized method of SVA and have generated the results.
+Both thse methods seem to be closely matching. The results are on expected lines with the SVA offering the best SLLS as well as
+main lobe width.
+
+Currently I have tested and observed the magnitude spectrum performance of SVA. Need to check if SVA can also be used to extract
+the phase information from the complex spectrum. In other words, is SVA (optimized version) a spectral estimator like APES or
+a pseudo spectral estimator like MUSIC which gives info about the sinusoids present in the signal but not the phase of the sinusoids.
+One thing is clear, the SVA-brute force is a pseudo spectral estimator since we pick the maximum energy across several windows
+for each frequency point. SInce it operates on the energy to obatin the final spectrum, it is a pseudo spectral estimator. But I need
+to check if SVA-optimized is a spectral estimator which gives the phase of the sinusoid as well.
+"""
+
+
+def spatially_variant_apodization_bruteforce(received_signal,numFFTOSR):
+
+    """
+    received_signal should be a column vector e.g: 32 x 1
+
+    """
+    num_samples = received_signal.shape[0]
+    alpha = np.linspace(0,0.5,100)
+    svaWindow = 1 - 2*alpha[None,:]*np.cos(2*np.pi*np.arange(num_samples)[:,None]/num_samples)
+    signalWindowed = received_signal * svaWindow
+    svaSignalFFT = np.fft.fft(signalWindowed,n=numFFTOSR,axis=0)/num_samples
+    svaSignalFFTShift = np.fft.fftshift(svaSignalFFT,axes=(0,))
+    svaSignalPsd = np.abs(svaSignalFFTShift)**2
+    svaSignalPsdNormalized = svaSignalPsd/np.amax(svaSignalPsd,axis=0)[None,:]
+    svaSpectralEstimator = np.amin(svaSignalPsdNormalized,axis=1)
+    svaSpectralEstimatordB_unoptimal = 10*np.log10(svaSpectralEstimator)
+
+    return svaSpectralEstimatordB_unoptimal
+
+
+def spatially_variant_apodization_optimized(received_signal, osrFact):
+
+
+    num_samples = received_signal.shape[0]
+    received_signal_sva = np.squeeze(received_signal)
+    numFFTOSR = osrFact*num_samples
+    signalFFT = np.fft.fft(received_signal_sva,n=numFFTOSR,axis=0)/num_samples # Is normalization required here for sva
+    Xk = signalFFT
+    kmKInd = np.arange(0,numFFTOSR) - osrFact
+    kmKInd[kmKInd<0] += numFFTOSR
+    XkmK = Xk[kmKInd]
+    kpKInd = np.arange(0,numFFTOSR) + osrFact
+    kpKInd[kpKInd>numFFTOSR-1] -= numFFTOSR
+    XkpK = Xk[kpKInd]
+    alphaK = np.real(Xk/(XkmK+XkpK))
+    alphaK[alphaK<0] = 0
+    alphaK[alphaK>0.5] = 0.5
+    svaspectrum = Xk - alphaK*(XkmK+XkpK)
+    svaOptimalComplexSpectrumfftshifted = np.fft.fftshift(svaspectrum)
+    svaOptimalMagSpectrumdB = 20*np.log10(np.abs(svaOptimalComplexSpectrumfftshifted))
+    svaOptimalMagSpectrumdB -= np.amax(svaOptimalMagSpectrumdB)
+
+    return svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB
+
+
+def spatially_variant_apodization_multidimension(received_signal, osrFact, apod_axis):
+
+
+    num_samples = received_signal.shape[apod_axis]
+    received_signal_sva = received_signal
+    numFFTOSR = osrFact*num_samples
+    signalFFT = np.fft.fft(received_signal_sva,n=numFFTOSR,axis=apod_axis)/num_samples # Is normalization required here for sva
+    Xk = signalFFT
+    kmKInd = np.arange(0,numFFTOSR) - osrFact
+    kmKInd[kmKInd<0] += numFFTOSR
+    # XkmK = Xk[kmKInd,:]
+    XkmK = np.take(Xk,kmKInd,axis=apod_axis)
+    kpKInd = np.arange(0,numFFTOSR) + osrFact
+    kpKInd[kpKInd>numFFTOSR-1] -= numFFTOSR
+    # XkpK = Xk[kpKInd,:]
+    XkpK = np.take(Xk,kpKInd,axis=apod_axis)
+    alphaK = np.real(Xk/(XkmK+XkpK))
+    alphaK[alphaK<0] = 0
+    alphaK[alphaK>0.5] = 0.5
+    svaspectrum = Xk - alphaK*(XkmK+XkpK)
+    svaOptimalComplexSpectrumfftshifted = np.fft.fftshift(svaspectrum,axes=(apod_axis,))
+    svaOptimalMagSpectrumdB = 20*np.log10(np.abs(svaOptimalComplexSpectrumfftshifted))
+
+    return svaOptimalComplexSpectrumfftshifted, svaOptimalMagSpectrumdB
 
 
 
