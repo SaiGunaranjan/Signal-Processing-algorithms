@@ -45,7 +45,8 @@ HTree.build_huffman_tree()
 rootNode = HTree.HuffmanTreeList[0]
 HTree.generate_huffman_codes(rootNode, "")
 longest_key, longest_string = HTree.find_longest_string(HTree.codeWordDict)
-print('\nSymbol {} has the largest length = {}\n'.format(longest_key,len(longest_string)))
+print('\nSymbol {} has the largest code word length = {}\n'.format(longest_key,len(longest_string)))
+HTree.codeWordStructure()
 HTree.compute_entropy()
 
 textFileToCompress = inputTextFile
