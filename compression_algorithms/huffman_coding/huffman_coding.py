@@ -129,6 +129,20 @@ class HuffmanTree:
 
 
 
+    def codeWordStructure(self):
+
+        """ Sort Dictionary based on the increasing order of length of code words"""
+        sorted_items = sorted(self.codeWordDict.items(), key=lambda x: len(x[1]))
+        sorted_dict = dict(sorted_items)
+        self.codeWordDictSort = {key: value for key, value in sorted_dict.items()}
+
+        self.symbols = list(self.codeWordDictSort.keys())
+        self.codeWords = list(self.codeWordDictSort.values())
+        self.codeWordsLen = [len(ele) for ele in self.codeWords]
+        self.LenDict = len(self.codeWordDict)
+
+
+
     def find_longest_string(self,dictionary):
         if not dictionary:  # Check if the dictionary is empty
             return None
@@ -223,6 +237,10 @@ class HuffmanTree:
                     arrayOfBytes += bytearray([int(binaryString[0:8], 2)])
                     binaryString = binaryString[8::]
 
+        while len(binaryString) > 8:
+            arrayOfBytes += bytearray([int(binaryString[0:8], 2)])
+            binaryString = binaryString[8::]
+
 
         residualBits = len(binaryString)
         print('\nCompressed data size = {} bytes'.format(len(arrayOfBytes) + residualBits/8))
@@ -248,7 +266,11 @@ class HuffmanTree:
         self.decodedbinaryString = "".join(f"{n:08b}" for n in open(CompressBinFileName, "rb").read()) # Converts byte array to bitstring
         headerByteString = self.decodedbinaryString[0:8] # Extract the header byte carrying info about the number of 0 bits padded at end
         numBitsappended = int(headerByteString,2)
-        self.decodedbinaryString = self.decodedbinaryString[8:-numBitsappended] # Strip the header and the extra padded 0 bits
+
+        if (numBitsappended!=0):
+            self.decodedbinaryString = self.decodedbinaryString[8:-numBitsappended] # Strip the header and the extra padded 0 bits
+        else:
+            self.decodedbinaryString = self.decodedbinaryString[8::] # Strip the header and the extra padded 0 bits
 
         print('\nCommencing decoding....')
 
@@ -269,21 +291,74 @@ class HuffmanTree:
         self.symbolList = [] # create a placeholder to decoded symbols
         count = 0
         n = 0
-        while count < len(self.decodedbinaryString):
-            while True:
+        index = 0
+        while count < len(self.decodedbinaryString): # This loop is for incrementing count
+            while True: # This loop is for incrementing n
                 if count+n > len(self.decodedbinaryString):
                     return
-                if self.decodedbinaryString[count:count+n] in self.codeWordDict.values():
-                    for symbol, codeword in self.codeWordDict.items():
-                        if (codeword == self.decodedbinaryString[count:count+n]):
-                            self.symbolList.append(symbol)
-                            break
 
-                    count = count + n
-                    n = 0
+                for ele1 in range(index,self.LenDict):
+                    codeword = self.codeWords[ele1]
+                    lenCodeWord = self.codeWordsLen[ele1]
+                    if (lenCodeWord > len(self.decodedbinaryString[count:count+n])):
+                        flag_codefound = False
+                        break
+                    elif (lenCodeWord == len(self.decodedbinaryString[count:count+n])):
+                        if (codeword == self.decodedbinaryString[count:count+n]):
+                            flag_codefound = True
+                            self.symbolList.append(self.symbols[ele1])
+                            count = count + n
+                            n = 0
+                            index = 0
+                            break
+						#else it just continue for loop
+                if flag_codefound == True:
                     break
                 else:
                     n += 1
+                    index = ele1
+
+
+    # def decode_data(self):
+
+    #     self.symbolList = [] # create a placeholder to decoded symbols
+    #     count = 0
+    #     n = 0
+    #     while count < len(self.decodedbinaryString):
+    #         while True:
+    #             if count+n > len(self.decodedbinaryString):
+    #                 return
+    #             if self.decodedbinaryString[count:count+n] in self.codeWordDict.values():
+    #                 code = self.decodedbinaryString[count:count+n]
+    #                 symbol = list(self.codeWordDict.keys()) [list(self.codeWordDict.values()).index(code)]
+    #                 self.symbolList.append(symbol)
+
+    #                 count = count + n
+    #                 n = 0
+    #                 break
+    #             else:
+    #                 n += 1
+
+    # def decode_data(self):
+
+    #     self.symbolList = [] # create a placeholder to decoded symbols
+    #     count = 0
+    #     n = 0
+    #     while count < len(self.decodedbinaryString):
+    #         while True:
+    #             if count+n > len(self.decodedbinaryString):
+    #                 return
+    #             if self.decodedbinaryString[count:count+n] in self.codeWordDict.values():
+    #                 for symbol, codeword in self.codeWordDict.items():
+    #                     if (codeword == self.decodedbinaryString[count:count+n]):
+    #                         self.symbolList.append(symbol)
+    #                         break
+
+    #                 count = count + n
+    #                 n = 0
+    #                 break
+    #             else:
+    #                 n += 1
 
 
 
